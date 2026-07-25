@@ -1,0 +1,642 @@
+We need to be able to declare dependency to our shared platform services so that Aspire can start them
+
+---
+
+<task-notification>
+<task-id>abf4e53a78ed999ef</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-robinhultman-dev-intropy-tooling-intropy-topology/676ac302-a06d-4990-89ee-19ad06833472/tasks/abf4e53a78ed999ef.output</output-file>
+<status>completed</status>
+<summary>Agent "Explore topology DSL and Aspire backend" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report follows.
+
+# intropy-topology — codebase report for "declare dependency to shared platform services"
+
+## 0. Repo shape
+
+```
+src/Intropy.Topology/                 core DSL + model + validation (zero deps)
+src/Intropy.Topology.Generation/      SystemTopology -&gt; Dapr YAML + runtime config; check|graph|generate (zero deps)
+src/Intropy.Topology.Aspire/          F5 run backend (Aspire.Hosting, CommunityToolkit Dapr, Cronos)
+examples/OrderFlow.SystemHost/        reference declaration + entry point
+examples/order-extractor|order-loader flat sibling projects resolved by folder convention
+test/Intropy.Topology{,.Generation,.Aspire}.Test/
+docs/{index,getting-started}.md, docs/concepts/*.md, docs/decisions/0001..0010
+```
+Solution: `/Users/robinhultman/dev/intropy/tooling/intropy-topology/Intropy.Topology.slnx`. Central package versions in `Directory.Packages.props` (only Aspire.Hosting 13.4.6, Aspire.Hosting.AppHost, Aspire.Hosting.Testing, CommunityToolkit.Aspire.Hosting.Dapr 13.0.0, Cronos 0.13.0 — **no `Aspire.Hosting.PostgreSQL`/`Redis`/`RabbitMQ` integration packages are referenced anywhere**).
+
+Git history is squashed to 4 commits (root `99be93e feat: import minimal topology core`); the `full-topology` branch referenced by ADR 0009/CLAUDE.md is **not present in this repo** (branches: `main`, `chore/port-minimal-core`, `fix/dapr-rabbitmq-startup-race`, `entire/checkpoints/v1`). So the removed platform-service code is not recoverable here — only its design is (see §6).
+
+---
+
+## 1. src/Intropy.Topology structure
+
+### `/src/Intropy.Topology/SystemBuilder.cs` (85 lines)
+```csharp
+public sealed class SystemBuilder
+{
+    private readonly List&lt;Component&gt; _components = [];
+    public string SystemName { get; }
+    internal IReadOnlyList&lt;Component&gt; Components =&gt; _components;
+    public static SystemBuilder Create(string systemName);
+    public ExtractorBuilder AddExtractor(string name);
+    public LoaderBuilder AddLoader(string name);
+    public TransactionalIntegrationBuilder AddTransactionalIntegration(string name);
+    public SystemTopology Build();                                       // throws TopologyValidationException
+    public bool TryBuild(out SystemTopology?, out IReadOnlyList&lt;TopologyDiagnostic&gt;);
+    public IReadOnlyList&lt;TopologyDiagnostic&gt; Validate();
+    private T Register&lt;T&gt;(T component) where T : Component;
+}
+```
+Single declaration-ordered `List&lt;Component&gt;`; no `AddTopic`, no `AddService` — resources materialize from usage. This is the natural insertion point either for a new `Add*`-style declaration or (per the removed design) nothing at all if a shared service is referenced by a `ServiceRef` static field like `TopicRef`/`ConnectorRef`.
+
+### `/src/Intropy.Topology/Components.cs` (92 lines)
+`public abstract class Component` is the recording state. Public surface: `Name`, `Kind`. Internal recorded calls + mutators:
+```csharp
+internal const string DefaultPort = "default";
+internal string? ScheduleCall { get; private set; }
+internal IReadOnlyList&lt;TopicRef&gt; SubscribeCalls { get; }
+internal IReadOnlyList&lt;(string Port, TopicRef Topic)&gt; PublishCalls { get; }
+internal IReadOnlyList&lt;(ConnectorRef Connector, ConnectorDirection Direction)&gt; ConnectorCalls { get; }
+internal void AddSubscribe(TopicRef);
+internal void AddPublish(TopicRef);
+internal void AddConnector(ConnectorRef, ConnectorDirection);
+internal void SetSchedule(string cron);   // ArgumentException.ThrowIfNullOrWhiteSpace
+```
+Sealed subclasses: `ExtractorComponent`, `LoaderComponent`, `TransactionalIntegrationComponent` (each just passes a `ComponentKind`).
+
+A "uses shared service" declaration would add exactly one more pair here: `internal IReadOnlyList&lt;ServiceRef&gt; ServiceCalls` + `internal void AddService(ServiceRef)`.
+
+### `/src/Intropy.Topology/Building/ComponentBuilders.cs` (105 lines)
+```csharp
+public abstract class ComponentBuilder&lt;TSelf, TComponent&gt;
+    where TSelf : ComponentBuilder&lt;TSelf, TComponent&gt; where TComponent : Component
+{
+    private protected ComponentBuilder(TComponent component) =&gt; Component = component;
+    public TComponent Component { get; }
+}
+public sealed class ExtractorBuilder : ComponentBuilder&lt;ExtractorBuilder, ExtractorComponent&gt;
+{
+    public ExtractorBuilder From(ConnectorRef connector);      // AddConnector(..., In)
+    public ExtractorBuilder Publishes(TopicRef topic);         // AddPublish
+    public ExtractorBuilder WithSchedule(string cron);         // SetSchedule
+}
+public sealed class LoaderBuilder  { Subscribes(TopicRef); To(ConnectorRef); }
+public sealed class TransactionalIntegrationBuilder { From(ConnectorRef); To(ConnectorRef); }
+```
+Design invariant (CLAUDE.md, ADR 0001/0003): **the builder's members are exactly that block's legal grammar** — an illegal edge is a compile error, not a diagnostic. So a `Uses(ServiceRef)` placed on all three builders (or on the shared base) is the decision point: base class ⇒ every block may use a service; per-builder ⇒ compile-time restriction.
+
+### `/src/Intropy.Topology/Refs.cs` (142 lines)
+```csharp
+public abstract record TopicRef { public string PubSubName; public string TopicName; public abstract Type ContractType; }
+public sealed record TopicRef&lt;T&gt; : TopicRef { public static TopicRef&lt;T&gt; Define([ConstantExpected] string pubSubName, [ConstantExpected] string topicName); }
+
+public sealed record ConnectorRef
+{
+    public string Name { get; }            // DNS-1123 label
+    public Transport Transport { get; }
+    public static ConnectorRef Define([ConstantExpected] string name, Transport transport);
+}
+
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "$transport")]
+[JsonDerivedType(typeof(FileTransport), "file")]
+public abstract record Transport
+{
+    public abstract string DaprType { get; }                 // e.g. "bindings.localstorage"
+    public static Transport File([ConstantExpected] string rootPath) =&gt; new FileTransport(rootPath);
+}
+public sealed record FileTransport : Transport { public override string DaprType =&gt; "bindings.localstorage"; public string RootPath { get; } }
+```
+`Transport` is the closest existing precedent for "a closed, polymorphic, JSON-discriminated hierarchy of infrastructure kinds" — a `ServiceKind`/`PlatformService` hierarchy (Redis / Postgres / …) would mirror it exactly (`$transport` → e.g. `$service`), including the `[JsonDerivedType]` registration a new kind must be added to (round-trip is asserted in `EndToEndTests.Serialize_WithSampleSystem_ShouldRoundTrip`).
+
+Names validated eagerly at the call site via `NameRules.RequireLabel` / `RequireSubdomain` (`/src/Intropy.Topology/Validation/NameRules.cs`). Its doc comment already says "resource names (topic, pubsub, **service**) must be DNS-1123 subdomains" — a leftover from the removed feature.
+
+### Model — `/src/Intropy.Topology/Model/`
+`SystemTopology.cs`:
+```csharp
+public sealed record SystemTopology
+{
+    public required string SystemName { get; init; }
+    public required IReadOnlyList&lt;ComponentModel&gt; Components { get; init; }
+    public required IReadOnlyList&lt;TopicResource&gt; Topics { get; init; }
+    public required IReadOnlyList&lt;ConnectorResource&gt; Connectors { get; init; }
+}
+```
+`ComponentModel.cs`: `{ Name, Kind, string? Schedule, IReadOnlyList&lt;TopicSubscription&gt; Subscribes, IReadOnlyList&lt;PublishEdge&gt; Publishes, IReadOnlyList&lt;ConnectorEdge&gt; Connectors }` — all `required`.
+
+`Edges.cs` (34 lines): `TopicSubscription { PubSubName, TopicName }`, `PublishEdge { Port, PubSubName, TopicName }`, `ConnectorEdge { ConnectorName, Direction }`. A `ServiceUseEdge { ServiceName }` belongs here (grouped-file rule, CLAUDE.md).
+
+`Resources.cs` (44 lines): `TopicResource { PubSubName, TopicName, ContractTypeName, Publishers, Subscribers }`, `ConnectorResource { Name, Transport, DaprComponentName =&gt; $"binding.{Name}", Directions, UsedBy }`. A `ServiceResource { Name, &lt;kind&gt;, UsedBy }` belongs here.
+
+`Enums.cs` (24 lines): `ComponentKind { Extractor, Loader, TransactionalIntegration }`, `ConnectorDirection { In, Out }`.
+
+### WithSchedule as the end-to-end template (ADR 0010, `/docs/decisions/0010-schedule-as-activation-attribute.md`)
+The complete touch-list for the most recent capability addition — the exact checklist a new declaration must repeat:
+
+| Layer | File | Change |
+|---|---|---|
+| Builder | `Building/ComponentBuilders.cs` | `ExtractorBuilder.WithSchedule(string cron)` (extractor-only *at compile time*) |
+| Recording state | `Components.cs` | `ScheduleCall` + `SetSchedule` (eager `ArgumentException`) |
+| Model | `Model/ComponentModel.cs` | `required string? Schedule` |
+| Materializer | `Building/TopologyMaterializer.cs` | `Schedule = component.ScheduleCall` |
+| Validation | `Validation/Rules/ActivationRules.cs` (new file) + registration in `Validation/TopologyRules.cs` `Rules[]` | ITP210 `ScheduleExpressionRule` |
+| Helper | `Validation/CronValidator.cs` | shallow syntax check |
+| Generation | `Generation/Generation.cs` | `component.Schedule` in `*.intropy.json`; `JsonIgnoreCondition.WhenWritingNull` to keep old output byte-identical |
+| Graph verb | `Generation/IntropyGenerate.cs` `DisplayComponent` | `entry["schedule"]` only when non-null |
+| Aspire | `Aspire/IntropyAspire.cs` (`RegisterScheduler`, `AddRunNowCommand`, `Schedule is null` endpoint branch) + `Aspire/Scheduling.cs` | new behavior + DI registration |
+| Tests | `BuilderMappingTests`, `RuleTests`, `EndToEndTests` (incl. **byte-exact JSON snapshot**), `Generation.Test/TestSystem.cs`, `TopologyGeneratorTests`, `IntropyGenerateTests`, `Aspire.Test/SchedulingTests.cs` | |
+| Docs | `docs/decisions/0010-*.md`, `docs/concepts/validation.md` (code table + retired table), `CLAUDE.md`, Aspire README, example `OrderFlowSystem.cs` | |
+
+---
+
+## 2. TopologyMaterializer and TopologyRules
+
+### `/src/Intropy.Topology/Building/TopologyMaterializer.cs` (146 lines)
+`internal static SystemTopology Materialize(SystemBuilder builder)`. Materialization **never fails** — first-seen wins on identity conflicts so validation sees the whole picture. Pattern for a resource-from-usage:
+
+```csharp
+var connectors = new Dictionary&lt;string, ConnectorAccumulator&gt;();
+...
+Connectors = connectors.OrderBy(c =&gt; c.Key, StringComparer.Ordinal)
+    .Select(c =&gt; new ConnectorResource { Name = c.Key, Transport = c.Value.Transport,
+        Directions = [.. c.Value.Directions.Order()], UsedBy = [.. c.Value.UsedBy] }).ToArray(),
+```
+with private accumulator classes holding `SortedSet&lt;string&gt; UsedBy` (`StringComparer.Ordinal`) and the first-seen identity:
+```csharp
+private static ConnectorAccumulator AccumulateConnector(dict, ConnectorRef connector, ConnectorDirection direction)
+{
+    if (!connectors.TryGetValue(connector.Name, out var accumulator))
+    {   // First-seen wins on identity; conflicting declarations are reported by validation.
+        accumulator = new ConnectorAccumulator(connector.Transport);
+        connectors[connector.Name] = accumulator;
+    }
+    accumulator.Directions.Add(direction);
+    return accumulator;
+}
+```
+Per-component edge lists are deduplicated in the component loop (`seenConnectorEdges` HashSet). A `ServiceResource` would slot in as a third dictionary + accumulator + ordered projection; determinism (declaration order for components, `Ordinal` sort for resources) is asserted by the snapshot test.
+
+### `/src/Intropy.Topology/Validation/`
+- `ITopologyRule.cs`: `internal sealed record ValidationContext(SystemBuilder Builder, SystemTopology Topology)`; `internal interface ITopologyRule { IEnumerable&lt;TopologyDiagnostic&gt; Evaluate(ValidationContext); }` — rules can inspect **both** raw builder calls and the materialized model.
+- `TopologyRules.cs`: a static `ITopologyRule[] Rules` array (13 entries, order = report order) plus a long "retired codes — do not reuse" comment block. `Run` = `Rules.SelectMany(r =&gt; r.Evaluate(context)).ToArray()`.
+- `TopologyDiagnostic.cs`: `record TopologyDiagnostic(string Code, DiagnosticSeverity Severity, string Message, string? Target)`; `DiagnosticSeverity { Warning, Error }`.
+- `TopologyValidationException.cs`: aggregates all diagnostics into a multi-line message.
+
+Diagnostic bands currently in use (also tabulated in `/docs/concepts/validation.md`):
+
+| Code | Sev | Rule / file |
+|---|---|---|
+| ITP001 | E | `DuplicateComponentNameRule` — StructureRules.cs |
+| ITP002 | E | `EmptySystemRule` — StructureRules.cs |
+| ITP101 | E | `DuplicatePortRule` (&gt;1 `Publishes`) — TopicAndConnectorRules.cs |
+| ITP102 | E | `DuplicateSubscriptionRule` |
+| ITP103 | E | `TopicContractConflictRule` |
+| ITP104 | E | `ConnectorConflictRule` (same name, two transports) |
+| ITP206 | E | `MissingRequiredOutputRule` (extractor must publish) — CompletenessRules.cs |
+| ITP207 | E | `MissingRequiredSubscriptionRule` (loader exactly 1) |
+| ITP208 / ITP209 | E | `UnconsumedTopicRule` / `UnproducedTopicRule` |
+| ITP210 | E | `ScheduleExpressionRule` — ActivationRules.cs |
+| ITP302 | W | `NoEdgesRule` — UsageAndCollisionRules.cs |
+| ITP401 | E | `PubSubConnectorNameCollisionRule` (pubsub name == `binding.&lt;connector&gt;`) |
+
+**Never reuse:** ITP105, ITP106, ITP107, ITP201–205, ITP501 — **and note ITP301 / ITP402 were the platform-service codes** (ADR 0004 §PoC lean pass). They are *not* in the current retired list in `TopologyRules.cs` or `docs/concepts/validation.md`, i.e. the 300/400 bands are effectively reserved for service-related rules. Bands in use: 0xx structural, 1xx per-component/resource conflicts, 2xx completeness/activation, 3xx warnings, 4xx name collisions across Dapr namespaces.
+
+**Flow for a new resource kind:** `Builder method → Component.AddX (eager ArgumentException) → materializer accumulator → new *Resource on SystemTopology + *Edge on ComponentModel → new ITopologyRule(s) registered in Rules[] → Generation (YAML + runtime config + graph verb) → Aspire translate`. `NoEdgesRule` (ITP302) counts "edges" and would need extending if a service use should count as an edge.
+
+---
+
+## 3. Aspire backend — `/src/Intropy.Topology.Aspire/`
+
+Files: `IntropyAspire.cs` (333), `Scheduling.cs` (249), `SidecarRecovery.cs` (149), `ComponentOverlay.cs` (90), `TcpReadyHealthCheck.cs` (73), `ProjectConvention.cs` (33), `README.md` (stale — still documents `IDevProfile`/Microcks/profiles removed by ADR 0009).
+
+### What it creates today
+`IntropyAspire.RunAsync(Assembly, string[])`: discover → `TopologyGenerator.Generate(...).WriteTo(tempRoot)` → `Apply(builder, topology, generatedRoot)` → `app.RunAsync()`.
+
+`internal static void Apply(IDistributedApplicationBuilder builder, SystemTopology topology, string generatedRoot)` — the single translate method, ~130 lines, is where a shared service would be added:
+
+1. **One backend container, hard-coded**:
+```csharp
+internal const int RabbitMqPort = 5672;
+var rabbitmq = builder.AddContainer("rabbitmq", "docker.io/library/rabbitmq", "4")
+    .WithEndpoint(port: RabbitMqPort, targetPort: RabbitMqPort);
+WithTcpReadiness(builder, rabbitmq, RabbitMqPort);
+var backends = new List&lt;IResourceBuilder&lt;IResource&gt;&gt; { rabbitmq };
+var backendProbes = new List&lt;TcpReadyHealthCheck&gt; { new("localhost", RabbitMqPort) };
+```
+Deliberately `AddContainer`, **not** `AddRabbitMQ` — the generated YAML speaks fixed `guest/guest` on `localhost:5672`, while `AddRabbitMQ` injects generated credentials (ADR 0005 amended). Same reasoning previously applied to Redis. This is the key precedent: **new shared services should be plain containers on fixed host ports, because generation runs before the run and bakes the endpoint into YAML.** `backends`/`backendProbes` are *already lists* — adding platform-service containers to them is the minimal-diff path.
+
+2. **Three layers of startup ordering** (no `WaitFor` on sidecars is possible):
+   - `resource.WaitFor(backend)` and `sidecar.WaitFor(backend)` inside `Wire&lt;T&gt;`;
+   - a global `BeforeResourceStartedEvent` hook gating every `*-dapr-cli` resource on all `backendProbes` (up to 3 min) — necessary because the Dapr toolkit materializes each sidecar as a separate executable resource that carries no wait annotations;
+   - publisher→subscriber precedence derived from topics.
+```csharp
+builder.Eventing.Subscribe&lt;BeforeResourceStartedEvent&gt;(async (evt, ct) =&gt; {
+    if (!evt.Resource.Name.EndsWith("-dapr-cli", StringComparison.Ordinal)) return;
+    foreach (var probe in backendProbes) await probe.WaitUntilReadyAsync(TimeSpan.FromMinutes(3), ct);
+    if (sidecarWaits.TryGetValue(evt.Resource.Name, out var subscriberSidecars)) { /* WaitForResourceAsync(Running) */ }
+});
+```
+
+3. **Per component**: `ComponentOverlay.Stage(...)` → `ProjectConvention.Resolve(...)` (throws with "No project found for these components by folder convention" when missing) → `builder.AddProject(name, path)` → `WithHttpEndpoint()` **only when `Schedule is null`** → `Wire(...)`:
+```csharp
+private static void Wire&lt;T&gt;(IResourceBuilder&lt;T&gt; resource, ComponentModel component, string resourcesPath,
+    string configDir, IReadOnlyList&lt;IResourceBuilder&lt;IResource&gt;&gt; backends)
+    where T : IResourceWithEnvironment, IResourceWithWaitSupport
+{
+    resource.WithDaprSidecar(sidecar =&gt; {
+            sidecar.WithOptions(new DaprSidecarOptions { AppId = component.Name, ResourcesPaths = [resourcesPath] });
+            foreach (var backend in backends) sidecar.WaitFor(backend);
+        })
+        .WithEnvironment("INTROPY__COMPONENT", component.Name)
+        .WithEnvironment("INTROPY__CONFIG", Path.Combine(configDir, $"{component.Name}.intropy.json"));
+    foreach (var backend in backends) resource.WaitFor(backend);
+}
+```
+Note `backends` is applied to **every** component uniformly — a per-component service dependency would need this to become per-component (`component.Services` → the subset of resources to `WaitFor`), which is the main structural change the feature implies. There is **no `AddConnectionString`, no `WithReference`, no env-var injection other than the two `INTROPY__*` variables** anywhere in the repo.
+
+4. **Subscriber-first ordering**: `SubscriberPrecedence(topology)` (publisher → all subscribers of its topics, self-loops skipped) + `HasCycle` DFS; on a cycle it prints to stderr and skips ordering entirely rather than deadlocking. `waiters[name] = dep =&gt; project.WaitFor(dep)` and `sidecarWaits["&lt;pub&gt;-dapr-cli"] = ["&lt;sub&gt;-dapr-cli", ...]`.
+
+5. **`RegisterScheduler`** (only when some component has `Schedule != null`) and **`RegisterDaprSidecarRecovery`** (always) register hosted services via `builder.Services` (`TryAddSingleton&lt;TimeProvider&gt;`, `IResourceLifecycle`, `IResourceStateMonitor`, `IBackendReadiness`).
+
+6. `AddRunNowCommand` — dashboard `WithCommand("intropy-run-now", ...)` resolving `ComponentScheduler` from `context.ServiceProvider`.
+
+### `Scheduling.cs`
+- `internal sealed record ScheduledComponent(string Name, string Cron)`
+- `internal static class ScheduleTickPlanner.NextOccurrence(string cron, DateTimeOffset after, TimeZoneInfo zone)` (Cronos)
+- `internal interface IResourceLifecycle { WatchAsync; IsStartable(string); ExecuteAsync(name, command, ct); WaitUntilRunningAsync(name, timeout, ct) }` + `AspireResourceLifecycle` over `ResourceCommandService`/`ResourceNotificationService` — the testability seam pattern to copy for any new runtime behavior.
+- `internal sealed class ComponentScheduler(IReadOnlyList&lt;ScheduledComponent&gt;, IResourceLifecycle, TimeProvider, ILogger) : BackgroundService` — per-component cron loop; `TriggerAsync` gates on a per-component `SemaphoreSlim` (skip on overlap = `concurrencyPolicy: Forbid`), starts `"&lt;component&gt;-dapr-cli"` first and waits for Running (3 min), then the app; `Start` with `Restart` fallback.
+
+### `ComponentOverlay.cs`
+`public static string Stage(string appHostDirectory, string componentName, string generatedComponentsDir)` → `&lt;appHost&gt;/obj/dapr-components/&lt;component&gt;/`, wiped and rebuilt each start. Local `&lt;integration&gt;/local/dapr-components/*.y[a]ml` are copied first, then generated files overlay **by top-level `metadata.name`** (`internal static string? MetadataName(string yaml)` — only the unindented `metadata:` block qualifies). Every component gets its own directory (asserted in `IntropyAspireTests.REDACTED`). If a shared service materializes a Dapr component (state store, lock, secret store), this is the mechanism that would scope it per component — and generation would need to emit only the components a given component may see, or rely on Dapr `scopes` as pub/sub and bindings do today.
+
+### `SidecarRecovery.cs`, `TcpReadyHealthCheck.cs`
+`DaprSidecarRecovery : BackgroundService` restarts `*-dapr-cli` sidecars that die during component init (max 3 attempts, waits for `IBackendReadiness` first) — because **daprd treats a failed component init as fatal**, which is precisely the risk when adding another backend a sidecar dials. `TcpReadyHealthCheck(host, port)` implements both `IHealthCheck` and `IBackendReadiness`; it requires the connection to survive a 750 ms read window (Docker Desktop's port proxy accepts early). Any new platform-service container should get a probe here and be added to `backendProbes`.
+
+---
+
+## 4. Generation package — `/src/Intropy.Topology.Generation/`
+
+`Generation.cs` (189):
+```csharp
+public sealed record GeneratedFile(string RelativePath, string Content);
+public sealed class GeneratedArtifacts {
+    public const string ComponentsDir = "components";
+    public const string ConfigDir = "config";
+    public IReadOnlyList&lt;GeneratedFile&gt; Files { get; }
+    public void WriteTo(string directory);
+}
+public static class TopologyGenerator { public static GeneratedArtifacts Generate(SystemTopology topology); }
+```
+Emits, deterministically:
+- one `components/&lt;pubSubName&gt;.yaml` per distinct `PubSubName`, `spec.type: pubsub.rabbitmq`, hard-coded metadata `hostname=localhost, port=5672, username=guest, password=guest`, `scopes` = publishers ∪ subscribers;
+- one `components/binding.&lt;connector&gt;.yaml` per connector, `spec.type = Transport.DaprType`, `rootPath = Path.GetFullPath(file.RootPath)` (anchored at generation time because the sidecar's cwd isn't guaranteed), `scopes = UsedBy`;
+- one `config/&lt;component&gt;.intropy.json` per component:
+```csharp
+var config = new { Intropy = new { System = systemName, Component = component.Name,
+    Kind = component.Kind.ToString(), component.Schedule,
+    Subscribes = ..., Publishes = ...,
+    Connectors = component.Connectors.Select(c =&gt; new { c.ConnectorName,
+        Direction = c.Direction.ToString(), DaprComponent = $"binding.{c.ConnectorName}" }) } };
+```
+  serialized with `WriteIndented = true, DefaultIgnoreCondition = WhenWritingNull`.
+- `internal static class DaprYaml.Component(name, type, IEnumerable&lt;(string,string)&gt; metadata, IEnumerable&lt;string&gt; scopes)` — hand-rolled emitter, everything double-quoted, `metadata: []` when empty, `scopes:` block only when non-empty. This is where a `state.redis` / `bindings.postgres` / secret-store component would be emitted.
+
+`IntropyGenerate.cs` (181): `RunAsync(assembly, args)` → `check | graph | generate [dir]`. `DisplayModel`/`DisplayComponent` is the human projection (camelCase, kebab-case kinds, empty collections omitted, `schedule` only when set) — a new resource kind needs a branch here too (`if (topology.Connectors.Count &gt; 0) model["connectors"] = ...`).
+
+**No notion of infrastructure/service dependency exists in Generation**: no connection strings, no secrets, no env-var emission beyond the two `INTROPY__*` set by the Aspire backend, no state store / lock / secret-store / configuration Dapr building block. The `Generation/README.md` is stale (documents `GenerationProfile.Dev/Prod`, `DevManifest`, Microcks, `HTTPEndpoint` — all removed by ADR 0009).
+
+---
+
+## 5. examples/OrderFlow.SystemHost — exact contents
+
+`Program.cs`:
+```csharp
+using System.Reflection;
+using Intropy.Topology.Aspire;
+using Intropy.Topology.Generation;
+var assembly = Assembly.GetExecutingAssembly();
+return args is ["run", ..] or []
+    ? await IntropyAspire.RunAsync(assembly, args)
+    : await IntropyGenerate.RunAsync(assembly, args);
+```
+`OrderFlowSystem.cs`:
+```csharp
+public sealed class OrderFlowSystem : ISystemDefinition
+{
+    public string SystemName =&gt; "order-flow";
+    public void Define(SystemBuilder builder)
+    {
+        builder.AddExtractor("order-extractor")
+            .From(Connectors.OrderExtractorSource)
+            .Publishes(Topics.Orders)
+            .WithSchedule("* * * * *");
+        builder.AddLoader("order-loader").Subscribes(Topics.Orders).To(Connectors.OrderLoaderDestination);
+    }
+}
+```
+`Topics.cs`: `public static readonly TopicRef&lt;Order&gt; Orders = TopicRef&lt;Order&gt;.Define("pubsub", "orders");`
+`Connectors.cs`: two `ConnectorRef.Define("order-extractor-source", Transport.File("./test/order-extractor-source"))` / `"order-loader-destination"` → `./test/order-loader-destination`.
+
+**Constraint from CLAUDE.md line 47**: these three files mirror `intropy sys create` codegen **verbatim** (golden output in intropy-cli `internal/system/create_test.go`); they double as a compile-time guarantee that CLI-generated code builds. `WithSchedule` in the example deliberately runs *ahead* of the CLI template (ADR 0010 "Out of scope"), which is the accepted precedent for demonstrating a new capability in the example before the CLI emits it. Sibling projects `examples/order-extractor/Program.cs` (run-to-completion, POSTs `/v1.0/shutdown` to its sidecar in a `finally`) and `order-loader`; each has `local/dapr-components/pubsub.yaml` with `pubsub.in-memory` (overlaid by the generated RabbitMQ one).
+
+---
+
+## 6. Existing mentions of platform service / infrastructure / dependency
+
+**The feature existed and was removed** — `/docs/decisions/0004-edges-over-triggers.md` is the primary design record:
+
+- §Interface model table, line 47: `| Service | component ↔ external platform svc | none (external) | sync |` — i.e. a platform service was modeled as a *fourth interface kind* alongside Topic / API / Connector, external (no in-system provider), synchronous.
+- §PoC lean pass (2026-07-21), lines 65–77:
+```
+- **Platform services**: `ServiceRef`, `UseService`, `.Uses`, `ServiceResource`,
+  `ServiceUseEdge`, `SystemTopology.Services`, and diagnostics `ITP301`/`ITP402`.
+```
+  "removed the same day, to be re-added when a concrete need appears (git history + this ADR preserve the design)".
+- `/docs/decisions/0001-staged-per-block-builders.md:55`: `// Unchanged: AddContainerService(name, image), UseService(name)` and line 42 shows the call shape: `.Uses(idempotency)` on an aggregator — so `ServiceRef` was a static-field ref (like `TopicRef`) named e.g. `idempotency`, declared with `UseService(name)` on `SystemBuilder` and consumed with `.Uses(ref)` on builders.
+- `/docs/decisions/0003-per-block-components.md:84-91` "Container services normalized onto the shared path" — a `ContainerServiceComponent` was a *component kind* materialized on the shared `List&lt;Component&gt;`; distinct from platform services.
+- **Stale leftover in current code**: `/src/Intropy.Topology/README.md:17` still lists `ServiceRef` among the Refs; `Validation/NameRules.cs` doc comment still says "(topic, pubsub, **service**)".
+- `ITP301` and `ITP402` are **absent from both the retired-code list in `TopologyRules.cs` and `docs/concepts/validation.md`** — they were dropped from the ledger rather than retired, so they are candidates for reuse (worth an explicit decision).
+
+Other relevant mentions:
+- Redis/infrastructure: `docs/decisions/0005-aspire-run-backend.md:28-29,65,77` (why a plain container over `AddRedis`/`AddRabbitMQ`; fixed dev ports forced by generate-before-run) and `0006-microcks-dev-mocks.md:34,40,44` ("mirrors the single-`redis` infra pattern", fixed host port precedent).
+- `WaitFor`: only in `src/Intropy.Topology.Aspire/IntropyAspire.cs` (`sidecar.WaitFor(backend)`, `resource.WaitFor(backend)`, `project.WaitFor(dependency)`) and asserted in `test/Intropy.Topology.Aspire.Test/IntropyAspireTests.cs` via `WaitAnnotation`.
+- `AddConnectionString`, `WithReference`, `ConnectionString`, `DependsOn`, `StateStore`, `Postgres`, `Database`: **zero hits** anywhere in code.
+
+**docs/decisions/*.md titles:**
+| File | Title | Status |
+|---|---|---|
+| 0001-staged-per-block-builders.md | Refactoring task: staged per-block builders | implemented |
+| 0002-connector-redefinition.md | Follow-up task: Binding → Connector redefinition | implemented |
+| 0003-per-block-components.md | Per-block components and framework-style layout | implemented |
+| 0004-edges-over-triggers.md | Refactoring task: edges over triggers, and APIs as first-class edges | implemented (with PoC lean-pass removals) |
+| 0005-aspire-run-backend.md | Aspire run-backend — discover → generate → translate | implemented |
+| 0006-microcks-dev-mocks.md | Contract-backed dev mocks via Microcks | implemented (later cut by 0009) |
+| 0007-defer-connector-external-system.md | Defer a connector's external system to system assembly | implemented |
+| 0008-topic-completeness-over-loader-connectors.md | Topic completeness is validated; a loader's destination may stay private | implemented |
+| 0009-minimal-model-for-system-tutorial.md | Reduce the library to the minimal model the system tutorial requires | implemented 2026-07-25 |
+| 0010-schedule-as-activation-attribute.md | Schedule as an activation attribute | accepted 2026-07-25 |
+
+Docs that would need updating: `docs/concepts/validation.md` (code table + retired table), `docs/concepts/materialization.md` (`SystemTopology` shape + model table + serialization example), `docs/concepts/components.md` (kind/edge table), `docs/index.md` (nav table — a new `docs/concepts/services.md` would be listed there), `docs/getting-started.md`, root `README.md`, `CLAUDE.md` (§Key Concepts + the "minimal model / don't re-add piecemeal — cherry-pick from `full-topology`" paragraph, which this feature directly contradicts and must address), and the three package READMEs (already stale).
+
+---
+
+## 7. Test structure relevant to a new declaration feature
+
+`test/Intropy.Topology.Test/` — xUnit, plain `Assert`, no mocking/assertion libs, `Method_WithCondition_ShouldExpectation`, explicit `// Arrange / // Act / // Assert`, internals via `InternalsVisibleTo` (`src/*/AssemblyInfo.cs`).
+
+| File | Role |
+|---|---|
+| `TestContracts.cs` | Shared fixtures: `RawEvent`, `EnrichedEvent`, `TestTopics.Raw/.Enriched`, `TestConnectors.Pim/.Erp`. **A new `TestServices` helper class goes here.** |
+| `Building/BuilderMappingTests.cs` (188) | One test per builder method: records the edge, returns `this` for chaining (`Assert.Same(builder, builder.WithSchedule("@daily"))`), last-call-wins |
+| `Building/MaterializationTests.cs` (106) | Declaration order, dedup-from-usage, `Publishers`/`Subscribers`/`UsedBy` |
+| `Building/EndToEndTests.cs` (143) | **The living spec.** `DeclareSystem()` = 5-component `product-distribution` system; 4 tests: full-shape assertions, `Validate()` empty, **byte-exact inline JSON snapshot** (`Serialize_..._ShouldMatchSnapshot`, one ~2 KB `const string expected`), and round-trip through `System.Text.Json` (asserts `Assert.IsType&lt;FileTransport&gt;` — a new polymorphic hierarchy must be round-trip-asserted here). Any model change requires regenerating the snapshot by hand. |
+| `Validation/RuleTests.cs` (419) | One `public class &lt;Rule&gt;Tests` per rule + `internal static class ValidationTestHelper` with `SystemBuilder.WithValidComponent()` (an extractor/loader pair violating nothing) and `.DiagnosticsFor(code)`. Each rule gets a positive (`Assert.Single(s.DiagnosticsFor("ITPxxx"))` + severity + `Target` + exact message) and a negative test. |
+| `Validation/BuildValidationTests.cs` (86) | Aggregation: `Build()` throws with all codes, message lists every diagnostic |
+| `Validation/NameRulesTests.cs`, `CronValidatorTests.cs` | Helper-level |
+| `ComponentTests.cs`, `RefTests.cs`, `DiscoveryTests.cs` | Public-surface/ref/discovery behavior (`RefTests` covers `Define` argument validation and record equality — a new `ServiceRef` belongs here) |
+
+`test/Intropy.Topology.Generation.Test/`: `TestSystem.cs` holds the single `ISystemDefinition` (`OrderSystem`, 4 components / 2 pubsubs / 2 connectors, `WithSchedule("*/5 * * * *")`) that `SystemDiscovery` resolves for the assembly — extend this to exercise a new declaration through generation. `TopologyGeneratorTests.cs` asserts YAML by substring (`Assert.Contains("type: \"pubsub.rabbitmq\"", yaml, StringComparison.Ordinal)`) via a `Content(relativePath)` helper; `IntropyGenerateTests.cs` captures console output for `check`/`graph`/`generate`.
+
+`test/Intropy.Topology.Aspire.Test/`: uses real `DistributedApplication.CreateBuilder(new DistributedApplicationOptions { ProjectDirectory = AppHostDir })` over a temp workspace with fake `&lt;name&gt;.csproj` files, then asserts on `builder.Resources` / annotations without running DCP:
+- `IntropyAspireTests.cs` — `Assert.Contains(builder.Resources, r =&gt; r.Name == "rabbitmq")`, sidecar `AppId`/`ResourcesPaths` via a `SidecarOptions(builder, name)` helper walking `DaprSidecarAnnotation → DaprSidecarOptionsAnnotation`, `WaitAnnotation` assertions for publisher→subscriber ordering, `GetEnvironmentVariableValuesAsync(DistributedApplicationOperation.Publish)` for the `INTROPY__*` env contract, and the throw-on-missing-project case. **This is the file where "Apply adds the declared platform-service resource and makes the dependent component WaitFor it" belongs.**
+- `SchedulingTests.cs` (311) — DI-registration assertions (`builder.Services.Single(d =&gt; d.ServiceType == typeof(IReadOnlyList&lt;ScheduledComponent&gt;))`), `WithCommand` presence, endpoint-annotation absence, plus a `FakeResourceLifecycle` + `FakeTimeProvider` unit suite for `ComponentScheduler`.
+- `ComponentOverlayTests.cs`, `SidecarRecoveryTests.cs`.
+
+---
+
+## Key design tensions to resolve when planning
+
+1. **CLAUDE.md/ADR 0009 forbid re-adding cut features piecemeal** ("cherry-pick from `full-topology`") — but that branch is absent from this repo. Either locate it (other clone/remote of `integrio-intropy/intropy-topology`) or record a new ADR (0011) that deliberately supersedes that instruction for platform services, reusing the ADR 0004 design (`ServiceRef`, `.Uses`, `ServiceResource`, `ServiceUseEdge`, `SystemTopology.Services`, ITP301/ITP402).
+2. **Generate-before-run forces fixed host ports** (ADR 0005 known limits) — a declared Postgres/Redis must get a fixed port baked into generated YAML/config, or generation must move after Aspire endpoint allocation (a structural change).
+3. **`backends`/`backendProbes` are currently global to every component**; a per-component dependency means threading `component.Services` into `Wire` and into the `sidecarWaits`/`BeforeResourceStartedEvent` gate.
+4. **Plain container vs. Aspire integration package** — the repo has consistently rejected `AddRabbitMQ`/`AddRedis` because generated Dapr YAML needs stable, known credentials; using `AddPostgres()` + `AddConnectionString` would be a new pattern (and a new package reference in `Directory.Packages.props`).
+5. **Where the connection reaches the workload**: today only `INTROPY__COMPONENT` / `INTROPY__CONFIG` env vars plus Dapr components exist. A shared service is either (a) a Dapr building block (state store / lock / secret store component YAML + `scopes`, consistent with everything else here), or (b) a raw connection string in runtime config / env — which would be the first non-Dapr connectivity in the system and contradicts `Refs.cs`'s "All connectivity goes through Dapr — it never bypasses Dapr".</result>
+<usage><subagent_tokens>120344</subagent_tokens><tool_uses>54</tool_uses><duration_ms>285129</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a65c257df0fd05122</task-id>
+<tool-use-id>toolu_014VVtHg1HwHxTc2kZimKLbN</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-robinhultman-dev-intropy-tooling-intropy-topology/676ac302-a06d-4990-89ee-19ad06833472/tasks/a65c257df0fd05122.output</output-file>
+<status>completed</status>
+<summary>Agent "Design platform-service dependency feature" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I have a complete picture of the codebase. Here is the implementation plan.
+
+# Implementation Plan: System-Level Platform Services (declared containers, Aspire startup gating)
+
+## 0. Design decisions (with justification)
+
+**D1 — Image string embeds the tag** (`Service.Container("docker.io/library/redis:7", 6379)`), no separate `tag` parameter.
+- The core model is backend-agnostic and dependency-free; the single Docker image reference (`name[:tag]`) is the tool-neutral form every future consumer uses verbatim (Kubernetes `image:`, docker compose). Aspire's `(name, image, tag)` split is an Aspire detail, so the split belongs in the Aspire package: last `:` after the last `/` (handles `localhost:5000/img`), no colon → `AddContainer(name, image)` (Aspire defaults to `latest`). Digest (`@sha256`) refs are out of scope — document.
+
+**D2 — Builder method is `UsesService(ServiceRef)`, returning `void`.**
+- `Add*` on `SystemBuilder` has an established meaning: "declare a component block, get its block builder back" (CLAUDE.md "Key Concepts"). A service is not a component and yields no builder, so `AddService` would break that contract. `UsesService` also echoes the historical `UseService` (ADR 0004 PoC lean pass) in the DSL's present-tense edge style (`Publishes`, `Subscribes`). Returns `void` — the SystemHost declaration style is statements, and no chaining need exists (minimality).
+
+**D3 — Diagnostic codes: mint ITP108 for the identity conflict, revive ITP402 for the name collision, permanently retire ITP301.**
+- **ITP402 (revived)**: its old meaning per ADR 0004 was exactly the platform-service name collision. It was removed *with* its feature, never retired-with-prejudice (it's absent from both retired lists). Reviving it with the same meaning is continuity, not reuse.
+- **ITP301 (retire permanently)**: its old meaning ("service declared but no component `.Uses` it") is predicated on the per-component edge the user explicitly excluded. With system-level declaration there is no usage to check — the rule is meaningless, and its code must be added to the retired list so it is never repurposed.
+- **ITP108 (new)**: "same service name, two different definitions" is a *resource identity conflict*, the ITP1xx band (103 topic contract, 104 connector transport). 105–107 are retired, so 108 is the next free code. The old feature had no such rule (it used a registry, not refs), so no old code exists to revive.
+- All three decisions get recorded in ADR 0011, the `TopologyRules` retired-codes comment, and `docs/concepts/validation.md`.
+
+**D4 — `graph` shows services, gated on `Count &gt; 0`.**
+- `graph` is the human inspection surface ("what runs"); a declared container is part of that. `DisplayModel` already omits empty collections (`connectors` precedent at `IntropyGenerate.cs:76`), so systems without services print byte-identical output — the constraint in the scope decision holds by construction.
+
+**D5 — `rabbitmq` reservation enforced in the new ITP402 rule, for services only.**
+- A service named `rabbitmq` is a guaranteed F5 failure (Aspire resource names share one namespace with the hard-coded broker at `IntropyAspire.cs:65`). Catching it at `Build()`/`check` beats a DCP crash. A *component* named `rabbitmq` has the same problem today — that pre-existing gap stays out of scope (flagged below) to keep this change service-shaped.
+
+---
+
+## 1. Public API surface
+
+### `src/Intropy.Topology/Refs.cs` (grouped-file convention — refs live together), namespace `Intropy.Topology`
+
+```csharp
+/// A shared platform service the system depends on (e.g. an idempotency store).
+public sealed record ServiceRef
+{
+    public string Name { get; }              // DNS-1123 label (becomes the Aspire resource name)
+    public Service Service { get; }
+    public static ServiceRef Define([ConstantExpected] string name, Service service);
+    // private ctor; Define does NameRules.RequireLabel(name) + ArgumentNullException.ThrowIfNull(service)
+}
+
+/// What a platform service materializes as — mirrors Transport's polymorphism.
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "$service")]
+[JsonDerivedType(typeof(ContainerService), "container")]
+public abstract record Service
+{
+    private protected Service() { }
+    /// An arbitrary container on a fixed host port. Image may embed a tag ("redis:7"); no tag means latest.
+    public static Service Container([ConstantExpected] string image, int port) =&gt; new ContainerService(image, port);
+}
+
+public sealed record ContainerService : Service
+{
+    public string Image { get; }   // full reference, tag optional; digests unsupported
+    public int Port { get; }       // fixed host port == container port (generate-before-run constraint)
+    public ContainerService(string image, int port)  // public ctor: STJ polymorphic deserialization, FileTransport precedent
+    // guards: ThrowIfNullOrWhiteSpace(image); ArgumentOutOfRangeException for port outside 1..65535
+}
+```
+
+### `src/Intropy.Topology/SystemBuilder.cs`
+
+```csharp
+private readonly List&lt;ServiceRef&gt; _services = [];
+internal IReadOnlyList&lt;ServiceRef&gt; Services =&gt; _services;
+
+/// Declares a shared platform service the whole system depends on. The run backend
+/// starts it and starts every component only after it is ready. No connectivity is
+/// injected — starting the container and the startup ordering is the whole contract.
+public void UsesService(ServiceRef service);   // null-check; duplicates dedup at materialization
+```
+
+### `src/Intropy.Topology/Model/Resources.cs` + `Model/SystemTopology.cs`
+
+```csharp
+/// A platform service declared on the system (not materialized from usage).
+public sealed record ServiceResource
+{
+    public required string Name { get; init; }
+    public required Service Service { get; init; }
+}
+
+// SystemTopology gains, after Connectors:
+public required IReadOnlyList&lt;ServiceResource&gt; Services { get; init; }
+```
+
+### `src/Intropy.Topology/Validation/NameRules.cs`
+Fix the doc comment: "service" is currently listed under subdomains (leftover). A service name is a **label** (Aspire resource name, future K8s workload name) — move it to the label list.
+
+## 2. Materializer (`Building/TopologyMaterializer.cs`)
+
+Services are *declared*, not materialized from usage — a third, simpler accumulation from `builder.Services`:
+
+- `Dictionary&lt;string, Service&gt;(StringComparer.Ordinal)`; `TryAdd(ref.Name, ref.Service)` → **first-seen wins** on duplicate names (consistent with connectors; conflicting definitions reported by ITP108, identical re-registrations dedup silently).
+- Output: `OrderBy(Name, StringComparer.Ordinal)` → `ServiceResource[]`. Never fails.
+
+## 3. Validation
+
+**`Validation/Rules/TopicAndConnectorRules.cs`** (the ITP1xx identity-conflict band) — `ServiceConflictRule`:
+- **ITP108, Error**: groups `context.Builder.Services` by name (raw declarations, à la ITP104); &gt;1 distinct `Service` value → "The service '&lt;name&gt;' is declared with conflicting definitions." Record equality makes "distinct" exact.
+
+**`Validation/Rules/UsageAndCollisionRules.cs`** (next to ITP401) — `ServiceNameCollisionRule`:
+- **ITP402, Error** (revived), two clauses over `context.Topology`:
+  - a service name equals a component name — both become resource names in one runtime namespace;
+  - a service is named `rabbitmq` — reserved by the local run backend for the pub/sub broker.
+
+**`Validation/TopologyRules.cs`**: register both rules; extend the retired-codes comment: ITP301 retired (its per-component `.Uses` edge predicate no longer exists; system-level services need no usage rule — ADR 0011), ITP402 revived.
+
+**Deliberate non-rules** (assert in tests, note in ADR): a system with only services still errors **ITP002** (services declare no integration); **ITP302** unchanged (services aren't component edges).
+
+## 4. Aspire `Apply` (`src/Intropy.Topology.Aspire/IntropyAspire.cs`)
+
+Insertion point: immediately after `backendProbes` is initialized (line 73), before the eventing subscription and component loop:
+
+```csharp
+foreach (var service in topology.Services)
+{
+    if (service.Service is not ContainerService containerService)
+        throw new InvalidOperationException($"Unsupported service kind for '{service.Name}'.");
+
+    var (image, tag) = SplitImageTag(containerService.Image);   // new private helper, last ':' after last '/'
+    var container = tag is null
+        ? builder.AddContainer(service.Name, image)
+        : builder.AddContainer(service.Name, image, tag);
+    container.WithEndpoint(port: containerService.Port, targetPort: containerService.Port);
+    WithTcpReadiness(builder, container, containerService.Port);
+    backends.Add(container);
+    backendProbes.Add(new TcpReadyHealthCheck("localhost", containerService.Port));
+}
+```
+
+Everything else falls out with **zero further changes** — this is the whole point of the insertion point:
+- `Wire(...)` already does `resource.WaitFor(backend)` + `sidecar.WaitFor(backend)` over `backends` (lines 320–331); `WaitFor` waits for *healthy* because of the registered health check.
+- The `BeforeResourceStartedEvent` hook (line 81) already gates every `*-dapr-cli` on all `backendProbes`.
+- `RegisterDaprSidecarRecovery` runs after the loop and snapshots `backendProbes` then — service probes are included.
+
+**Port handling**: fixed host port = declared port = targetPort, exactly like `RabbitMqPort` — required by the generate-before-run constraint and it *is* the declared contract ("fixed host port"). A container whose internal port differs from the desired host port is unsupported in the minimal model.
+
+## 5. `graph` verb (`Generation/IntropyGenerate.cs`)
+
+In `DisplayModel`, after the `connectors` block, same omit-when-empty pattern:
+
+```csharp
+if (topology.Services.Count &gt; 0)
+    model["services"] = topology.Services.Select(s =&gt; new Dictionary&lt;string, object&gt;
+        { ["name"] = s.Name, ["image"] = ((ContainerService)s.Service).Image,
+          ["port"] = ((ContainerService)s.Service).Port }).ToArray();
+```
+
+(Use a pattern match, not a cast, if you prefer; flatten the container shape — `$service` is wire format, `graph` is presentation.) `TopologyGenerator.Generate` iterates only Topics/Connectors/Components — **no change**; emitted artifacts stay byte-identical automatically.
+
+## 6. Tests (per file, TDD order matches commits below)
+
+**`test/Intropy.Topology.Test/RefTests.cs`** — `ServiceRefTests` + `ServiceTests` mirroring `ConnectorRefTests`/`TransportTests`: Define exposes Name/Service; invalid label throws `ArgumentException` (with the `#pragma warning disable CA1857` pattern); null service throws `ArgumentNullException`; `Service.Container` exposes Image/Port; empty/whitespace image throws; port 0 / 65536 throws; record equality both ways.
+
+**`Building/BuilderMappingTests.cs`** — `UsesService_ShouldAppearInBuiltTopology` (name + `IsType&lt;ContainerService&gt;`), plus a no-services declaration yields `Services` empty.
+
+**`Building/MaterializationTests.cs`** — duplicate registration same name/same definition → single `ServiceResource`; conflicting definitions → first-seen wins (materialization never fails); multiple services sorted `Ordinal` by name.
+
+**`Building/EndToEndTests.cs`** — the load-bearing change:
+- Extend `DeclareSystem()` with `s.UsesService(ServiceRef.Define("idempotency", Service.Container("docker.io/library/redis:7", 6379)));` and assert it in `Build_WithSampleSystem_ShouldMaterializeFullTopology`.
+- **Snapshot MUST change**: today's snapshot (line 115) has no `Services` key; the default serializer writes every property, so the new snapshot ends `...,"Services":[{"Name":"idempotency","Service":{"$service":"container","Image":"docker.io/library/redis:7","Port":6379}}]}` (discriminator serialized first; `Services` last per property declaration order). Write the expected string, run, and reconcile against actual output.
+- Round-trip test: assert `Assert.IsType&lt;ContainerService&gt;(deserialized.Services.Single().Service)` with Image/Port — this proves the new polymorphic hierarchy round-trips.
+
+**`Validation/RuleTests.cs`** —
+- `ServiceConflictRuleTests`: ITP108 positive (same name, redis:7 vs redis:8 or different port; on a `.WithValidComponent()` system, assert Error + Build throws) and negative (identical `Define` twice → empty).
+- `ServiceNameCollisionRuleTests`: ITP402 service-name==component-name; ITP402 service named `rabbitmq`; negative case.
+- `EmptySystemRuleTests`: add `Validate_WithOnlyServices_ShouldStillReportItp002`.
+- Extend the mid-file retired-codes comment with ITP301.
+
+**`test/Intropy.Topology.Generation.Test/`** — add `builder.UsesService(...)` to `TestSystem.OrderSystem`. That makes the *unchanged* `TopologyGeneratorTests` the byte-identical-artifacts proof. In `IntropyGenerateTests` add `RunAsync_Graph_ShouldListDeclaredServices` (contains `"services"`, `"image": "..."`); omission-when-empty is by-construction (`Count &gt; 0`) and its old-output guarantee is covered by the pre-existing graph tests until TestSystem changed — assert `"services"` appears exactly once.
+
+**`test/Intropy.Topology.Aspire.Test/IntropyAspireTests.cs`** — extend `Topology()` with the service (or add a second topology factory):
+- `Apply_WithDeclaredService_ShouldAddContainerWithFixedPort`: resource `idempotency` exists; `ContainerImageAnnotation` Image=`docker.io/library/redis` Tag=`7` (verifies `SplitImageTag`); `EndpointAnnotation` Port==TargetPort==6379; `HealthCheckAnnotation` present.
+- `REDACTED`: both `order-extractor` and `order-loader` carry a `WaitAnnotation` on `idempotency` (and via the `SidecarOptions` accessor pattern, the sidecar resources too).
+- Untagged-image variant (e.g. `Service.Container("redis", 6379)`) → tagless `AddContainer` path.
+
+## 7. Docs / ADR
+
+- **`docs/decisions/0011-system-level-platform-services.md`** (new): re-adds the ADR 0004 PoC-cut feature on a concrete need (idempotency store); records the fixed decisions (system-level `UsesService`, no per-component edge, no connectivity injection — startup ordering is the whole contract, model+Aspire scope only); records D1–D5 above, especially the code decisions (ITP108 new, ITP402 revived, ITP301 permanently retired); **records that the `full-topology` branch does not exist in this clone**, so the re-add follows ADR 0004's preserved design rather than a cherry-pick, and that CLAUDE.md is amended accordingly. Flag the pre-existing component-named-`rabbitmq` gap as noted-not-fixed.
+- **`CLAUDE.md`**: amend the line-33 paragraph (full-topology branch caveat + "platform services re-added per ADR 0011"); update the refs paragraph (line 57) — `ServiceRef.Define` in a scaffolded `Services.cs`, and the "resources materialize from usage" sentence gains the caveat that services are the exception (declared via `UsesService`); update the retired-codes sentence (line 51) with ITP301.
+- **`docs/concepts/validation.md`**: add ITP108 + ITP402 rows to the code table; add ITP301 to the retired table.
+- **`docs/concepts/materialization.md`**: updated `SystemTopology` snippet, table row `ServiceResource | Each UsesService call — declared, not usage-materialized; first-seen wins, sorted`, note the second `$service` discriminator under Serialization.
+- **`docs/concepts/services.md`** (new, short — sibling of topics/connectors): what a platform service is, the no-connectivity contract, the Aspire semantics; link from **`docs/index.md`** documentation table.
+- **`examples/OrderFlow.SystemHost`**: new `Services.cs` (`Services.Idempotency = ServiceRef.Define("idempotency", Service.Container("docker.io/library/redis:7", 6379))`) + `builder.UsesService(Services.Idempotency);` in `OrderFlowSystem.Define`, with the ADR 0010-style comment that this runs ahead of the `intropy sys create` golden template on purpose.
+
+## 8. Commit sequence (TDD-ish) &amp; verification
+
+1. **Refs**: `ServiceRef`/`Service`/`ContainerService` + `RefTests` (+ NameRules doc fix).
+2. **Model + builder + materializer**: `ServiceResource`, `SystemTopology.Services`, `UsesService`, materializer; `BuilderMappingTests`, `MaterializationTests`, **EndToEndTests incl. snapshot update**.
+3. **Validation**: ITP108/ITP402 rules + registration + retired-comment; `RuleTests`; `validation.md`.
+4. **Aspire**: `Apply` service loop + `SplitImageTag`; `IntropyAspireTests`.
+5. **graph verb**: `DisplayModel` + `TestSystem` service + `IntropyGenerateTests` (unchanged `TopologyGeneratorTests` prove artifact stability).
+6. **Example + docs + ADR 0011 + CLAUDE.md.**
+
+Verify each step: `dotnet build Intropy.Topology.slnx` / `dotnet test Intropy.Topology.slnx` (single class: `--filter "FullyQualifiedName~EndToEndTests"`). See it working:
+- `dotnet run --project examples/OrderFlow.SystemHost -- check` (valid), `-- graph` (services block), `-- generate ./out` (no new/changed files vs. main's output).
+- `dotnet run --project examples/OrderFlow.SystemHost` (needs Docker + `dapr init`): Aspire dashboard shows `idempotency` container; `order-extractor`/`order-loader` and their `*-dapr-cli` sidecars sit in Waiting until it's healthy; `docker ps` shows `redis:7` with `6379-&gt;6379`.
+
+## Risks &amp; flags
+
+- **Snapshot/back-compat**: `Services` is `required` → the byte-exact snapshot changes (planned), and any *previously serialized* `SystemTopology` JSON fails to deserialize (missing required property). No wire artifacts persist in this repo; flag for downstream consumers of the model.
+- **JSON round-trip**: mirrors `Transport` exactly (public param-matching ctor on the sealed subtype); the round-trip test covers it. Keep ctor parameter names `image`/`port` matching properties.
+- **Fixed host ports can clash**: two services on one port, or a service on 5672, fails at container bind time with a clear Docker/DCP error. Deliberately not validated (minimality); ADR 0011 notes it as a possible future ITP rule.
+- **Pre-existing gap**: a *component* named `rabbitmq` already collides with the broker resource today; ITP402 fixes it for services only — noted, not fixed.
+- **ITP002**: a services-only system still errors — intended, tested, documented.
+- **Image parsing**: digest references and internal-port≠host-port containers unsupported — documented in `Service.Container` XML docs and ADR 0011.
+- **`Uses` naming headroom**: if a per-component edge ever returns (ADR 0004's `.Uses`), system-level `UsesService` does not collide with it — no reserved-name conflict.
+
+### Critical Files for Implementation
+- /Users/robinhultman/dev/intropy/tooling/intropy-topology/src/Intropy.Topology/Refs.cs
+- /Users/robinhultman/dev/intropy/tooling/intropy-topology/src/Intropy.Topology/SystemBuilder.cs
+- /Users/robinhultman/dev/intropy/tooling/intropy-topology/src/Intropy.Topology/Building/TopologyMaterializer.cs
+- /Users/robinhultman/dev/intropy/tooling/intropy-topology/src/Intropy.Topology.Aspire/IntropyAspire.cs
+- /Users/robinhultman/dev/intropy/tooling/intropy-topology/test/Intropy.Topology.Test/Building/EndToEndTests.cs</result>
+<usage><subagent_tokens>83434</subagent_tokens><tool_uses>29</tool_uses><duration_ms>468083</duration_ms></usage>
+</task-notification>
