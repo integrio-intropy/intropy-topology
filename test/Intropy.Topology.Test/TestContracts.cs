@@ -21,3 +21,9 @@ public static class TestConnectors
     public static readonly ConnectorRef Erp =
         ConnectorRef.Define("erp", Transport.File("./test/erp"));
 }
+
+public static class TestServices
+{
+    public static readonly ServiceRef Idempotency =
+        ServiceRef.Define("idempotency", Service.Container("docker.io/library/redis:7", 6379));
+}

@@ -42,3 +42,17 @@ public sealed record ConnectorResource
     public required IReadOnlyList<string> UsedBy { get; init; }
 }
 
+/// <summary>
+/// A shared platform service declared on the system with <c>UsesService</c> — the one
+/// resource that does not materialize from usage. The run backend starts it and starts
+/// every component only after it is ready; no connectivity is injected.
+/// </summary>
+public sealed record ServiceResource
+{
+    /// <summary>The service's name (DNS-1123 label).</summary>
+    public required string Name { get; init; }
+
+    /// <summary>What the service materializes as.</summary>
+    public required Service Service { get; init; }
+}
+

@@ -1,3 +1,4 @@
+using Intropy.Topology.Building;
 using Intropy.Topology.Model;
 
 namespace Intropy.Topology.Test.Building;
@@ -99,6 +100,54 @@ public class MaterializationTests
         // Assert
         Assert.Equal(["aaa-topic", "zzz-topic"], topology.Topics.Select(t => t.TopicName));
         Assert.Equal(["erp", "pim"], topology.Connectors.Select(c => c.Name));
+    }
+
+    [Fact]
+    public void Build_WithDuplicateIdenticalServiceDeclarations_ShouldDedupeSilently()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("extractor").Publishes(TestTopics.Raw);
+        s.AddLoader("sink").Subscribes(TestTopics.Raw);
+        s.UsesService(TestServices.Idempotency);
+        s.UsesService(TestServices.Idempotency);
+
+        // Act
+        var topology = s.Build();
+
+        // Assert: one resource, no diagnostics
+        Assert.Single(topology.Services);
+        Assert.Empty(s.Validate());
+    }
+
+    [Fact]
+    public void Build_WithConflictingServiceDeclarations_ShouldKeepFirstSeen()
+    {
+        // Arrange: materialization never fails; the conflict is validation's to report
+        var s = SystemBuilder.Create("test-system");
+        s.UsesService(ServiceRef.Define("idempotency", Service.Container("redis:7", 6379)));
+        s.UsesService(ServiceRef.Define("idempotency", Service.Container("redis:8", 6379)));
+
+        // Act
+        var topology = TopologyMaterializer.Materialize(s);
+
+        // Assert
+        var service = Assert.Single(topology.Services);
+        Assert.Equal(Service.Container("redis:7", 6379), service.Service);
+    }
+
+    [Fact]
+    public void Build_ShouldSortServicesDeterministically()
+    {
+        // Arrange: declare in non-alphabetical order
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("extractor").Publishes(TestTopics.Raw);
+        s.AddLoader("sink").Subscribes(TestTopics.Raw);
+        s.UsesService(ServiceRef.Define("zeta-store", Service.Container("redis:7", 6380)));
+        s.UsesService(ServiceRef.Define("alpha-store", Service.Container("redis:7", 6379)));
+
+        // Act & Assert
+        Assert.Equal(["alpha-store", "zeta-store"], s.Build().Services.Select(x => x.Name));
     }
 
     // A second edge that a block cannot legally have (formerly the ITP203/204/205 family)

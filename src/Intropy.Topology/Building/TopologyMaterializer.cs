@@ -47,7 +47,23 @@ internal static class TopologyMaterializer
                     UsedBy = [.. c.Value.UsedBy],
                 })
                 .ToArray(),
+            Services = MaterializeServices(builder.Services),
         };
+    }
+
+    private static ServiceResource[] MaterializeServices(IReadOnlyList<ServiceRef> declarations)
+    {
+        var services = new Dictionary<string, Service>(StringComparer.Ordinal);
+        foreach (var declaration in declarations)
+        {
+            // First-seen wins on identity; conflicting declarations are reported by validation.
+            services.TryAdd(declaration.Name, declaration.Service);
+        }
+
+        return services
+            .OrderBy(s => s.Key, StringComparer.Ordinal)
+            .Select(s => new ServiceResource { Name = s.Key, Service = s.Value })
+            .ToArray();
     }
 
     private static ComponentModel MaterializeComponent(

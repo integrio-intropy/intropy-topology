@@ -8,12 +8,15 @@ namespace Intropy.Topology;
 /// Entry point for declaring an integration system's topology. Add components, wire
 /// them to topics and connectors, then call <see cref="Build"/> to materialize and
 /// validate the immutable <see cref="SystemTopology"/>. Resources (topics, connectors)
-/// materialize from usage — there is no <c>AddTopic</c>. Not thread-safe;
-/// a second <see cref="Build"/> after further mutation reflects the mutations.
+/// materialize from usage — there is no <c>AddTopic</c>; shared platform services are
+/// the exception, declared explicitly with <see cref="UsesService"/> because no edge
+/// references them. Not thread-safe; a second <see cref="Build"/> after further
+/// mutation reflects the mutations.
 /// </summary>
 public sealed class SystemBuilder
 {
     private readonly List<Component> _components = [];
+    private readonly List<ServiceRef> _services = [];
 
     /// <summary>The system's name (DNS-1123 label).</summary>
     public string SystemName { get; }
@@ -24,6 +27,8 @@ public sealed class SystemBuilder
     }
 
     internal IReadOnlyList<Component> Components => _components;
+
+    internal IReadOnlyList<ServiceRef> Services => _services;
 
     /// <summary>Creates a builder for a named system.</summary>
     /// <param name="systemName">The system's name (DNS-1123 label).</param>
@@ -45,6 +50,18 @@ public sealed class SystemBuilder
     /// <param name="name">The component's name (DNS-1123 label).</param>
     public TransactionalIntegrationBuilder AddTransactionalIntegration(string name) =>
         new(Register(new TransactionalIntegrationComponent(NameRules.RequireLabel(name, nameof(name)))));
+
+    /// <summary>
+    /// Declares a shared platform service the whole system depends on. The run backend
+    /// starts it and starts every component only after it is ready. No connectivity is
+    /// injected — starting the service and the startup ordering is the whole contract.
+    /// </summary>
+    /// <param name="service">The service the system uses.</param>
+    public void UsesService(ServiceRef service)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        _services.Add(service);
+    }
 
     /// <summary>
     /// Materializes and validates the topology. Throws when any error-severity

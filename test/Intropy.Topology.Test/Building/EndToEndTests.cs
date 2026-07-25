@@ -49,6 +49,9 @@ public class EndToEndTests
         s.AddLoader("price-loader")
             .Subscribes(PriceFlow.Raw);
 
+        // A shared platform service the whole system depends on.
+        s.UsesService(ServiceRef.Define("idempotency", Service.Container("docker.io/library/redis:7", 6379)));
+
         return s;
     }
 
@@ -97,6 +100,10 @@ public class EndToEndTests
         Assert.Equal(Transport.File("./test/pim"), pim.Transport);
         Assert.Equal("binding.pim", pim.DaprComponentName);
         Assert.Equal(["pim-extractor", "pricing-service"], pim.UsedBy);
+
+        var service = Assert.Single(topology.Services);
+        Assert.Equal("idempotency", service.Name);
+        Assert.Equal(Service.Container("docker.io/library/redis:7", 6379), service.Service);
     }
 
     [Fact]
@@ -112,7 +119,7 @@ public class EndToEndTests
         // Byte-exact snapshot of the sample system's serialized model: guards materializer
         // output across builder refactors. Regenerate only on intentional model changes.
         const string expected =
-            """{"SystemName":"product-distribution","Components":[{"Name":"pim-extractor","Kind":0,"Schedule":"*/5 * * * *","Subscribes":[],"Publishes":[{"Port":"default","PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Connectors":[{"ConnectorName":"pim","Direction":0}]},{"Name":"pricing-service","Kind":2,"Schedule":null,"Subscribes":[],"Publishes":[],"Connectors":[{"ConnectorName":"pim","Direction":0},{"ConnectorName":"erp","Direction":1}]},{"Name":"product-loader","Kind":1,"Schedule":null,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Publishes":[],"Connectors":[{"ConnectorName":"erp","Direction":1}]},{"Name":"price-extractor","Kind":0,"Schedule":null,"Subscribes":[],"Publishes":[{"Port":"default","PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Connectors":[]},{"Name":"price-loader","Kind":1,"Schedule":null,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Publishes":[],"Connectors":[]}],"Topics":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["price-extractor"],"Subscribers":["price-loader"]},{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["pim-extractor"],"Subscribers":["product-loader"]}],"Connectors":[{"Name":"erp","Transport":{"$transport":"file","DaprType":"bindings.localstorage","RootPath":"./test/erp"},"DaprComponentName":"binding.erp","Directions":[1],"UsedBy":["pricing-service","product-loader"]},{"Name":"pim","Transport":{"$transport":"file","DaprType":"bindings.localstorage","RootPath":"./test/pim"},"DaprComponentName":"binding.pim","Directions":[0],"UsedBy":["pim-extractor","pricing-service"]}]}""";
+            """{"SystemName":"product-distribution","Components":[{"Name":"pim-extractor","Kind":0,"Schedule":"*/5 * * * *","Subscribes":[],"Publishes":[{"Port":"default","PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Connectors":[{"ConnectorName":"pim","Direction":0}]},{"Name":"pricing-service","Kind":2,"Schedule":null,"Subscribes":[],"Publishes":[],"Connectors":[{"ConnectorName":"pim","Direction":0},{"ConnectorName":"erp","Direction":1}]},{"Name":"product-loader","Kind":1,"Schedule":null,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Publishes":[],"Connectors":[{"ConnectorName":"erp","Direction":1}]},{"Name":"price-extractor","Kind":0,"Schedule":null,"Subscribes":[],"Publishes":[{"Port":"default","PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Connectors":[]},{"Name":"price-loader","Kind":1,"Schedule":null,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Publishes":[],"Connectors":[]}],"Topics":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["price-extractor"],"Subscribers":["price-loader"]},{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["pim-extractor"],"Subscribers":["product-loader"]}],"Connectors":[{"Name":"erp","Transport":{"$transport":"file","DaprType":"bindings.localstorage","RootPath":"./test/erp"},"DaprComponentName":"binding.erp","Directions":[1],"UsedBy":["pricing-service","product-loader"]},{"Name":"pim","Transport":{"$transport":"file","DaprType":"bindings.localstorage","RootPath":"./test/pim"},"DaprComponentName":"binding.pim","Directions":[0],"UsedBy":["pim-extractor","pricing-service"]}],"Services":[{"Name":"idempotency","Service":{"$service":"container","Image":"docker.io/library/redis:7","Port":6379}}]}""";
 
         // Act
         var json = JsonSerializer.Serialize(DeclareSystem().Build());
@@ -139,5 +146,8 @@ public class EndToEndTests
         Assert.Equal(["product-raw"], deserialized.Components[2].Subscribes.Select(t => t.TopicName));
         var file = Assert.IsType<FileTransport>(deserialized.Connectors.Single(c => c.Name == "erp").Transport);
         Assert.Equal("./test/erp", file.RootPath);
+        var container = Assert.IsType<ContainerService>(deserialized.Services.Single().Service);
+        Assert.Equal("docker.io/library/redis:7", container.Image);
+        Assert.Equal(6379, container.Port);
     }
 }

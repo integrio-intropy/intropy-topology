@@ -156,6 +156,47 @@ public class BuilderMappingTests
     }
 
     [Fact]
+    public void UsesService_ShouldAppearInBuiltTopology()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("extractor").Publishes(TestTopics.Raw);
+        s.AddLoader("sink").Subscribes(TestTopics.Raw);
+        s.UsesService(TestServices.Idempotency);
+
+        // Act
+        var service = s.Build().Services.Single();
+
+        // Assert
+        Assert.Equal("idempotency", service.Name);
+        var container = Assert.IsType<ContainerService>(service.Service);
+        Assert.Equal("docker.io/library/redis:7", container.Image);
+        Assert.Equal(6379, container.Port);
+    }
+
+    [Fact]
+    public void UsesService_WithoutAnyDeclaration_ShouldLeaveServicesEmpty()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("extractor").Publishes(TestTopics.Raw);
+        s.AddLoader("sink").Subscribes(TestTopics.Raw);
+
+        // Act & Assert
+        Assert.Empty(s.Build().Services);
+    }
+
+    [Fact]
+    public void UsesService_WithNull_ShouldThrowArgumentNullException()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => s.UsesService(null!));
+    }
+
+    [Fact]
     public void Build_CalledTwiceAfterMutation_ShouldReflectMutation()
     {
         // Arrange
