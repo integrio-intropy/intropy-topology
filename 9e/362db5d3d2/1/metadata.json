@@ -1,0 +1,41 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "9e362db5d3d2",
+  "session_id": "676ac302-a06d-4990-89ee-19ad06833472",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-25T20:43:08.136371Z",
+  "branch": "feat/platform-services",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/Intropy.Topology.Aspire/IntropyAspire.cs",
+    "test/Intropy.Topology.Aspire.Test/IntropyAspireTests.cs"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5",
+  "turn_id": "d06e69cc62c7",
+  "checkpoint_transcript_start": 333,
+  "transcript_lines_at_start": 333,
+  "compact_transcript_start": 75,
+  "token_usage": {
+    "input_tokens": 12,
+    "cache_creation_tokens": 9360,
+    "cache_read_tokens": 927688,
+    "output_tokens": 4961,
+    "api_call_count": 6
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-25T20:43:08.099573Z",
+    "agent_lines": 105,
+    "agent_removed": 2,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 105,
+    "total_lines_changed": 107,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
