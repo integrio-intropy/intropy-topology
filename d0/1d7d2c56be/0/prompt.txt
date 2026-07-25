@@ -1,0 +1,166 @@
+We should configure idempotency service and business incident service in the template
+
+---
+
+<task-notification>
+<task-id>a7239cf485b7b640c</task-id>
+<tool-use-id>toolu_012QB76p3pEqNEr7DoK4ABDq</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-robinhultman-dev-intropy-tooling-intropy-topology/676ac302-a06d-4990-89ee-19ad06833472/tasks/a7239cf485b7b640c.output</output-file>
+<status>completed</status>
+<summary>Agent "Find service images and CLI templates" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## 1. Idempotency Service — `/Users/robinhultman/dev/intropy/tooling/idempotency-service`
+
+**What it is:** a **.NET 10 ASP.NET Core minimal-API service** — *not* Redis. It stores idempotency records through a **Dapr state store** and is reached by callers via **Dapr service invocation** (app-id `idempotency-service`). Decision logic: Proceed/Ignore based on hash + timestamp (`README.md`).
+
+| Fact | Value | Evidence |
+|---|---|---|
+| Published image | `harbor.intropy.io/platform/idempotency-service:&lt;version&gt;` + `:latest` | `/Users/robinhultman/dev/intropy/tooling/idempotency-service/.github/workflows/release.yml` (`REGISTRY: harbor.intropy.io`, `REGISTRY_PROJECT: platform`) |
+| Chart default tag | `1.0.0` | `/Users/robinhultman/dev/intropy/tooling/idempotency-service/charts/idempotency-service/values.yaml:9-15` |
+| **Tag the templates actually pin** | **`1.1.1`** | `/Users/robinhultman/dev/intropy/tooling/intropy-templates/extractor/skeleton/local/platform-services/compose.yaml:12` |
+| Container port | **8080** (`EXPOSE 8080`, `8081`; `ASPNETCORE_URLS: http://+:8080`) | `.../idempotency-service/Dockerfile`, templates compose |
+| K8s service port / Dapr app-port | 8080 | `charts/idempotency-service/values.yaml:52-57`, `templates/deployment.yaml:17-19` |
+| Base image | `mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra` (distroless → **no shell, no healthcheck possible**) | `Dockerfile` |
+
+**Local deployment shape (this is the shape to copy):** `/Users/robinhultman/dev/intropy/tooling/intropy-templates/extractor/skeleton/local/platform-services/compose.yaml` — service on `8080:8080`, plus a **`daprio/daprd:1.16.1` sidecar** (`-app-id idempotency-service -app-port 8080 -dapr-http-port 3500`, `DAPR_HOST_IP=127.0.0.1`, `network_mode: service:idempotency-service`), backed by **azurite** (Azure Table Storage emulator) via `idempotency/statestore.yaml` (`state.azure.tablestorage`, table `IdempotencyService`, scoped to `idempotency-service`). Its own repo's compose uses postgres instead (`local/compose.yaml`, `local/dapr-components/...`).
+
+## 2. Business Incident Service — `/Users/robinhultman/dev/intropy/services/business-incident-service`
+
+(The `tooling/business-incident-enrichment` folder is a dead end — a single `CLAUDE.md` prompt for a Tempo-based support agent. The real service lives under `intropy/services/`. Related but separate: `services/business-incident-enricher`, `business-incident-email-loader`, `business-incident-devops-exporter`.)
+
+**What it is:** .NET 10 ASP.NET Core service, Postgres-backed (Dapper + migrations image), with Dapr internal pub/sub + notification pub/sub. **Two Kestrel listeners.**
+
+| Fact | Value | Evidence |
+|---|---|---|
+| Published image | `harbor.intropy.io/platform/business-incident-service` (+ `-migrate` sidecar image) | `/Users/robinhultman/dev/intropy/services/business-incident-service/pipeline/run.yml:9-26`, `templates/docker.yml` |
+| Chart default tag | `1.1.0` | `charts/business-incident-service/values.yaml:9-15` |
+| **Tag the templates pin** | **`1.1.0`** | `/Users/robinhultman/dev/intropy/tooling/intropy-templates/extractor/skeleton/local/platform-services/compose.yaml:43` |
+| Ports | **8080 = Public, 8081 = Internal** (`Ports.Public/Ports.Internal`, both `ListenAnyIP`) | `service/src/Configuration/Ports.cs:5-6`, `service/src/Program.cs` |
+| Dapr app-port (k8s) | **8081** (`dapr.appPort`) | `charts/business-incident-service/values.yaml:137-138`, `templates/deployment.yaml:17-19` |
+| Dapr app-port (templates compose) | 8080, published as **`8081:8080`** | templates `platform-services/compose.yaml:43-50` |
+
+**Load-bearing subtlety — which port the framework needs.** The client's incident-reporting call is `POST events`, and `events`/`outbox`/health are gated with `.RequireHost($"*:{Ports.Internal}")` (8081), while `incidents` queries are gated to `*:{Ports.Public}` (8080):
+
+- `client/src/BusinessIncidentServiceClient.cs:144` → `CreateInvokeMethodRequest(POST, _appId, "events")`
+- `service/src/Endpoints/EventEndpoints.cs:53,95,121` → `.RequireHost("*:8081")`
+
+`RequireHost` matches the **Host header**, so the service must be addressed on **:8081** for the framework's write path to route. That's why the template's HTTPEndpoint points at `http://127.0.0.1:8081` even though the compose maps host 8081 → container 8080.
+
+## How the framework/pipeline addresses both services
+
+- **No URL env vars at all.** Both clients use **Dapr service invocation** through the local sidecar. App-ids are hardcoded defaults:
+  - `IdempotencyServiceClientOptions.AppId = "idempotency-service"`, optional `DaprHttpEndpoint` (defaults `http://localhost:3500`) — `/Users/robinhultman/dev/intropy/tooling/idempotency-service/client/src/IdempotencyServiceClientOptions.cs`
+  - `BusinessIncidentServiceClientOptions.AppId = "business-incident-service"` (no endpoint override at all) — `/Users/robinhultman/dev/intropy/services/business-incident-service/client/src/BusinessIncidentServiceClientOptions.cs`
+  - Config sections if bound from `IConfiguration`: `IdempotencyService:*` and `BusinessIncidentService:*`.
+- **Resolution is via Dapr `HTTPEndpoint` components**, whose `metadata.name` must equal the app-id:
+  - `/Users/robinhultman/dev/intropy/tooling/intropy-templates/extractor/skeleton/local/dapr-components/idempotency-service.yaml` → `baseUrl: http://127.0.0.1:8080`
+  - `.../local/dapr-components/business-incident-service.yaml` → `baseUrl: http://127.0.0.1:8081`
+- Blocks register both unconditionally: `extractor/skeleton/src/Program.cs.tmpl:30-31` (`AddIdempotencyServiceClient(); AddBusinessIncidentServiceClient();`) — so `sys create` can emit both services without a per-block flag.
+- Job sidecar port: `DAPR_HTTP_PORT` default `3500` (`extractor/skeleton/Taskfile.yml.tmpl:14,60`); `task services:up` prints "Idempotency Service → http://localhost:8080, Business Incident Service → http://localhost:8081" (`Taskfile.yml.tmpl:69-77`).
+- `intropy-libs-pipeline/src/Idempotency/ServiceCollectionExtensions.cs` only adapts an already-registered `IIdempotencyServiceClient` — no addressing of its own. Same for `src/BusinessIncidents/ExternalBusinessIncidentRouter.cs`.
+
+**⇒ Required declaration ports:** idempotency-service on **8080**, business-incident-service on **8081**. These fit `Service.Container(image, port)`'s container-port == host-port constraint (the incident service listens on both 8080 and 8081, so 8081 works natively; no collision with 8080).
+
+**⚠️ Two gaps for a `ServiceRef`-only scaffold:** `ContainerService` carries **only image + port — no env vars, no sidecar, no dependencies** (ADR 0011 explicitly: "No connectivity contract"). But the idempotency service needs a **daprd sidecar + azurite state store**, and the incident service needs **Postgres (+ migration job) + rabbitmq/azurite + daprd**, plus `DaprComponentsConfig:*` env. Declaring them as bare `ServiceRef` containers starts them but they won't be functional unless the Aspire backend also brings the sidecars/backends (compare the templates' compose, which needs 6 services to do this).
+
+## 3. intropy-cli `sys create` — `/Users/robinhultman/dev/intropy/tooling/intropy-cli` (branch `feature/system`)
+
+### Where code generation lives
+Templates are **Go raw-string literals**, not files on disk:
+
+- **`/Users/robinhultman/dev/intropy/tooling/intropy-cli/internal/system/codegen.go`** — `topicsFileTmpl`, `connectorsFileTmpl`, `systemClassFileTmpl` (`text/template`), plus `writeTopicsFile`, `writeConnectorsFile`, `writeSystemClassFile`, `renderTo`, `componentView`, `defaultExtractorSchedule = "* * * * *"`.
+- `/Users/robinhultman/dev/intropy/tooling/intropy-cli/internal/system/create.go` — orchestration: `template.ListScaffolds` → `Assemble` → render `system-host` template → read back `projectName`/`systemClass` → `writeTopicsFile` → `writeConnectorsFile` → `writeSystemClassFile` → `mkdir test/&lt;connector&gt;` → `insertProjectReference`.
+- `/Users/robinhultman/dev/intropy/tooling/intropy-cli/internal/system/assemble.go` — builds `Model` from scaffold records (topics, connectors; **no notion of services**).
+- `/Users/robinhultman/dev/intropy/tooling/intropy-cli/internal/system/model.go` — `Model{Name, ProjectName, SystemClass, Components, Topics, Connectors, Shared}` — **no `Services` field yet**.
+- `/Users/robinhultman/dev/intropy/tooling/intropy-cli/internal/system/csproj.go` — textual `ProjectReference` insertion before `&lt;/Project&gt;`.
+- CLI surface: `/Users/robinhultman/dev/intropy/tooling/intropy-cli/cmd/intropy/sys_create.go` (`-n/--name`, `-o/--output`, `--version`, `--force`, `--output-json`), `cmd/intropy/sys.go`.
+
+The **static shell** is a separate repo: `/Users/robinhultman/dev/intropy/tooling/intropy-templates/system-host/` — `template.yaml`, `skeleton/Program.cs`, `skeleton/Topics.cs.tmpl`, `skeleton/Connectors.cs.tmpl`, `skeleton/{{ .systemClass }}.cs.tmpl`, `skeleton/{{ .projectName }}.SystemHost.csproj.tmpl`, `AGENTS.md.tmpl`, `Taskfile.yml.tmpl`, `README.md.tmpl`, `Properties/launchSettings.json`.
+
+### Does it emit Services.cs / UsesService? **No.**
+`codegen.go` has exactly three templates (Topics, Connectors, SystemClass). Confirmed by ADR 0011's own "out of scope" list in the topology repo: *"`intropy sys create` codegen emitting `Services.cs`/`UsesService` (intropy-cli repo) — until then the example host runs ahead of the golden template."*
+
+### The golden-output test mechanism — `internal/system/create_test.go`
+1. A **fake system-host template** is built in-memory: `systemHostTemplateYAML` (trimmed but faithful copy of the real manifest — same `required: [name]`, same `spec.values` derivations for `projectName`/`systemClass`/`pubsub`) and `systemHostFiles()`, a `map[path]content` with **placeholder stand-ins** (`"// placeholder\n"`).
+2. `buildTarGz` packs it under prefix `owner-repo-abc123`; `newSystemHostServer` serves `/repos/o/r/releases/latest` and `/repos/o/r/tarball/&lt;tag&gt;` via `httptest` and counts hits with an `atomic.Int32` (used to assert local validation precedes network I/O).
+3. `writeWorkspace` lays out the tutorial workspace (`order-extractor`, `order-loader`, `Contracts`) by writing real `.intropy/scaffold.json` records via `template.WriteScaffold`.
+4. Golden output = **exact string comparison** against consts `wantTopicsCS`, `wantSystemCS`, `wantConnectorsCS`, `wantLegacySystemCS` (`if string(topics) != wantTopicsCS { t.Errorf(...) }`). No golden files, no `-update` flag — **adding a Services.cs means adding a `wantServicesCS` const and a read/compare block.**
+5. Tests: `TestCreateAssemblesSystem`, `TestCreateWithoutConnectorsPlaceholderDegradesToLegacyOutput`, `TestCreateWithRecordMissingConnectorOmitsItsFromTo`, `TestCreateDefaultsOutputDirToKebabName`, `TestCreateRefusesNonEmptyOutputDir`, `TestCreateForceRerunSkipsOldHost`, `TestCreateValidatesBeforeNetwork`, `TestCreateFailsWhenPlaceholderMissing`.
+
+**Placeholder gate = the versioning contract.** Codegen **never creates** a declaration file; it only overwrites a placeholder the template rendered. Missing `&lt;SystemClass&gt;.cs` → hard error; missing `Connectors.cs` → **warn + degrade** (no `From/To`, no `WithSchedule`, no `test/` folders) because "this release predates connectors" and its pinned `Intropy.Topology` lacks `Transport.File`. A `Services.cs` should follow the same degrade pattern.
+
+### Current template content (exact)
+
+`systemClassFileTmpl` (codegen.go:44-63):
+```go
+const systemClassFileTmpl = `using Intropy.Topology;
+
+/// &lt;summary&gt;The {{ .Name }} system: what exists, and what connects it.&lt;/summary&gt;
+public sealed class {{ .SystemClass }} : ISystemDefinition
+{
+    public string SystemName =&gt; "{{ .Name }}";
+
+    public void Define(SystemBuilder builder)
+    {
+{{- range .Components }}
+        builder.{{ .Add }}("{{ .AppID }}")
+{{- range .Calls }}
+            {{ . }}
+{{- end }};
+{{- end }}
+    }
+}
+`
+```
+
+`connectorsFileTmpl` (the closest analogue for a refs file, codegen.go:30-42):
+```go
+const connectorsFileTmpl = `using Intropy.Topology;
+
+/// &lt;summary&gt;The system's connectors: the named ports its edge blocks reach the outside world through. Each defaults to a local file folder under test/ so the system runs with zero external configuration.&lt;/summary&gt;
+public static class Connectors
+{
+{{- range $i, $c := .Connectors }}
+{{- if $i }}
+{{ end }}
+    /// &lt;summary&gt;Local file connector '{{ $c.Name }}' (folder ./test/{{ $c.Name }}). Point it at a real external system and transport when known.&lt;/summary&gt;
+    public static readonly ConnectorRef {{ $c.Field }} = ConnectorRef.Define("{{ $c.Name }}", Transport.File("./test/{{ $c.Name }}"));
+{{- end }}
+}
+`
+```
+(`topicsFileTmpl` is the same shape with `using {{ .Shared.Name }};` and `TopicRef&lt;T&gt;.Define(pubsub, topic)`.)
+
+### Package version + template versioning
+- Generated csproj pins **`Intropy.Topology.Aspire` 0.2.0** and **`Intropy.Topology.Generation` 0.2.0** (Aspire SDK/AppHost 13.4.6, net10.0): `/Users/robinhultman/dev/intropy/tooling/intropy-templates/system-host/skeleton/{{ .projectName }}.SystemHost.csproj.tmpl`. Matching local packages exist at `/Users/robinhultman/dev/intropy/local-nuget/Intropy.Topology*.0.2.0.nupkg`.
+- Templates are versioned as **GitHub release tags of `intropy-templates`**, resolved by `internal/template/create.go:resolveReleaseTag` (`--version`, default = `latest` release) and recorded in `.intropy/scaffold.json` (`owner`, `repo`, `version`). Latest tag there: **`v0.3.0-rc.1`** (prior series `v0.2.1-beta.1…9`).
+- **`Services.cs` needs three coordinated changes:** the `system-host` skeleton gains a `Services.cs.tmpl` placeholder → new templates tag; the csproj pin bumps to a topology version containing `ServiceRef` (currently unreleased — the feature lives on `intropy-topology` branch `feat/platform-services`); `codegen.go` gains the template + degrade gate.
+
+### Recent commits / branches
+- **intropy-cli** — on `feature/system` (not merged to `main`): `823f4686 Add schedule`, `b51ae760 Model system concept`. Uncommitted working-tree changes to exactly the two files you'd touch: `internal/system/codegen.go` + `internal/system/create_test.go`, refactoring `componentView` from fixed fields (`Edge/From/To/Schedule`) to a **`Calls []string` list rendered one-per-line** — i.e. the chained-call rendering is already generalized. No service-related commits or branches.
+- **intropy-topology** (cwd) — on `feat/platform-services`, the whole feature already landed: `1f35e47 feat: add ServiceRef and Service container spec`, `19ad7fb feat: declare platform services on the system and materialize them`, `568bad7 feat: validate platform-service conflicts and name collisions`, `a08bd68 feat(aspire): start declared platform services as waited-for backends`, `fd64077 feat(generation): show declared services in the graph verb`, `f4cf2ee docs: record platform services in ADR 0011, concepts, and example`.
+
+### The target shape already exists as a hand-written example
+`/Users/robinhultman/dev/intropy/tooling/intropy-topology/examples/OrderFlow.SystemHost/Services.cs`:
+```csharp
+using Intropy.Topology;
+
+/// &lt;summary&gt;The shared platform services the system depends on. The run backend starts each one and starts every component only after it is ready; no connectivity is injected — components reach the service on its fixed port.&lt;/summary&gt;
+public static class Services
+{
+    /// &lt;summary&gt;The shared idempotency store (Redis on its default port).&lt;/summary&gt;
+    public static readonly ServiceRef Idempotency = ServiceRef.Define("idempotency", Service.Container("docker.io/library/redis:7", 6379));
+}
+```
+and in `examples/OrderFlow.SystemHost/OrderFlowSystem.cs`: `builder.UsesService(Services.Idempotency);` (with a comment noting it "runs ahead of the golden template").
+
+Note the example uses a **Redis placeholder**, which is *not* what these two services are — the real declarations should be:
+```csharp
+public static readonly ServiceRef Idempotency = ServiceRef.Define("idempotency-service",
+    Service.Container("harbor.intropy.io/platform/idempotency-service:1.1.1", 8080));
+public static readonly ServiceRef BusinessIncidents = ServiceRef.Define("business-incident-service",
+    Service.Container("harbor.intropy.io/platform/business-incident-service:1.1.0", 8081));
+```
+Names must be DNS-1123 labels, must not collide with component names, and `rabbitmq` is reserved (ITP402); duplicate name with differing definition is ITP108 (`/Users/robinhultman/dev/intropy/tooling/intropy-topology/docs/concepts/services.md`, `docs/decisions/0011-system-level-platform-services.md`). API surface: `src/Intropy.Topology/Refs.cs:143-229` (`ServiceRef.Define`, `Service.Container(image, port)`, `ContainerService`), `src/Intropy.Topology/SystemBuilder.cs:56-64` (`UsesService` returns `void`).</result>
+<usage><subagent_tokens>106067</subagent_tokens><tool_uses>55</tool_uses><duration_ms>334785</duration_ms></usage>
+</task-notification>

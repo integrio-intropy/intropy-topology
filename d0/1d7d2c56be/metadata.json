@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "d01d7d2c56be",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/Intropy.Topology.Aspire/IntropyAspire.cs",
+    "test/Intropy.Topology.Aspire.Test/IntropyAspireTests.cs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d0/1d7d2c56be/0/metadata.json",
+      "transcript": "/d0/1d7d2c56be/0/full.jsonl",
+      "compact_transcript": "/d0/1d7d2c56be/0/transcript.jsonl",
+      "content_hash": "/d0/1d7d2c56be/0/content_hash.txt",
+      "prompt": "/d0/1d7d2c56be/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 12,
+    "cache_creation_tokens": 14664,
+    "cache_read_tokens": 1166543,
+    "output_tokens": 8530,
+    "api_call_count": 6
+  }
+}
