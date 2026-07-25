@@ -3,7 +3,7 @@
   "checkpoint_id": "84ccc6772ee9",
   "strategy": "manual-commit",
   "branch": "feat/platform-services",
-  "checkpoints_count": 1,
+  "checkpoints_count": 3,
   "files_touched": [
     "src/Intropy.Topology.Generation/IntropyGenerate.cs",
     "test/Intropy.Topology.Generation.Test/IntropyGenerateTests.cs",
@@ -16,13 +16,20 @@
       "compact_transcript": "/84/ccc6772ee9/0/transcript.jsonl",
       "content_hash": "/84/ccc6772ee9/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/84/ccc6772ee9/1/metadata.json",
+      "transcript": "/84/ccc6772ee9/1/full.jsonl",
+      "compact_transcript": "/84/ccc6772ee9/1/transcript.jsonl",
+      "content_hash": "/84/ccc6772ee9/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 14,
+    "cache_creation_tokens": 9113,
+    "cache_read_tokens": 1155653,
+    "output_tokens": 2973,
+    "api_call_count": 7
   }
 }
