@@ -2,9 +2,9 @@ namespace Intropy.Topology.Model;
 
 /// <summary>
 /// One component in the system: an integration block or a container service, together
-/// with all of its edges. How the component is activated at runtime (schedule vs.
-/// long-running) is not modeled here — the topology records only the edges between
-/// components; workload shape lives in the component's own scaffold.
+/// with all of its edges and one activation attribute — an optional cron schedule
+/// (decision 0010). Everything else about the workload shape (hosting model, ports,
+/// process lifetime) lives in the component's own scaffold, not in the topology.
 /// </summary>
 public sealed record ComponentModel
 {
@@ -13,6 +13,10 @@ public sealed record ComponentModel
 
     /// <summary>The component kind this component was declared as.</summary>
     public required ComponentKind Kind { get; init; }
+
+    /// <summary>The cron schedule that activates the component; null when it runs once
+    /// at host start.</summary>
+    public required string? Schedule { get; init; }
 
     /// <summary>Topics the component subscribes to.</summary>
     public required IReadOnlyList<TopicSubscription> Subscribes { get; init; }

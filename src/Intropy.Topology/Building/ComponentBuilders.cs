@@ -42,6 +42,18 @@ public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, Extrac
         Component.AddPublish(topic);
         return this;
     }
+
+    /// <summary>Declares that the extractor is activated on a cron schedule (standard
+    /// five-field cron or a macro such as <c>@daily</c>). Without a schedule the
+    /// extractor runs once at host start. Syntax is validated at
+    /// <see cref="SystemBuilder.Build"/> (ITP210); a later call replaces the value.</summary>
+    /// <param name="cron">The cron expression.</param>
+    /// <exception cref="ArgumentException">The expression is null or whitespace.</exception>
+    public ExtractorBuilder WithSchedule(string cron)
+    {
+        Component.SetSchedule(cron);
+        return this;
+    }
 }
 
 /// <summary>Fluent builder for a loader: an edge block that subscribes to exactly one topic

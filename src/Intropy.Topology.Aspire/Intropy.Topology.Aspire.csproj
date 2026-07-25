@@ -13,6 +13,7 @@
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Dapr" />
+    <PackageReference Include="Cronos" />
   </ItemGroup>
 
 </Project>

@@ -81,6 +81,55 @@ public class MultiplePublishesRuleTests
     }
 }
 
+public class ScheduleExpressionRuleTests
+{
+    [Theory]
+    [InlineData("not a cron")]
+    [InlineData("* * * * * *")]
+    [InlineData("@fortnightly")]
+    public void Validate_WithInvalidCron_ShouldReportItp210(string cron)
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("scheduled").Publishes(TestTopics.Raw).WithSchedule(cron);
+        s.AddLoader("valid-sink").Subscribes(TestTopics.Raw);
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP210"));
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("scheduled", diagnostic.Target);
+        Assert.Throws<TopologyValidationException>(() => s.Build());
+    }
+
+    [Theory]
+    [InlineData("*/5 * * * *")]
+    [InlineData("0 9 * * 1-5")]
+    [InlineData("@daily")]
+    [InlineData("@MIDNIGHT")]
+    public void Validate_WithValidCron_ShouldNotReportItp210(string cron)
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("scheduled").Publishes(TestTopics.Raw).WithSchedule(cron);
+        s.AddLoader("valid-sink").Subscribes(TestTopics.Raw);
+
+        // Act & Assert
+        Assert.Empty(s.DiagnosticsFor("ITP210"));
+    }
+
+    [Fact]
+    public void Validate_WithoutSchedule_ShouldNotReportItp210()
+    {
+        // Arrange: the schedule is optional — an unscheduled extractor runs once at host start
+        var s = SystemBuilder.Create("test-system").WithValidComponent();
+
+        // Act & Assert
+        Assert.Empty(s.DiagnosticsFor("ITP210"));
+    }
+}
+
 public class DuplicateSubscriptionRuleTests
 {
     [Fact]

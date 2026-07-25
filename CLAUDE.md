@@ -32,7 +32,7 @@ This is a typed, fluent DSL for declaring Intropy integration-system topologies 
 
 **This is the minimal model** — exactly what the system tutorial and `intropy sys create` need. The full model (aggregators, APIs/`Provides`/`Consumes`, named publish ports, Http/Sftp/Blob/Custom transports, unresolved connectors, the `IDevProfile` mocking seam, the Prod generation profile) is preserved on the **`full-topology`** branch for later reapplication; don't re-add those features here piecemeal — cherry-pick from that branch.
 
-**The topology is only the edges *between* components** — subscriptions, publishes, connectors. What activates a component at runtime (cron schedule vs. long-running app) and its workload shape are *not* modeled here; they live in the component's own scaffold. There is no trigger concept and no `WorkloadType`.
+**The topology is the edges *between* components** — subscriptions, publishes, connectors — **plus one activation attribute**: an optional cron schedule (`WithSchedule`, extractors only, ITP210 at Build; ADR 0010). Everything else about the workload shape (hosting model, ports, process lifetime) lives in the component's own scaffold. There is still no trigger concept and no `WorkloadType`; the Aspire backend's `ComponentScheduler` re-runs scheduled components on their ticks (Cronos is that project's only extra dependency — the core stays dependency-free).
 
 ### Packages
 

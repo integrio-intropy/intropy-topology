@@ -48,6 +48,7 @@ Codes are grouped in bands.
 | ITP207 | Error | Loaders subscribe to exactly one topic |
 | ITP208 | Error | A published topic must have a subscriber |
 | ITP209 | Error | A subscribed topic must have a publisher |
+| ITP210 | Error | A declared schedule must be valid five-field cron or a macro such as `@daily` |
 | ITP302 | Warning | A component with no edges (no subscriptions, publishes, or connectors) is likely unfinished |
 | ITP401 | Error | A pubsub name must not equal a connector's derived Dapr component name |
 
@@ -60,7 +61,7 @@ These codes are never emitted at `Build()` and are never reused:
 | ITP105 | Retired with the minimal model — connector direction capabilities (input support) are not modeled; the file transport reads and writes |
 | ITP106 | Retired with the minimal model — as ITP105, for output support |
 | ITP107 | Retired with the minimal model — unresolved connectors no longer exist; every `ConnectorRef` carries a transport |
-| ITP201 | Retired — invalid cron; triggers and schedules are no longer modeled |
+| ITP201 | Retired — invalid cron on the trigger-era `ScheduleTrigger`; the schedule *attribute* introduced by [ADR 0010](../decisions/0010-schedule-as-activation-attribute.md) uses ITP210 |
 | ITP202 | Retired — missing trigger; triggers no longer exist |
 | ITP203 | Retired — multiple `TriggeredBy`; triggers no longer exist |
 | ITP204 | Enforced at compile time — an illegal edge for a block simply doesn't exist on its builder |
@@ -71,7 +72,7 @@ The features behind ITP105/106/107/501 live on the `full-topology` branch (see [
 
 ## Argument validation
 
-Name and argument invariants are enforced eagerly at the call site, not collected: component, topic, and connector names are DNS-1123 labels/subdomains and throw `ArgumentException` immediately when invalid. Only *semantic* topology validation is deferred to `Build()`.
+Name and argument invariants are enforced eagerly at the call site, not collected: component, topic, and connector names are DNS-1123 labels/subdomains and throw `ArgumentException` immediately when invalid, and `WithSchedule` throws for a null/whitespace expression. Only *semantic* topology validation is deferred to `Build()` — including cron syntax (ITP210), so all diagnostics report at once.
 
 ## Related
 

@@ -5,6 +5,7 @@ using CommunityToolkit.Aspire.Hosting.Dapr;
 using Intropy.Topology.Generation;
 using Intropy.Topology.Model;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Intropy.Topology.Aspire;
 
@@ -12,8 +13,10 @@ namespace Intropy.Topology.Aspire;
 /// The Aspire run-backend. Discovers a system's validated topology, generates its Dapr
 /// components, and translates the model into Aspire resources — one project per component
 /// with a Dapr sidecar on its own staged component overlay, and RabbitMQ behind pub/sub —
-/// then runs it under DCP, subscribers before their publishers. Aspire never sees the
-/// topology; it receives ordinary resources.
+/// then runs it under DCP, subscribers before their publishers. Scheduled components are
+/// re-run on their cron ticks by the <see cref="ComponentScheduler"/> (CronJob emulation,
+/// with a "Run now" dashboard command). Aspire never sees the topology; it receives
+/// ordinary resources.
 /// </summary>
 public static class IntropyAspire
 {
@@ -115,13 +118,26 @@ public static class IntropyAspire
                 continue;
             }
 
-            // The endpoint makes Aspire allocate a port and inject ASPNETCORE_URLS (without it every
-            // Kestrel binds the 5000 default) and gives the Dapr sidecar its app-port.
-            var project = builder.AddProject(component.Name, projectPath).WithHttpEndpoint();
+            var project = builder.AddProject(component.Name, projectPath);
+            if (component.Schedule is null)
+            {
+                // The endpoint makes Aspire allocate a port and inject ASPNETCORE_URLS (without it
+                // every Kestrel binds the 5000 default) and gives the Dapr sidecar its app-port.
+                // A scheduled component is a run-to-completion job that receives no inbound
+                // delivery, so it gets neither.
+                project = project.WithHttpEndpoint();
+            }
+            else
+            {
+                AddRunNowCommand(project, component.Name);
+            }
+
             Wire(project, component, stagedPath, configDir, backends);
             resources[component.Name] = project;
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
+
+        RegisterScheduler(builder, topology);
 
         if (unresolved.Count > 0)
         {
@@ -162,6 +178,47 @@ public static class IntropyAspire
                     [.. materialized.Select(s => $"{s}-dapr-cli")];
             }
         }
+    }
+
+    /// <summary>
+    /// Registers the <see cref="ComponentScheduler"/> when any component declares a schedule.
+    /// Keyed off <c>Schedule</c>, not the component kind — the scheduler is kind-blind.
+    /// </summary>
+    private static void RegisterScheduler(IDistributedApplicationBuilder builder, SystemTopology topology)
+    {
+        var scheduled = topology.Components
+            .Where(c => c.Schedule is not null)
+            .Select(c => new ScheduledComponent(c.Name, c.Schedule!))
+            .ToArray();
+        if (scheduled.Length == 0)
+        {
+            return;
+        }
+
+        builder.Services.TryAddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<IReadOnlyList<ScheduledComponent>>(scheduled);
+        builder.Services.AddSingleton<IResourceLifecycle, AspireResourceLifecycle>();
+        builder.Services.AddSingleton<ComponentScheduler>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<ComponentScheduler>());
+    }
+
+    /// <summary>
+    /// A dashboard command that triggers a scheduled component immediately, through the same
+    /// path as a cron tick — including the skip when the previous run is still in progress.
+    /// </summary>
+    private static void AddRunNowCommand(IResourceBuilder<ProjectResource> project, string componentName)
+    {
+        project.WithCommand(
+            name: "intropy-run-now",
+            displayName: "Run now",
+            executeCommand: async context =>
+            {
+                var scheduler = context.ServiceProvider.GetRequiredService<ComponentScheduler>();
+                await scheduler.TriggerAsync(componentName, "manual run", context.CancellationToken)
+                    .ConfigureAwait(false);
+                return CommandResults.Success();
+            },
+            commandOptions: new CommandOptions { IconName = "Play", IconVariant = IconVariant.Filled });
     }
 
     /// <summary>

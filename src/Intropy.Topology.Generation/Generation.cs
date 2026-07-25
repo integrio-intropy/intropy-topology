@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Intropy.Topology.Model;
 
 namespace Intropy.Topology.Generation;
@@ -44,7 +45,13 @@ public sealed class GeneratedArtifacts
 /// </summary>
 public static class TopologyGenerator
 {
-    private static readonly JsonSerializerOptions s_json = new() { WriteIndented = true };
+    // WhenWritingNull keeps unscheduled components' config byte-identical to before the
+    // Schedule attribute existed; no other emitted property is ever null.
+    private static readonly JsonSerializerOptions s_json = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
 
     /// <summary>Generates the artifacts for a topology.</summary>
     /// <param name="topology">The validated topology.</param>
@@ -114,6 +121,7 @@ public static class TopologyGenerator
                 System = systemName,
                 Component = component.Name,
                 Kind = component.Kind.ToString(),
+                component.Schedule,
                 Subscribes = component.Subscribes.Select(s => new { s.PubSubName, s.TopicName }),
                 Publishes = component.Publishes.Select(p => new { p.Port, p.PubSubName, p.TopicName }),
                 Connectors = component.Connectors.Select(c => new

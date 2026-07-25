@@ -23,6 +23,7 @@
         <PackageReference Include="JunitXml.TestLogger" />
         <PackageReference Include="coverlet.msbuild" />
         <PackageReference Include="Aspire.Hosting.Testing" />
+        <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     </ItemGroup>
 
     <ItemGroup>

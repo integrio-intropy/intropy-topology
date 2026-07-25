@@ -94,6 +94,11 @@ public static class IntropyGenerate
             ["kind"] = KebabCase(component.Kind.ToString()),
         };
 
+        if (component.Schedule is not null)
+        {
+            entry["schedule"] = component.Schedule;
+        }
+
         if (component.Subscribes.Count > 0)
         {
             entry["subscribes"] = component.Subscribes

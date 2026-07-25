@@ -9,7 +9,9 @@ internal static class TopologyRules
     // ITP204 (trigger kind not allowed for the block kind), ITP205 (connector direction
     // not allowed for the block kind). No longer meaningful since triggers were replaced
     // by edges and activation/workload shape moved to the component scaffold: ITP201
-    // (invalid cron), ITP202 (missing trigger), ITP203 (multiple TriggeredBy calls).
+    // (invalid cron on the trigger-era ScheduleTrigger — its successor for the schedule
+    // *attribute* introduced by decision 0010 is ITP210), ITP202 (missing trigger),
+    // ITP203 (multiple TriggeredBy calls).
     // Retired with the minimal model (full versions live on the full-topology branch):
     // ITP105/ITP106 (connector direction capability — the file transport supports both),
     // ITP107 (unresolved connector — every connector now declares its transport),
@@ -24,6 +26,7 @@ internal static class TopologyRules
         new Rules.ConnectorConflictRule(),
         new Rules.MissingRequiredOutputRule(),
         new Rules.MissingRequiredSubscriptionRule(),
+        new Rules.ScheduleExpressionRule(),
         new Rules.UnconsumedTopicRule(),
         new Rules.UnproducedTopicRule(),
         new Rules.NoEdgesRule(),

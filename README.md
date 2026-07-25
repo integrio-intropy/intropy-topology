@@ -22,9 +22,10 @@ builder that exposes only the edges legal for that block. *Illegal topology is a
 a validation diagnostic*; only what types cannot check (completeness and cross-component conflicts)
 is validated at `Build()`.
 
-The topology records only the edges **between** components — subscriptions, publishes, and
-connectors out to the outside world. How a component is activated at runtime and its workload shape
-are not modeled here; they live in the component's own scaffold.
+The topology records the edges **between** components — subscriptions, publishes, and connectors
+out to the outside world — plus one activation attribute: an optional cron schedule
+(`WithSchedule`, extractors only). Everything else about the workload shape lives in the
+component's own scaffold.
 
 ## Packages
 

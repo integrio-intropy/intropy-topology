@@ -99,6 +99,26 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
+    public void Generate_WithSchedule_ShouldEmitScheduleInRuntimeConfig()
+    {
+        // Act
+        var json = Content("config/order-extractor.intropy.json");
+
+        // Assert
+        Assert.Contains("\"Schedule\": \"*/5 * * * *\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generate_WithoutSchedule_ShouldOmitScheduleFromRuntimeConfig()
+    {
+        // Act — unscheduled components' config stays byte-identical to the pre-schedule shape.
+        var json = Content("config/order-loader.intropy.json");
+
+        // Assert
+        Assert.DoesNotContain("Schedule", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Generate_ShouldBeDeterministic()
     {
         // Act

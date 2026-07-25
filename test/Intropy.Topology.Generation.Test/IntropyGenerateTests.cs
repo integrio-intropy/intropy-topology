@@ -46,6 +46,17 @@ public class IntropyGenerateTests
     }
 
     [Fact]
+    public async Task RunAsync_Graph_ShouldShowScheduleOnlyForScheduledComponents()
+    {
+        // Act — order-extractor declares a schedule; the other components do not.
+        var (_, output) = await Capture(() => IntropyGenerate.RunAsync(s_assembly, ["graph"]));
+
+        // Assert
+        Assert.Contains("\"schedule\": \"*/5 * * * *\"", output, StringComparison.Ordinal);
+        Assert.Equal(1, output.Split("\"schedule\"").Length - 1);
+    }
+
+    [Fact]
     public async Task RunAsync_Generate_ShouldWriteArtifactsToDirectory()
     {
         // Arrange

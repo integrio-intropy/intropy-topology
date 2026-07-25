@@ -8,7 +8,7 @@ Intropy.Topology lets a SystemHost project declare a system's components (extrac
 
 This is the **minimal model** — exactly the surface the system tutorial and `intropy sys create` use. The full model (aggregators, APIs, named publish ports, sftp/blob/http/custom transports, dev mocking) is preserved on the `full-topology` branch ([ADR 0009](decisions/0009-minimal-model-for-system-tutorial.md)).
 
-The topology models only the edges *between* components — subscriptions, publishes, connectors. How a component is activated at runtime (a schedule vs. a long-running app) and its workload shape are not modeled; they live in the component's own scaffold.
+The topology models the edges *between* components — subscriptions, publishes, connectors — plus one activation attribute: an optional cron schedule (`WithSchedule`, extractors only; [ADR 0010](decisions/0010-schedule-as-activation-attribute.md)). Everything else about the workload shape lives in the component's own scaffold.
 
 The library's signature move is **compile-time legality**: each `Add*` call returns a block-specific builder that exposes only the grammar legal for that block. Illegal topology is a compile error, not a validation diagnostic; only what types cannot check (completeness and cross-component conflicts) is validated at `Build()`.
 

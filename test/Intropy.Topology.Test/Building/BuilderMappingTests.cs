@@ -106,6 +106,53 @@ public class BuilderMappingTests
         // Assert
         Assert.Same(builder, builder.Publishes(TestTopics.Raw));
         Assert.Same(builder, builder.From(TestConnectors.Pim));
+        Assert.Same(builder, builder.WithSchedule("@daily"));
+    }
+
+    [Fact]
+    public void WithSchedule_ShouldRecordScheduleOnComponentModel()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("extractor").Publishes(TestTopics.Raw).WithSchedule("*/5 * * * *");
+        s.AddLoader("sink").Subscribes(TestTopics.Raw);
+
+        // Act
+        var topology = s.Build();
+
+        // Assert
+        Assert.Equal("*/5 * * * *", topology.Components[0].Schedule);
+        Assert.Null(topology.Components[1].Schedule);
+    }
+
+    [Fact]
+    public void WithSchedule_CalledTwice_ShouldKeepLastValue()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("extractor")
+            .Publishes(TestTopics.Raw)
+            .WithSchedule("@hourly")
+            .WithSchedule("@daily");
+        s.AddLoader("sink").Subscribes(TestTopics.Raw);
+
+        // Act & Assert
+        Assert.Equal("@daily", s.Build().Components[0].Schedule);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void WithSchedule_WithNullOrWhitespace_ShouldThrowArgumentException(string? cron)
+    {
+        // Arrange: null/whitespace is an argument error at the call site; cron *syntax*
+        // is deferred to Build() (ITP210) so all diagnostics report at once.
+        var s = SystemBuilder.Create("test-system");
+        var builder = s.AddExtractor("extractor");
+
+        // Act & Assert
+        Assert.ThrowsAny<ArgumentException>(() => builder.WithSchedule(cron!));
     }
 
     [Fact]

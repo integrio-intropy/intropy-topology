@@ -16,6 +16,12 @@ The adapter is a one-way **translator**. At AppHost startup it:
 Aspire never sees the topology; it receives ordinary resources. This mirrors the one-way
 relationship Generation has with Dapr YAML, targeting a live object model instead of files.
 
+Components that declare a schedule (`WithSchedule`, [ADR 0010](../../docs/decisions/0010-schedule-as-activation-attribute.md))
+are re-run on their cron ticks by the `ComponentScheduler` — CronJob emulation for the dev
+loop: sidecar restarted first, overlapping ticks skipped with a warning, a "Run now"
+command on the dashboard, local time zone. Cronos (cron next-occurrence math) is this
+package's only dependency beyond Aspire itself.
+
 ## Usage
 
 One entry point in the AppHost, two backends of the same discovered truth:
