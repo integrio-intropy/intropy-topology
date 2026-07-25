@@ -9,7 +9,12 @@ namespace Intropy.Topology.Aspire;
 /// then closes them — so the probe connects and requires the connection to survive a short read
 /// window (a server banner or plain silence both pass); an immediate EOF means not ready.
 /// </summary>
-internal sealed class TcpReadyHealthCheck(string host, int port) : IHealthCheck
+internal interface IBackendReadiness
+{
+    Task WaitUntilReadyAsync(TimeSpan timeout, CancellationToken cancellationToken);
+}
+
+internal sealed class TcpReadyHealthCheck(string host, int port) : IHealthCheck, IBackendReadiness
 {
     private static readonly TimeSpan s_readWindow = TimeSpan.FromMilliseconds(750);
 
