@@ -15,5 +15,9 @@ public sealed class OrderFlowSystem : ISystemDefinition
             .Publishes(Topics.Orders)
             .WithSchedule("* * * * *");
         builder.AddLoader("order-loader").Subscribes(Topics.Orders).To(Connectors.OrderLoaderDestination);
+
+        // UsesService also runs ahead of the golden template: the whole system waits for
+        // the shared idempotency store before any component starts.
+        builder.UsesService(Services.Idempotency);
     }
 }

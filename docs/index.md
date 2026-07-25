@@ -34,7 +34,7 @@ s.AddLoader("order-loader")
 SystemTopology topology = s.Build();   // throws TopologyValidationException with all violations
 ```
 
-Topics and connectors are declared as static fields in a scaffolded `Topics.cs` / `Connectors.cs`; resources materialize from usage — there is no `AddTopic`.
+Topics and connectors are declared as static fields in a scaffolded `Topics.cs` / `Connectors.cs`; resources materialize from usage — there is no `AddTopic`. Shared platform services are the exception: `builder.UsesService(Services.Idempotency)` declares a container the whole system depends on, which the run backend starts first ([Services](concepts/services.md)).
 
 ## Key features
 
@@ -52,6 +52,7 @@ Topics and connectors are declared as static fields in a scaffolded `Topics.cs` 
 | [Components](concepts/components.md) | Component kinds, block builders, and their legal edges |
 | [Topics](concepts/topics.md) | Typed topic refs and the materialize-from-usage model |
 | [Connectors](concepts/connectors.md) | Connectors, the file transport, and derived binding names |
+| [Services](concepts/services.md) | Shared platform services the run backend starts before any component |
 | [Validation](concepts/validation.md) | The ITP diagnostic codes and the Build/TryBuild/Validate API |
 | [Materialization](concepts/materialization.md) | How declarations fold into the immutable model |
 | [Decisions](decisions/0001-staged-per-block-builders.md) | Design decision records |
