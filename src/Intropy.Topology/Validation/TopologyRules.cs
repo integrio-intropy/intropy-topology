@@ -16,6 +16,10 @@ internal static class TopologyRules
     // ITP105/ITP106 (connector direction capability — the file transport supports both),
     // ITP107 (unresolved connector — every connector now declares its transport),
     // ITP501 (API provider — the API surface is not part of the minimal model).
+    // ITP301 (service declared but unused) is retired permanently: it presupposed the
+    // per-component .Uses edge; services are system-level since ADR 0011, so there is
+    // no usage to check. ITP402 was revived by the same ADR with its original meaning
+    // (service name collision).
     private static readonly ITopologyRule[] Rules =
     [
         new Rules.DuplicateComponentNameRule(),
@@ -24,6 +28,7 @@ internal static class TopologyRules
         new Rules.DuplicateSubscriptionRule(),
         new Rules.TopicContractConflictRule(),
         new Rules.ConnectorConflictRule(),
+        new Rules.ServiceConflictRule(),
         new Rules.MissingRequiredOutputRule(),
         new Rules.MissingRequiredSubscriptionRule(),
         new Rules.ScheduleExpressionRule(),
@@ -31,6 +36,7 @@ internal static class TopologyRules
         new Rules.UnproducedTopicRule(),
         new Rules.NoEdgesRule(),
         new Rules.PubSubConnectorNameCollisionRule(),
+        new Rules.ServiceNameCollisionRule(),
     ];
 
     public static IReadOnlyList<TopologyDiagnostic> Run(SystemBuilder builder, SystemTopology topology)

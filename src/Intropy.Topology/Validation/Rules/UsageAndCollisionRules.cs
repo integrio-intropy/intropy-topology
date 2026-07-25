@@ -48,3 +48,42 @@ internal sealed class PubSubConnectorNameCollisionRule : ITopologyRule
         }
     }
 }
+
+/// <summary>
+/// ITP402: a service name must not collide with another runtime resource name — a
+/// component's, or the run backend's reserved <c>rabbitmq</c> broker — because services
+/// and components share one resource-name namespace when the system runs.
+/// </summary>
+internal sealed class ServiceNameCollisionRule : ITopologyRule
+{
+    /// <summary>The run backend's pub/sub broker resource; its name is taken.</summary>
+    private const string ReservedBrokerName = "rabbitmq";
+
+    public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
+    {
+        var componentNames = context.Topology.Components
+            .Select(c => c.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var service in context.Topology.Services)
+        {
+            if (componentNames.Contains(service.Name))
+            {
+                yield return new TopologyDiagnostic(
+                    "ITP402",
+                    DiagnosticSeverity.Error,
+                    $"The service '{service.Name}' has the same name as a component; services and components share one resource-name namespace.",
+                    service.Name);
+            }
+
+            if (string.Equals(service.Name, ReservedBrokerName, StringComparison.Ordinal))
+            {
+                yield return new TopologyDiagnostic(
+                    "ITP402",
+                    DiagnosticSeverity.Error,
+                    $"The service name '{ReservedBrokerName}' is reserved for the run backend's pub/sub broker.",
+                    service.Name);
+            }
+        }
+    }
+}

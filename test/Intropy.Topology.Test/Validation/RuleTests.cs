@@ -46,6 +46,18 @@ public class EmptySystemRuleTests
         Assert.Single(s.DiagnosticsFor("ITP002"));
         Assert.Throws<TopologyValidationException>(() => s.Build());
     }
+
+    [Fact]
+    public void Validate_WithOnlyServices_ShouldStillReportItp002()
+    {
+        // Arrange: a platform service declares no integration — the system is still empty
+        var s = SystemBuilder.Create("test-system");
+        s.UsesService(TestServices.Idempotency);
+
+        // Act & Assert
+        Assert.Single(s.DiagnosticsFor("ITP002"));
+        Assert.Throws<TopologyValidationException>(() => s.Build());
+    }
 }
 
 public class MultiplePublishesRuleTests
@@ -208,12 +220,47 @@ public class ConnectorConflictRuleTests
     }
 }
 
+public class ServiceConflictRuleTests
+{
+    [Fact]
+    public void Validate_WithSameServiceNameForTwoDefinitions_ShouldReportItp108()
+    {
+        // Arrange: one service name, two different definitions
+        var s = SystemBuilder.Create("test-system").WithValidComponent();
+        s.UsesService(ServiceRef.Define("idempotency", Service.Container("redis:7", 6379)));
+        s.UsesService(ServiceRef.Define("idempotency", Service.Container("redis:8", 6379)));
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP108"));
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("idempotency", diagnostic.Target);
+        Assert.Equal("The service 'idempotency' is declared with conflicting definitions.", diagnostic.Message);
+        Assert.Throws<TopologyValidationException>(() => s.Build());
+    }
+
+    [Fact]
+    public void Validate_WithSameServiceDeclaredTwiceIdentically_ShouldNotReportItp108()
+    {
+        // Arrange: two identical declarations of one service
+        var s = SystemBuilder.Create("test-system").WithValidComponent();
+        s.UsesService(ServiceRef.Define("idempotency", Service.Container("redis:7", 6379)));
+        s.UsesService(ServiceRef.Define("idempotency", Service.Container("redis:7", 6379)));
+
+        // Act & Assert
+        Assert.Empty(s.DiagnosticsFor("ITP108"));
+    }
+}
+
 // ITP201 (invalid cron), ITP202 (missing trigger), and ITP203 (multiple TriggeredBy) are
 // retired: triggers were replaced by edges and activation/workload shape moved to the
 // component scaffold. ITP204/ITP205 (trigger kind / connector direction not allowed for a
 // block) are compile errors — the offending methods do not exist on the block's builder
 // type. ITP105/ITP106 (connector direction capability), ITP107 (unresolved connector), and
-// ITP501 (API provider) retired with the minimal model.
+// ITP501 (API provider) retired with the minimal model. ITP301 (service declared but
+// unused) is retired permanently: services are system-level (ADR 0011), so there is no
+// per-component usage to check.
 
 public class MissingRequiredOutputRuleTests
 {
@@ -399,6 +446,53 @@ public class PubSubConnectorNameCollisionRuleTests
         // Assert
         Assert.Equal("binding.shared", diagnostic.Target);
         Assert.Contains("shared", diagnostic.Message);
+    }
+}
+
+public class ServiceNameCollisionRuleTests
+{
+    [Fact]
+    public void Validate_WithServiceNamedLikeComponent_ShouldReportItp402()
+    {
+        // Arrange: services and components share one resource-name namespace at run time
+        var s = SystemBuilder.Create("test-system").WithValidComponent();
+        s.UsesService(ServiceRef.Define("valid-extractor", Service.Container("redis:7", 6379)));
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP402"));
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("valid-extractor", diagnostic.Target);
+        Assert.Contains("same name as a component", diagnostic.Message);
+        Assert.Throws<TopologyValidationException>(() => s.Build());
+    }
+
+    [Fact]
+    public void Validate_WithServiceNamedRabbitmq_ShouldReportItp402()
+    {
+        // Arrange: the run backend claims "rabbitmq" for its pub/sub broker
+        var s = SystemBuilder.Create("test-system").WithValidComponent();
+        s.UsesService(ServiceRef.Define("rabbitmq", Service.Container("redis:7", 6379)));
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP402"));
+
+        // Assert
+        Assert.Equal("rabbitmq", diagnostic.Target);
+        Assert.Contains("reserved", diagnostic.Message);
+        Assert.Throws<TopologyValidationException>(() => s.Build());
+    }
+
+    [Fact]
+    public void Validate_WithDistinctServiceName_ShouldNotReportItp402()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system").WithValidComponent();
+        s.UsesService(TestServices.Idempotency);
+
+        // Act & Assert
+        Assert.Empty(s.DiagnosticsFor("ITP402"));
     }
 }
 

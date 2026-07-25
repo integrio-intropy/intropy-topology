@@ -120,3 +120,22 @@ internal sealed class ConnectorConflictRule : ITopologyRule
         }
     }
 }
+
+/// <summary>ITP108: one service name must not be declared with two different definitions.</summary>
+internal sealed class ServiceConflictRule : ITopologyRule
+{
+    public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
+    {
+        foreach (var group in context.Builder.Services.GroupBy(s => s.Name, StringComparer.Ordinal))
+        {
+            if (group.Select(s => s.Service).Distinct().Count() > 1)
+            {
+                yield return new TopologyDiagnostic(
+                    "ITP108",
+                    DiagnosticSeverity.Error,
+                    $"The service '{group.Key}' is declared with conflicting definitions.",
+                    group.Key);
+            }
+        }
+    }
+}

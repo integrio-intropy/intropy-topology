@@ -44,6 +44,7 @@ Codes are grouped in bands.
 | ITP102 | Error | A component must not subscribe to the same topic more than once |
 | ITP103 | Error | One topic must not be used with two different event contract types |
 | ITP104 | Error | One connector name must not be declared with two different transports |
+| ITP108 | Error | One service name must not be declared with two different definitions |
 | ITP206 | Error | Extractors must publish (a loader's destination may stay a private local component) |
 | ITP207 | Error | Loaders subscribe to exactly one topic |
 | ITP208 | Error | A published topic must have a subscriber |
@@ -51,6 +52,7 @@ Codes are grouped in bands.
 | ITP210 | Error | A declared schedule must be valid five-field cron or a macro such as `@daily` |
 | ITP302 | Warning | A component with no edges (no subscriptions, publishes, or connectors) is likely unfinished |
 | ITP401 | Error | A pubsub name must not equal a connector's derived Dapr component name |
+| ITP402 | Error | A service name must not collide with a component name or the reserved `rabbitmq` broker name |
 
 ### Retired and compile-time-enforced codes
 
@@ -66,6 +68,7 @@ These codes are never emitted at `Build()` and are never reused:
 | ITP203 | Retired — multiple `TriggeredBy`; triggers no longer exist |
 | ITP204 | Enforced at compile time — an illegal edge for a block simply doesn't exist on its builder |
 | ITP205 | Enforced at compile time — as above |
+| ITP301 | Retired permanently — "service declared but unused" presupposed the per-component `.Uses` edge; services are system-level ([ADR 0011](../decisions/0011-system-level-platform-services.md)), so there is no usage to check. ITP402 was revived by the same ADR with its original meaning |
 | ITP501 | Retired with the minimal model — APIs (`Provides`/`Consumes`) are not modeled |
 
 The features behind ITP105/106/107/501 live on the `full-topology` branch (see [ADR 0009](../decisions/0009-minimal-model-for-system-tutorial.md)).
