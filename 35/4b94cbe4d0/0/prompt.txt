@@ -1,0 +1,1 @@
+We have shared platform services that we would like to register in the topology so that aspire can start them via the Intropy.Topology.Aspire. Can you help me design that?
