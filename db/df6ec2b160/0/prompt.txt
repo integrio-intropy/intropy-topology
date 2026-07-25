@@ -1,0 +1,2 @@
+We have a problem with race conditions in Intropy.Aspire between dapr and rabbitmq.
+Gate sidecar startup on broker health (WaitFor), restart-or-retry on component init failure
