@@ -41,11 +41,16 @@ public sealed class IntropyAspireTests : IDisposable
     private IDistributedApplicationBuilder CreateBuilder() =>
         DistributedApplication.CreateBuilder(new DistributedApplicationOptions { ProjectDirectory = AppHostDir });
 
-    private static SystemTopology Topology()
+    private static SystemTopology Topology(ServiceRef? service = null)
     {
         var s = SystemBuilder.Create("order-flow");
         s.AddExtractor("order-extractor").From(s_webshop).Publishes(s_raw);
         s.AddLoader("order-loader").Subscribes(s_raw).To(s_erp);
+        if (service is not null)
+        {
+            s.UsesService(service);
+        }
+
         return s.Build();
     }
 
@@ -89,6 +94,70 @@ public sealed class IntropyAspireTests : IDisposable
         var expected = Path.Combine(builder.AppHostDirectory, "obj", "dapr-components", "order-extractor");
         Assert.Contains(expected, SidecarOptions(builder, "order-extractor").ResourcesPaths!);
         Assert.DoesNotContain(expected, SidecarOptions(builder, "order-loader").ResourcesPaths!);
+    }
+
+    [Fact]
+    public void Apply_WithDeclaredService_ShouldAddContainerWithFixedPort()
+    {
+        // Arrange
+        var builder = CreateBuilder();
+        var topology = Topology(ServiceRef.Define("idempotency", Service.Container("docker.io/library/redis:7", 6379)));
+
+        // Act
+        IntropyAspire.Apply(builder, topology, GeneratedRoot);
+
+        // Assert — a plain container on the declared fixed port, with a readiness check.
+        var container = builder.Resources.Single(r => r.Name == "idempotency");
+        var image = Assert.Single(container.Annotations.OfType<ContainerImageAnnotation>());
+        Assert.Equal("docker.io/library/redis", image.Image);
+        Assert.Equal("7", image.Tag);
+        var endpoint = Assert.Single(container.Annotations.OfType<EndpointAnnotation>());
+        Assert.Equal(6379, endpoint.Port);
+        Assert.Equal(6379, endpoint.TargetPort);
+        Assert.Single(container.Annotations.OfType<HealthCheckAnnotation>());
+    }
+
+    [Fact]
+    public void Apply_WithUntaggedServiceImage_ShouldNotMistakeRegistryPortForTag()
+    {
+        // Arrange — the image's only ':' belongs to the registry port, not a tag.
+        var builder = CreateBuilder();
+        var topology = Topology(ServiceRef.Define("idempotency", Service.Container("localhost:5000/redis", 6379)));
+
+        // Act
+        IntropyAspire.Apply(builder, topology, GeneratedRoot);
+
+        // Assert
+        var container = builder.Resources.Single(r => r.Name == "idempotency");
+        var image = Assert.Single(container.Annotations.OfType<ContainerImageAnnotation>());
+        Assert.Equal("localhost:5000/redis", image.Image);
+    }
+
+    [Fact]
+    public void Apply_WithDeclaredService_ShouldMakeEveryComponentAndSidecarWaitForIt()
+    {
+        // Arrange
+        var builder = CreateBuilder();
+        var topology = Topology(ServiceRef.Define("idempotency", Service.Container("redis:7", 6379)));
+
+        // Act
+        IntropyAspire.Apply(builder, topology, GeneratedRoot);
+
+        // Assert — services are backends: every component and its sidecar waits for them.
+        foreach (var componentName in new[] { "order-extractor", "order-loader" })
+        {
+            var resource = builder.Resources.Single(r => r.Name == componentName);
+            Assert.Contains(
+                resource.Annotations.OfType<WaitAnnotation>(),
+                w => w.Resource.Name == "idempotency");
+
+            var sidecar = (IResource)Assert
+                .Single(resource.Annotations.OfType<DaprSidecarAnnotation>())
+                .Sidecar;
+            Assert.Contains(
+                sidecar.Annotations.OfType<WaitAnnotation>(),
+                w => w.Resource.Name == "idempotency");
+        }
     }
 
     [Fact]

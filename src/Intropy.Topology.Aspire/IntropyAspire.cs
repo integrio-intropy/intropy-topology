@@ -12,7 +12,8 @@ namespace Intropy.Topology.Aspire;
 /// <summary>
 /// The Aspire run-backend. Discovers a system's validated topology, generates its Dapr
 /// components, and translates the model into Aspire resources — one project per component
-/// with a Dapr sidecar on its own staged component overlay, and RabbitMQ behind pub/sub —
+/// with a Dapr sidecar on its own staged component overlay, RabbitMQ behind pub/sub, and a
+/// container per declared platform service that everything waits for —
 /// then runs it under DCP, subscribers before their publishers. Scheduled components are
 /// re-run on their cron ticks by the <see cref="ComponentScheduler"/> (CronJob emulation,
 /// with a "Run now" dashboard command). Aspire never sees the topology; it receives
@@ -71,6 +72,26 @@ public static class IntropyAspire
         // a still-starting backend kills the sidecar.
         var backends = new List<IResourceBuilder<IResource>> { rabbitmq };
         var backendProbes = new List<TcpReadyHealthCheck> { new("localhost", RabbitMqPort) };
+
+        // Declared platform services join the backends: every component (and sidecar) waits
+        // for all of them, and the pre-start gate below holds sidecars until they answer.
+        foreach (var service in topology.Services)
+        {
+            if (service.Service is not ContainerService containerService)
+            {
+                throw new InvalidOperationException(
+                    $"The service '{service.Name}' declares an unsupported service kind.");
+            }
+
+            var (image, tag) = SplitImageTag(containerService.Image);
+            var container = tag is null
+                ? builder.AddContainer(service.Name, image)
+                : builder.AddContainer(service.Name, image, tag);
+            container.WithEndpoint(port: containerService.Port, targetPort: containerService.Port);
+            WithTcpReadiness(builder, container, containerService.Port);
+            backends.Add(container);
+            backendProbes.Add(new TcpReadyHealthCheck("localhost", containerService.Port));
+        }
 
         // Filled after the component loop; the hook closure only reads it at runtime.
         var sidecarWaits = new Dictionary<string, string[]>(StringComparer.Ordinal);
@@ -291,6 +312,19 @@ public static class IntropyAspire
         }
 
         return edges.Keys.Any(Visit);
+    }
+
+    /// <summary>
+    /// Splits a container image reference into Aspire's (image, tag) shape. The tag is the
+    /// part after the last ':' that follows the last '/', so a registry port
+    /// (<c>localhost:5000/img</c>) is not mistaken for a tag.
+    /// </summary>
+    private static (string Image, string? Tag) SplitImageTag(string reference)
+    {
+        var colon = reference.LastIndexOf(':');
+        return colon > reference.LastIndexOf('/')
+            ? (reference[..colon], reference[(colon + 1)..])
+            : (reference, null);
     }
 
     private static void WithTcpReadiness(
