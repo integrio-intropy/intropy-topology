@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "d050bf292949",
+  "strategy": "manual-commit",
+  "branch": "feat/platform-services",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CLAUDE.md",
+    "docs/concepts/materialization.md",
+    "docs/concepts/services.md",
+    "docs/decisions/0011-system-level-platform-services.md",
+    "docs/index.md",
+    "examples/OrderFlow.SystemHost/OrderFlowSystem.cs",
+    "examples/OrderFlow.SystemHost/Services.cs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d0/50bf292949/0/metadata.json",
+      "transcript": "/d0/50bf292949/0/full.jsonl",
+      "compact_transcript": "/d0/50bf292949/0/transcript.jsonl",
+      "content_hash": "/d0/50bf292949/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}

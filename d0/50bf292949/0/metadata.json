@@ -1,0 +1,43 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "d050bf292949",
+  "session_id": "019f9ae4-c1fc-7245-a2c3-cf25502bc707",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-25T20:47:45.913245Z",
+  "branch": "feat/platform-services",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CLAUDE.md",
+    "docs/concepts/materialization.md",
+    "docs/concepts/services.md",
+    "docs/decisions/0011-system-level-platform-services.md",
+    "docs/index.md",
+    "examples/OrderFlow.SystemHost/OrderFlowSystem.cs",
+    "examples/OrderFlow.SystemHost/Services.cs"
+  ],
+  "agent": "Pi",
+  "model": "gpt-5.6-terra",
+  "turn_id": "08153ddd1143",
+  "checkpoint_transcript_start": 33,
+  "transcript_lines_at_start": 33,
+  "compact_transcript_start": 11,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-25T20:47:45.900492Z",
+    "agent_lines": 152,
+    "agent_removed": 6,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 152,
+    "total_lines_changed": 158,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
