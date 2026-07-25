@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Typed, fluent DSL for declaring integration-system topologies. Materializes an immutable, serializable system model consumed by downstream Kubernetes and Dapr generation tooling.</Description>
+    <PackageTags>intropy;topology;integration;dapr;system-model</PackageTags>
+  </PropertyGroup>
+
+</Project>

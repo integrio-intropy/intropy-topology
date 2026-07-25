@@ -1,0 +1,12 @@
+<Solution>
+  <Project Path="src\Intropy.Topology\Intropy.Topology.csproj" />
+  <Project Path="src\Intropy.Topology.Generation\Intropy.Topology.Generation.csproj" />
+  <Project Path="src\Intropy.Topology.Aspire\Intropy.Topology.Aspire.csproj" />
+  <Project Path="test\Intropy.Topology.Test\Intropy.Topology.Test.csproj" />
+  <Project Path="test\Intropy.Topology.Generation.Test\Intropy.Topology.Generation.Test.csproj" />
+  <Project Path="test\Intropy.Topology.Aspire.Test\Intropy.Topology.Aspire.Test.csproj" />
+  <Project Path="examples\OrderFlow.Contracts\OrderFlow.Contracts.csproj" />
+  <Project Path="examples\OrderFlow.SystemHost\OrderFlow.SystemHost.csproj" />
+  <Project Path="examples\order-extractor\order-extractor.csproj" />
+  <Project Path="examples\order-loader\order-loader.csproj" />
+</Solution>

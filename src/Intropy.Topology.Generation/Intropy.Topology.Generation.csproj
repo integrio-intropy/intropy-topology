@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Generation for Intropy.Topology: turns a validated SystemTopology into Dapr component YAML and per-component runtime config, for a dev or prod profile. Backend-agnostic; consumed by the Aspire run backend and the generate/check/graph CLI verbs.</Description>
+    <PackageTags>intropy;topology;generation;dapr;yaml</PackageTags>
+    <!-- This package hosts the generate/check/graph CLI verbs, which write to the console. -->
+    <NoWarn>$(NoWarn);CA1303</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Intropy.Topology\Intropy.Topology.csproj" />
+  </ItemGroup>
+
+</Project>

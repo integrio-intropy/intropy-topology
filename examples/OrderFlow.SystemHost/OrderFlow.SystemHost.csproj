@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <Sdk Name="Aspire.AppHost.Sdk" Version="13.4.6" />
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>OrderFlow.SystemHost</RootNamespace>
+        <IsAspireHost>true</IsAspireHost>
+        <IsPackable>false</IsPackable>
+        <UserSecretsId>order-flow-systemhost</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Aspire.Hosting.AppHost" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="../../src/Intropy.Topology.Aspire/Intropy.Topology.Aspire.csproj" IsAspireProjectResource="false" />
+        <ProjectReference Include="../../src/Intropy.Topology.Generation/Intropy.Topology.Generation.csproj" IsAspireProjectResource="false" />
+        <ProjectReference Include="../OrderFlow.Contracts/OrderFlow.Contracts.csproj" IsAspireProjectResource="false" />
+    </ItemGroup>
+
+</Project>
