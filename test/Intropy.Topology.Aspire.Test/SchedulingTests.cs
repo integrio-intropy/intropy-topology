@@ -71,6 +71,21 @@ public sealed class SchedulingApplyTests : IDisposable
     }
 
     [Fact]
+    public void Apply_ShouldRegisterDaprSidecarRecovery_ForUnscheduledComponents()
+    {
+        // Arrange
+        var builder = CreateBuilder();
+
+        // Act
+        IntropyAspire.Apply(builder, Topology(schedule: null), GeneratedRoot);
+
+        // Assert — startup recovery protects every sidecar, not just cron-triggered components.
+        Assert.Contains(builder.Services, d => d.ServiceType == typeof(DaprSidecarRecovery));
+        Assert.Contains(builder.Services, d => d.ServiceType == typeof(IResourceStateMonitor));
+        Assert.Contains(builder.Services, d => d.ServiceType == typeof(IBackendReadiness));
+    }
+
+    [Fact]
     public void Apply_WithoutScheduledComponents_ShouldNotRegisterTheScheduler()
     {
         // Arrange

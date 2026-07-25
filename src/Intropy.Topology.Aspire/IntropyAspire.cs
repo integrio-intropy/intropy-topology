@@ -137,6 +137,7 @@ public static class IntropyAspire
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
 
+        RegisterDaprSidecarRecovery(builder, backendProbes);
         RegisterScheduler(builder, topology);
 
         if (unresolved.Count > 0)
@@ -197,9 +198,25 @@ public static class IntropyAspire
 
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IReadOnlyList<ScheduledComponent>>(scheduled);
-        builder.Services.AddSingleton<IResourceLifecycle, AspireResourceLifecycle>();
+        builder.Services.TryAddSingleton<IResourceLifecycle, AspireResourceLifecycle>();
         builder.Services.AddSingleton<ComponentScheduler>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<ComponentScheduler>());
+    }
+
+    /// <summary>
+    /// Registers recovery for every Dapr sidecar, including unscheduled components. The normal
+    /// pre-start gate prevents the common race; recovery covers the remaining interval where a
+    /// backend passes TCP readiness but daprd's component initialization still fails.
+    /// </summary>
+    private static void RegisterDaprSidecarRecovery(
+        IDistributedApplicationBuilder builder, IReadOnlyList<TcpReadyHealthCheck> backendProbes)
+    {
+        builder.Services.TryAddSingleton<IResourceLifecycle, AspireResourceLifecycle>();
+        builder.Services.AddSingleton<IResourceStateMonitor, AspireResourceStateMonitor>();
+        builder.Services.AddSingleton<IBackendReadiness>(
+            new BackendReadiness(backendProbes.Cast<IBackendReadiness>().ToArray()));
+        builder.Services.AddSingleton<DaprSidecarRecovery>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<DaprSidecarRecovery>());
     }
 
     /// <summary>
