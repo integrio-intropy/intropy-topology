@@ -3,7 +3,7 @@
   "checkpoint_id": "5bd58b15deca",
   "strategy": "manual-commit",
   "branch": "feat/platform-services",
-  "checkpoints_count": 1,
+  "checkpoints_count": 3,
   "files_touched": [
     "src/Intropy.Topology/Building/TopologyMaterializer.cs",
     "src/Intropy.Topology/Model/Resources.cs",
@@ -21,13 +21,20 @@
       "compact_transcript": "/5b/d58b15deca/0/transcript.jsonl",
       "content_hash": "/5b/d58b15deca/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/5b/d58b15deca/1/metadata.json",
+      "transcript": "/5b/d58b15deca/1/full.jsonl",
+      "compact_transcript": "/5b/d58b15deca/1/transcript.jsonl",
+      "content_hash": "/5b/d58b15deca/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 26,
+    "cache_creation_tokens": 16814,
+    "cache_read_tokens": 1591831,
+    "output_tokens": 8784,
+    "api_call_count": 13
   }
 }
