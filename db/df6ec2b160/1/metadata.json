@@ -1,0 +1,79 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "dbdf6ec2b160",
+  "session_id": "session",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-25T20:01:34.843407Z",
+  "branch": "fix/dapr-rabbitmq-startup-race",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    "src/Intropy.Topology.Aspire/IntropyAspire.cs",
+    "src/Intropy.Topology.Aspire/TcpReadyHealthCheck.cs",
+    "test/Intropy.Topology.Aspire.Test/SchedulingTests.cs"
+  ],
+  "agent": "Pi",
+  "model": "gpt-5.6-terra",
+  "turn_id": "a1878d15c31e",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 36781,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 187392,
+    "output_tokens": 1494,
+    "api_call_count": 8
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-25T20:01:34.832432Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 655,
+    "human_modified": 2,
+    "human_removed": 0,
+    "total_committed": 655,
+    "total_lines_changed": 657,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 336,
+      "user_lines_removed": 2,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "src/Intropy.Topology.Aspire/IntropyAspire.cs": 18,
+        "src/Intropy.Topology.Aspire/SidecarRecovery.cs": 142,
+        "src/Intropy.Topology.Aspire/TcpReadyHealthCheck.cs": 6,
+        "test/Intropy.Topology.Aspire.Test/SchedulingTests.cs": 15,
+        "test/Intropy.Topology.Aspire.Test/SidecarRecoveryTests.cs": 155
+      },
+      "user_removed_per_file": {
+        "src/Intropy.Topology.Aspire/IntropyAspire.cs": 1,
+        "src/Intropy.Topology.Aspire/TcpReadyHealthCheck.cs": 1
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 321,
+      "user_lines_removed": 0,
+      "agent_lines_added": 39,
+      "agent_lines_removed": 2,
+      "user_added_per_file": {
+        "src/Intropy.Topology.Aspire/SidecarRecovery.cs": 149,
+        "test/Intropy.Topology.Aspire.Test/SidecarRecoveryTests.cs": 172
+      }
+    }
+  ]
+}
