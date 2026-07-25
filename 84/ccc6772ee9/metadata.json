@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "84ccc6772ee9",
+  "strategy": "manual-commit",
+  "branch": "feat/platform-services",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/Intropy.Topology.Generation/IntropyGenerate.cs",
+    "test/Intropy.Topology.Generation.Test/IntropyGenerateTests.cs",
+    "test/Intropy.Topology.Generation.Test/TestSystem.cs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/84/ccc6772ee9/0/metadata.json",
+      "transcript": "/84/ccc6772ee9/0/full.jsonl",
+      "compact_transcript": "/84/ccc6772ee9/0/transcript.jsonl",
+      "content_hash": "/84/ccc6772ee9/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
