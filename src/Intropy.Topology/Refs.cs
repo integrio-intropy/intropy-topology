@@ -140,3 +140,90 @@ public sealed record FileTransport : Transport
         RootPath = rootPath;
     }
 }
+
+/// <summary>
+/// Reference to a shared platform service the system depends on (e.g. an idempotency
+/// store). Services are declared as static fields in a scaffolded <c>Services.cs</c> and
+/// registered on the system with <c>UsesService</c> — unlike topics and connectors they do
+/// not materialize from usage, because no edge references them. The run backend starts the
+/// service and starts every component only after it is ready; no connectivity is injected —
+/// starting the service and the startup ordering is the whole contract.
+/// </summary>
+public sealed record ServiceRef
+{
+    /// <summary>The service's name (DNS-1123 label; becomes the run backend's resource name).</summary>
+    public string Name { get; }
+
+    /// <summary>What the service materializes as.</summary>
+    public Service Service { get; }
+
+    private ServiceRef(string name, Service service)
+    {
+        Name = name;
+        Service = service;
+    }
+
+    /// <summary>Declares a shared platform service.</summary>
+    /// <param name="name">The service's name (DNS-1123 label).</param>
+    /// <param name="service">What the service materializes as.</param>
+    /// <exception cref="ArgumentException">The name is not a valid DNS-1123 label.</exception>
+    public static ServiceRef Define([ConstantExpected] string name, Service service)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        return new ServiceRef(NameRules.RequireLabel(name, nameof(name)), service);
+    }
+}
+
+/// <summary>
+/// What a shared platform service materializes as when the system runs. Mirrors
+/// <see cref="Transport"/>: a closed, JSON-discriminated hierarchy of service kinds.
+/// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "$service")]
+[JsonDerivedType(typeof(ContainerService), "container")]
+public abstract record Service
+{
+    private protected Service()
+    {
+    }
+
+    /// <summary>
+    /// An arbitrary container listening on a fixed port. The image may embed a tag
+    /// (<c>redis:7</c>); without one the backend's default (<c>latest</c>) applies.
+    /// Digest (<c>@sha256:…</c>) references are not supported. The declared port is both
+    /// the container port and the fixed host port it is published on.
+    /// </summary>
+    /// <param name="image">The container image reference, optionally with a tag.</param>
+    /// <param name="port">The port the service listens on (container port == host port).</param>
+    /// <exception cref="ArgumentException">The image is null or whitespace.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The port is outside 1–65535.</exception>
+    public static Service Container([ConstantExpected] string image, int port) =>
+        new ContainerService(image, port);
+}
+
+/// <summary>
+/// A platform service running as a container on a fixed port. The port is both the
+/// container port and the host port — generation runs before the system starts, so
+/// endpoints must be known up front.
+/// </summary>
+public sealed record ContainerService : Service
+{
+    /// <summary>The container image reference, optionally with a tag; digests unsupported.</summary>
+    public string Image { get; }
+
+    /// <summary>The port the service listens on (container port == fixed host port).</summary>
+    public int Port { get; }
+
+    /// <summary>Creates a container service. Prefer <see cref="Service.Container"/>.</summary>
+    /// <param name="image">The container image reference, optionally with a tag.</param>
+    /// <param name="port">The port the service listens on.</param>
+    /// <exception cref="ArgumentException">The image is null or whitespace.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The port is outside 1–65535.</exception>
+    public ContainerService(string image, int port)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(image);
+        ArgumentOutOfRangeException.ThrowIfLessThan(port, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(port, 65535);
+        Image = image;
+        Port = port;
+    }
+}

@@ -2,9 +2,9 @@ namespace Intropy.Topology.Validation;
 
 /// <summary>
 /// Name syntax rules for topology identifiers. Short names (system, component, port,
-/// endpoint, connector) must be DNS-1123 labels because they become Kubernetes resource
-/// names, Dapr app-ids, or derived Dapr binding component names
-/// (<c>binding.&lt;connector-name&gt;</c>); resource names (topic, pubsub, service) must be
+/// endpoint, connector, service) must be DNS-1123 labels because they become Kubernetes
+/// resource names, Dapr app-ids, or derived Dapr binding component names
+/// (<c>binding.&lt;connector-name&gt;</c>); resource names (topic, pubsub) must be
 /// DNS-1123 subdomains because they become Dapr Component <c>metadata.name</c> values.
 /// </summary>
 internal static class NameRules
