@@ -7,7 +7,7 @@ The adapter is a one-way **translator**. At AppHost startup it:
 
 1. **discovers** the system's validated topology from the assembly (`SystemDiscovery`),
 2. **generates** dev Dapr components in-memory (`Intropy.Topology.Generation`) to a temp folder, then
-3. **translates** the model into Aspire resources — a plain RabbitMQ container behind pub/sub,
+3. **translates** the model into Aspire resources — a plain Redis container behind pub/sub,
    `AddContainer` for declared mock external systems, one Microcks instance serving every
    contract-backed mock, one `AddProject` (by folder convention) or dev-override container per
    component, each with a Dapr sidecar (`app-id` = component name) whose `--resources-path`
@@ -76,13 +76,13 @@ Dev declarations never enter the `SystemTopology`, so the prod model stays pure.
 
 ## Notes
 
-- Dev pub/sub is backed by RabbitMQ on a fixed host port (5672), and contract-backed mocks by Microcks
+- Dev pub/sub is backed by Redis on a fixed host port (6380; `dapr init` owns 6379), and contract-backed mocks by Microcks
   on 8585; the generated YAML points at them. This resolves the generate-before-run ordering; a port
   conflict there is a known limitation.
 - Synchronous APIs (`Provides`/`Consumes`) create no Dapr component — Dapr service invocation
   addresses providers by app-id, which the sidecars already establish. A `MockApi` declaration is
   the exception: it emits an `HTTPEndpoint` resource named after the (skipped) provider.
-- Topic mocking is out of scope, though no longer for protocol reasons: Microcks' async minion
-  speaks AMQP, which the RabbitMQ dev broker uses (ADR 0006, amended).
+- Topic mocking is out of scope, for protocol reasons among others: Microcks' async minion
+  does not speak Redis (ADR 0006, amended again).
 - The runtime-config contract injected into each project (`INTROPY__COMPONENT`, `INTROPY__CONFIG`)
   is provisional until the Intropy Hosting framework consumes it.

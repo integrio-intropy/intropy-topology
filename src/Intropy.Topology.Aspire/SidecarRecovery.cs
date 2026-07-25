@@ -29,7 +29,7 @@ internal sealed class AspireResourceStateMonitor(ResourceNotificationService not
 
 /// <summary>
 /// Restarts Dapr sidecars that exit while initializing a component. Component initialization is
-/// fatal in daprd, and RabbitMQ can accept TCP connections shortly before it is ready to accept
+/// fatal in daprd, and a broker can accept TCP connections shortly before it is ready to accept
 /// the component connection. Initial startup is gated separately; this service handles the
 /// remaining transient window without requiring dashboard intervention.
 /// </summary>
@@ -44,17 +44,28 @@ internal sealed class BackendReadiness(IReadOnlyList<IBackendReadiness> backends
     }
 }
 
+/// <summary>Recovery configuration: which sidecars the scheduler owns and recovery must skip.</summary>
+internal sealed record DaprSidecarRecoveryOptions(IReadOnlySet<string> SchedulerOwnedSidecars);
+
 internal sealed class DaprSidecarRecovery(
     IResourceStateMonitor states,
     IResourceLifecycle lifecycle,
     IBackendReadiness backendReadiness,
+    DaprSidecarRecoveryOptions options,
+    TimeProvider time,
     ILogger<DaprSidecarRecovery> logger) : BackgroundService
 {
     private const int MaxAttemptsPerSidecar = 3;
     private static readonly TimeSpan s_backendReadyTimeout = TimeSpan.FromMinutes(3);
 
+    // DCP reports an executable as Running the moment its process launches, not when it is
+    // healthy — daprd lives ~1s before a fatal component-init exit. Only a stay in Running at
+    // least this long counts as having actually run; a scheduled sidecar that legitimately
+    // completes faster costs at most MaxAttemptsPerSidecar spurious restarts.
+    private static readonly TimeSpan s_minHealthyRunningDuration = TimeSpan.FromSeconds(10);
+
     private readonly ConcurrentDictionary<string, int> _attempts = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, byte> _hasReachedRunning = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _runningSince = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _gates = new(StringComparer.Ordinal);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -79,19 +90,30 @@ internal sealed class DaprSidecarRecovery(
             return;
         }
 
-        if (string.Equals(update.State, KnownResourceStates.Running, StringComparison.Ordinal))
+        // A scheduled component's sidecar is scheduler-owned: the run-to-completion block shuts
+        // its sidecar down after every run and the scheduler restarts it on the next tick
+        // (decision 0010), so its exits are lifecycle, not failure — however quick the run.
+        if (options.SchedulerOwnedSidecars.Contains(update.ResourceName))
         {
-            // A normal scheduled sidecar exits after its app completes. Remember that this
-            // instance was healthy so its later terminal state is not mistaken for a failed
-            // component initialization, and do not reset the recovery cap into a restart loop.
-            _hasReachedRunning.TryAdd(update.ResourceName, 0);
             return;
         }
 
+        if (string.Equals(update.State, KnownResourceStates.Running, StringComparison.Ordinal))
+        {
+            // Overwrite (not TryAdd): after a recovery restart the fresh instance's clock must
+            // start over, or its own early crash would be judged by the previous run's stamp.
+            _runningSince[update.ResourceName] = time.GetTimestamp();
+            return;
+        }
+
+        // A normal scheduled sidecar exits after its app completes — but only a sustained stay
+        // in Running proves that, so a component-init crash a moment after launch still recovers.
+        var ranHealthily = _runningSince.TryGetValue(update.ResourceName, out var since)
+            && time.GetElapsedTime(since) >= s_minHealthyRunningDuration;
         var failedBeforeRunning = string.Equals(update.State, KnownResourceStates.Finished, StringComparison.Ordinal)
             || string.Equals(update.State, KnownResourceStates.Exited, StringComparison.Ordinal);
         if (!string.Equals(update.State, KnownResourceStates.FailedToStart, StringComparison.Ordinal)
-            && (!failedBeforeRunning || _hasReachedRunning.ContainsKey(update.ResourceName)))
+            && (!failedBeforeRunning || ranHealthily))
         {
             return;
         }

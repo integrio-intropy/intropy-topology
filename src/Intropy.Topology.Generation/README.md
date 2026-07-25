@@ -6,7 +6,7 @@ validated `SystemTopology` into Dapr components and per-component runtime config
 
 It produces, deterministically:
 
-- one Dapr **pub/sub** component per distinct `PubSubName` (dev: RabbitMQ-backed),
+- one Dapr **pub/sub** component per distinct `PubSubName` (dev: Redis-backed),
 - one Dapr **binding** per connector (`type` from `Transport.DaprType`, `scopes` from `UsedBy`);
   in dev, `bindings.http` connectors with a declared `MockHttpExternalSystem` point at the
   contract-backed mock server (fixed port 8585, see `docs/decisions/0006`),

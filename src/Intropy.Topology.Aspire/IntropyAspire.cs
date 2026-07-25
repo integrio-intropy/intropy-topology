@@ -20,8 +20,11 @@ namespace Intropy.Topology.Aspire;
 /// </summary>
 public static class IntropyAspire
 {
-    /// <summary>Fixed host port for the local RabbitMQ backend (generated pub/sub YAML points here).</summary>
-    internal const int RabbitMqPort = 5672;
+    /// <summary>
+    /// Fixed host port for the local Redis backend (generated pub/sub YAML points here).
+    /// 6380 rather than the Redis default: `dapr init` publishes its own dapr_redis on 6379.
+    /// </summary>
+    internal const int RedisPort = 6380;
 
     /// <summary>
     /// Discovers the system in <paramref name="assembly"/>, generates its artifacts to a temp folder,
@@ -59,18 +62,23 @@ public static class IntropyAspire
         var componentsPath = Path.Combine(generatedRoot, GeneratedArtifacts.ComponentsDir);
         var configDir = Path.Combine(generatedRoot, GeneratedArtifacts.ConfigDir);
 
-        // A plain RabbitMQ container rather than AddRabbitMQ: the generated pub/sub YAML speaks
-        // default guest/guest to localhost:5672, while AddRabbitMQ injects generated credentials.
-        var rabbitmq = builder
-            .AddContainer("rabbitmq", "docker.io/library/rabbitmq", "4")
-            .WithEndpoint(port: RabbitMqPort, targetPort: RabbitMqPort);
-        WithTcpReadiness(builder, rabbitmq, RabbitMqPort);
+        // A plain Redis container rather than AddRedis: the generated pub/sub YAML speaks
+        // passwordless to localhost:6380, while AddRedis injects a generated password.
+        var redis = builder
+            .AddContainer("redis", "docker.io/library/redis", "7")
+            .WithEndpoint(port: RedisPort, targetPort: 6379);
+        WithTcpReadiness(builder, redis, RedisPort, TcpReadyHealthCheck.RedisHandshake);
 
         // Everything a sidecar dials during component init. Sidecars must wait for these to be
         // *ready* (not merely running) — daprd treats a failed component init as fatal, so racing
-        // a still-starting backend kills the sidecar.
-        var backends = new List<IResourceBuilder<IResource>> { rabbitmq };
-        var backendProbes = new List<TcpReadyHealthCheck> { new("localhost", RabbitMqPort) };
+        // a still-starting backend kills the sidecar. localhost:6380 is DCP's endpoint proxy,
+        // which accepts connections from host start, so the probe must demand a PONG rather
+        // than settle for an open socket.
+        var backends = new List<IResourceBuilder<IResource>> { redis };
+        var backendProbes = new List<TcpReadyHealthCheck>
+        {
+            new("localhost", RedisPort, TcpReadyHealthCheck.RedisHandshake),
+        };
 
         // Filled after the component loop; the hook closure only reads it at runtime.
         var sidecarWaits = new Dictionary<string, string[]>(StringComparer.Ordinal);
@@ -137,7 +145,7 @@ public static class IntropyAspire
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
 
-        RegisterDaprSidecarRecovery(builder, backendProbes);
+        RegisterDaprSidecarRecovery(builder, topology, backendProbes);
         RegisterScheduler(builder, topology);
 
         if (unresolved.Count > 0)
@@ -204,13 +212,21 @@ public static class IntropyAspire
     }
 
     /// <summary>
-    /// Registers recovery for every Dapr sidecar, including unscheduled components. The normal
-    /// pre-start gate prevents the common race; recovery covers the remaining interval where a
-    /// backend passes TCP readiness but daprd's component initialization still fails.
+    /// Registers recovery for long-running components' Dapr sidecars. The normal pre-start gate
+    /// prevents the common race; recovery covers the remaining interval where a backend passes
+    /// TCP readiness but daprd's component initialization still fails. Scheduled components'
+    /// sidecars are excluded: the scheduler owns their stop/start lifecycle.
     /// </summary>
     private static void RegisterDaprSidecarRecovery(
-        IDistributedApplicationBuilder builder, IReadOnlyList<TcpReadyHealthCheck> backendProbes)
+        IDistributedApplicationBuilder builder, SystemTopology topology,
+        IReadOnlyList<TcpReadyHealthCheck> backendProbes)
     {
+        var schedulerOwned = topology.Components
+            .Where(c => c.Schedule is not null)
+            .Select(c => $"{c.Name}-dapr-cli")
+            .ToHashSet(StringComparer.Ordinal);
+        builder.Services.AddSingleton(new DaprSidecarRecoveryOptions(schedulerOwned));
+        builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<IResourceLifecycle, AspireResourceLifecycle>();
         builder.Services.AddSingleton<IResourceStateMonitor, AspireResourceStateMonitor>();
         builder.Services.AddSingleton<IBackendReadiness>(
@@ -294,10 +310,11 @@ public static class IntropyAspire
     }
 
     private static void WithTcpReadiness(
-        IDistributedApplicationBuilder builder, IResourceBuilder<ContainerResource> container, int port)
+        IDistributedApplicationBuilder builder, IResourceBuilder<ContainerResource> container, int port,
+        ReadOnlyMemory<byte> handshake = default)
     {
         var key = $"{container.Resource.Name}-tcp-ready";
-        builder.Services.AddHealthChecks().AddCheck(key, new TcpReadyHealthCheck("localhost", port));
+        builder.Services.AddHealthChecks().AddCheck(key, new TcpReadyHealthCheck("localhost", port, handshake));
         container.WithHealthCheck(key);
     }
 

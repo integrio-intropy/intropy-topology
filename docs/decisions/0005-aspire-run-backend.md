@@ -69,6 +69,14 @@ relationship Generation has with Dapr YAML, targeting a live object model instea
   > how the sidecars connect). The shape is unchanged: a plain container rather than
   > `AddRabbitMQ`, which injects generated credentials the generated YAML doesn't know.
 
+  > **Amended again 2026-07-25 (later):** back to **Redis** (`pubsub.redis`), on fixed host port
+  > **6380** — not 6379, which `dapr init`'s own dapr_redis publishes on every dev machine.
+  > RabbitMQ's ~2.5s boot lost a startup race against daprd's fatal component init on every
+  > `task run` (Redis boots subsecond, and the sidecar gate now demands a PING/PONG through the
+  > DCP proxy before release). Redis Streams' consumer groups also redeliver unacked/RETRY'd
+  > messages, which the ungated `pubsub.rabbitmq` component silently dropped. The shape is still
+  > a plain container rather than `AddRedis`, which injects a generated password.
+
 ## Known limits
 
 - **No Hosting framework yet.** The injected runtime-config contract (`INTROPY__COMPONENT`,

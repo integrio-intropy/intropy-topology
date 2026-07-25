@@ -19,20 +19,15 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Generate_ShouldBackPubSubWithRabbitMq()
+    public void Generate_ShouldBackPubSubWithRedis()
     {
         // Act
         var yaml = Content("components/pubsub-a.yaml");
 
-        // Assert
-        Assert.Contains("type: \"pubsub.rabbitmq\"", yaml, StringComparison.Ordinal);
-        Assert.Contains("- name: \"hostname\"", yaml, StringComparison.Ordinal);
-        Assert.Contains("value: \"localhost\"", yaml, StringComparison.Ordinal);
-        Assert.Contains("- name: \"port\"", yaml, StringComparison.Ordinal);
-        Assert.Contains("value: \"5672\"", yaml, StringComparison.Ordinal);
-        Assert.Contains("- name: \"username\"", yaml, StringComparison.Ordinal);
-        Assert.Contains("- name: \"password\"", yaml, StringComparison.Ordinal);
-        Assert.Contains("value: \"guest\"", yaml, StringComparison.Ordinal);
+        // Assert — 6380, not the Redis default: `dapr init` owns 6379 on the host.
+        Assert.Contains("type: \"pubsub.redis\"", yaml, StringComparison.Ordinal);
+        Assert.Contains("- name: \"redisHost\"", yaml, StringComparison.Ordinal);
+        Assert.Contains("value: \"localhost:6380\"", yaml, StringComparison.Ordinal);
     }
 
     [Fact]

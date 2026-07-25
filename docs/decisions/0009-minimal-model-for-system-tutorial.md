@@ -29,7 +29,7 @@ What was cut:
   with it; its progressive-resolution stance survives as the file-transport default). A file
   connector's folder is its endpoint, so no external-system concept is needed.
 - **Dev mocking** — the `IDevProfile` seam and the Microcks integration (ADR 0006's machinery);
-  the Aspire backend runs only the dev broker (RabbitMQ), projects, and sidecars.
+  the Aspire backend runs only the dev broker (Redis), projects, and sidecars.
 - **The Prod generation profile** — `TopologyGenerator.Generate(topology)` takes no profile; the
   verbs are `check | graph | generate [dir]` with no `--profile`.
 

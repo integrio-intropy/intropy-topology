@@ -50,7 +50,7 @@ public sealed class IntropyAspireTests : IDisposable
     }
 
     [Fact]
-    public void Apply_ShouldAddRabbitMqBackend()
+    public void Apply_ShouldAddRedisBackend()
     {
         // Arrange
         var builder = CreateBuilder();
@@ -59,7 +59,7 @@ public sealed class IntropyAspireTests : IDisposable
         IntropyAspire.Apply(builder, Topology(), GeneratedRoot);
 
         // Assert
-        Assert.Contains(builder.Resources, r => r.Name == "rabbitmq");
+        Assert.Contains(builder.Resources, r => r.Name == "redis");
     }
 
     [Fact]
