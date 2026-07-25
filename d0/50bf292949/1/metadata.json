@@ -1,0 +1,46 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "d050bf292949",
+  "session_id": "676ac302-a06d-4990-89ee-19ad06833472",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-25T20:47:55.466575Z",
+  "branch": "feat/platform-services",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "examples/OrderFlow.SystemHost/Services.cs",
+    "examples/OrderFlow.SystemHost/OrderFlowSystem.cs",
+    "docs/decisions/0011-system-level-platform-services.md",
+    "docs/concepts/materialization.md",
+    "docs/concepts/services.md",
+    "docs/index.md",
+    "CLAUDE.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5",
+  "turn_id": "d06e69cc62c7",
+  "checkpoint_transcript_start": 409,
+  "transcript_lines_at_start": 409,
+  "compact_transcript_start": 94,
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 20297,
+    "cache_read_tokens": 2707161,
+    "output_tokens": 11136,
+    "api_call_count": 15
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-25T20:47:55.41997Z",
+    "agent_lines": 152,
+    "agent_removed": 6,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 152,
+    "total_lines_changed": 158,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}

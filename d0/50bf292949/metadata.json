@@ -3,7 +3,7 @@
   "checkpoint_id": "d050bf292949",
   "strategy": "manual-commit",
   "branch": "feat/platform-services",
-  "checkpoints_count": 1,
+  "checkpoints_count": 3,
   "files_touched": [
     "CLAUDE.md",
     "docs/concepts/materialization.md",
@@ -20,13 +20,20 @@
       "compact_transcript": "/d0/50bf292949/0/transcript.jsonl",
       "content_hash": "/d0/50bf292949/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/d0/50bf292949/1/metadata.json",
+      "transcript": "/d0/50bf292949/1/full.jsonl",
+      "compact_transcript": "/d0/50bf292949/1/transcript.jsonl",
+      "content_hash": "/d0/50bf292949/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 30,
+    "cache_creation_tokens": 20297,
+    "cache_read_tokens": 2707161,
+    "output_tokens": 11136,
+    "api_call_count": 15
   }
 }
