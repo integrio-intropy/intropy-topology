@@ -57,6 +57,19 @@ public class IntropyGenerateTests
     }
 
     [Fact]
+    public async Task RunAsync_Graph_ShouldListDeclaredServices()
+    {
+        // Act — the system declares one platform service; graph shows it once.
+        var (_, output) = await Capture(() => IntropyGenerate.RunAsync(s_assembly, ["graph"]));
+
+        // Assert
+        Assert.Contains("\"services\"", output, StringComparison.Ordinal);
+        Assert.Contains("\"image\": \"docker.io/library/redis:7\"", output, StringComparison.Ordinal);
+        Assert.Contains("\"port\": 6379", output, StringComparison.Ordinal);
+        Assert.Equal(1, output.Split("\"services\"").Length - 1);
+    }
+
+    [Fact]
     public async Task RunAsync_Generate_ShouldWriteArtifactsToDirectory()
     {
         // Arrange

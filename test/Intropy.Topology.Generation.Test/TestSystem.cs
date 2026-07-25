@@ -13,6 +13,7 @@ public sealed class OrderSystem : ISystemDefinition
     public static readonly TopicRef<FulfillmentOrder> Fulfillment = TopicRef<FulfillmentOrder>.Define("pubsub-b", "order-fulfillment");
     public static readonly ConnectorRef Webshop = ConnectorRef.Define("webshop", Transport.File("./test/webshop"));
     public static readonly ConnectorRef Erp = ConnectorRef.Define("erp", Transport.File("./test/erp"));
+    public static readonly ServiceRef Idempotency = ServiceRef.Define("idempotency", Service.Container("docker.io/library/redis:7", 6379));
 
     public string SystemName => "order-fulfillment";
 
@@ -22,5 +23,6 @@ public sealed class OrderSystem : ISystemDefinition
         builder.AddLoader("order-loader").Subscribes(Raw).To(Erp);
         builder.AddExtractor("fulfillment-extractor").Publishes(Fulfillment);
         builder.AddLoader("fulfillment-loader").Subscribes(Fulfillment);
+        builder.UsesService(Idempotency);
     }
 }

@@ -83,6 +83,21 @@ public static class IntropyGenerate
             }).ToArray();
         }
 
+        if (topology.Services.Count > 0)
+        {
+            model["services"] = topology.Services.Select(s =>
+            {
+                var entry = new Dictionary<string, object> { ["name"] = s.Name };
+                if (s.Service is ContainerService container)
+                {
+                    entry["image"] = container.Image;
+                    entry["port"] = container.Port;
+                }
+
+                return entry;
+            }).ToArray();
+        }
+
         return model;
     }
 
