@@ -3,7 +3,7 @@
   "checkpoint_id": "aa9ddccdbab2",
   "strategy": "manual-commit",
   "branch": "feat/system-host-graph-verb",
-  "checkpoints_count": 3,
+  "checkpoints_count": 6,
   "files_touched": [
     "README.md",
     "src/Intropy.Topology.Generation/IntropyGenerate.cs",
@@ -25,13 +25,20 @@
       "compact_transcript": "/aa/9ddccdbab2/1/transcript.jsonl",
       "content_hash": "/aa/9ddccdbab2/1/content_hash.txt",
       "prompt": "/aa/9ddccdbab2/1/prompt.txt"
+    },
+    {
+      "metadata": "/aa/9ddccdbab2/2/metadata.json",
+      "transcript": "/aa/9ddccdbab2/2/full.jsonl",
+      "compact_transcript": "/aa/9ddccdbab2/2/transcript.jsonl",
+      "content_hash": "/aa/9ddccdbab2/2/content_hash.txt",
+      "prompt": "/aa/9ddccdbab2/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 58273,
+    "input_tokens": 111906,
     "cache_creation_tokens": 185057,
-    "cache_read_tokens": 12980114,
-    "output_tokens": 81424,
-    "api_call_count": 113
+    "cache_read_tokens": 13288850,
+    "output_tokens": 84179,
+    "api_call_count": 124
   }
 }

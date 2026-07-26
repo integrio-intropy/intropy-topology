@@ -1,0 +1,81 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "aa9ddccdbab2",
+  "session_id": "session",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-26T07:55:23.694629Z",
+  "branch": "feat/system-host-graph-verb",
+  "checkpoints_count": 3,
+  "save_step_count": 1,
+  "files_touched": [
+    "README.md",
+    "src/Intropy.Topology.Generation/IntropyGenerate.cs",
+    "src/Intropy.Topology.Generation/README.md",
+    "test/Intropy.Topology.Generation.Test/IntropyGenerateTests.cs",
+    "test/Intropy.Topology.Generation.Test/TestSystem.cs"
+  ],
+  "agent": "Pi",
+  "model": "gpt-5.6-terra",
+  "turn_id": "c3ab324e5779",
+  "checkpoint_transcript_start": 51,
+  "transcript_lines_at_start": 51,
+  "compact_transcript_start": 15,
+  "token_usage": {
+    "input_tokens": 53633,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 308736,
+    "output_tokens": 2755,
+    "api_call_count": 11
+  },
+  "session_metrics": {
+    "turn_count": 11
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-26T07:55:23.680493Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 26,
+    "human_removed": 89,
+    "total_committed": 0,
+    "total_lines_changed": 115,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 148,
+      "user_lines_removed": 107,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "README.md": 3,
+        "src/Intropy.Topology.Generation/IntropyGenerate.cs": 89,
+        "src/Intropy.Topology.Generation/README.md": 1,
+        "test/Intropy.Topology.Generation.Test/IntropyGenerateTests.cs": 54,
+        "test/Intropy.Topology.Generation.Test/TestSystem.cs": 1
+      },
+      "user_removed_per_file": {
+        "README.md": 1,
+        "src/Intropy.Topology.Generation/IntropyGenerate.cs": 74,
+        "src/Intropy.Topology.Generation/README.md": 1,
+        "test/Intropy.Topology.Generation.Test/IntropyGenerateTests.cs": 31
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 12,
+      "user_lines_removed": 3,
+      "agent_lines_added": 148,
+      "agent_lines_removed": 107,
+      "user_added_per_file": {
+        "src/Intropy.Topology.Generation/IntropyGenerate.cs": 8,
+        "test/Intropy.Topology.Generation.Test/IntropyGenerateTests.cs": 4
+      },
+      "user_removed_per_file": {
+        "src/Intropy.Topology.Generation/IntropyGenerate.cs": 3
+      }
+    }
+  ]
+}
