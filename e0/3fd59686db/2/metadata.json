@@ -1,0 +1,90 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "e03fd59686db",
+  "session_id": "session",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-26T06:56:06.421506Z",
+  "branch": "feat/aspire-runtime-hardening",
+  "checkpoints_count": 6,
+  "save_step_count": 4,
+  "files_touched": [
+    "src/Intropy.Topology.Aspire/Intropy.Topology.Aspire.csproj",
+    "src/Intropy.Topology.Aspire/IntropyAspire.cs",
+    "src/Intropy.Topology.Aspire/README.md"
+  ],
+  "agent": "Pi",
+  "model": "gpt-5.6-terra",
+  "turn_id": "7af66fc4df8a",
+  "checkpoint_transcript_start": 36,
+  "transcript_lines_at_start": 36,
+  "compact_transcript_start": 14,
+  "token_usage": {
+    "input_tokens": 1318,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 87552,
+    "output_tokens": 523,
+    "api_call_count": 2
+  },
+  "session_metrics": {
+    "turn_count": 8
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-26T06:56:06.401273Z",
+    "agent_lines": 52,
+    "agent_removed": 107,
+    "human_added": 207,
+    "human_modified": 4,
+    "human_removed": 0,
+    "total_committed": 262,
+    "total_lines_changed": 436,
+    "agent_percentage": 36.46788990825688,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 40,
+      "user_lines_removed": 3,
+      "agent_lines_added": 207,
+      "agent_lines_removed": 170,
+      "user_added_per_file": {
+        "src/Intropy.Topology.Aspire/IntropyAspire.cs": 18,
+        "test/Intropy.Topology.Aspire.Test/AspireDaprIntegrationTests.cs": 2,
+        "test/Intropy.Topology.Aspire.Test/IntropyAspireTests.cs": 19,
+        "test/Intropy.Topology.Aspire.Test/SchedulingTests.cs": 1
+      },
+      "user_removed_per_file": {
+        "src/Intropy.Topology.Aspire/IntropyAspire.cs": 1,
+        "test/Intropy.Topology.Aspire.Test/AspireDaprIntegrationTests.cs": 2
+      }
+    }
+  ]
+}

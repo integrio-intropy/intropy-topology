@@ -3,7 +3,7 @@
   "checkpoint_id": "e03fd59686db",
   "strategy": "manual-commit",
   "branch": "feat/aspire-runtime-hardening",
-  "checkpoints_count": 4,
+  "checkpoints_count": 10,
   "files_touched": [
     "examples/OrderFlow.SystemHost/Program.cs",
     "src/Intropy.Topology.Aspire/Intropy.Topology.Aspire.csproj",
@@ -29,13 +29,20 @@
       "compact_transcript": "/e0/3fd59686db/1/transcript.jsonl",
       "content_hash": "/e0/3fd59686db/1/content_hash.txt",
       "prompt": "/e0/3fd59686db/1/prompt.txt"
+    },
+    {
+      "metadata": "/e0/3fd59686db/2/metadata.json",
+      "transcript": "/e0/3fd59686db/2/full.jsonl",
+      "compact_transcript": "/e0/3fd59686db/2/transcript.jsonl",
+      "content_hash": "/e0/3fd59686db/2/content_hash.txt",
+      "prompt": "/e0/3fd59686db/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 420921,
+    "input_tokens": 422239,
     "cache_creation_tokens": 185057,
-    "cache_read_tokens": 19380114,
-    "output_tokens": 90558,
-    "api_call_count": 165
+    "cache_read_tokens": 19467666,
+    "output_tokens": 91081,
+    "api_call_count": 167
   }
 }
