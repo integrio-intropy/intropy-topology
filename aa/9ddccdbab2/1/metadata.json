@@ -1,0 +1,41 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "aa9ddccdbab2",
+  "session_id": "676ac302-a06d-4990-89ee-19ad06833472",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-26T07:55:23.393059Z",
+  "branch": "feat/system-host-graph-verb",
+  "checkpoints_count": 2,
+  "save_step_count": 1,
+  "files_touched": [
+    "src/Intropy.Topology.Generation/IntropyGenerate.cs",
+    "test/Intropy.Topology.Generation.Test/IntropyGenerateTests.cs",
+    "test/Intropy.Topology.Generation.Test/TestSystem.cs"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5",
+  "turn_id": "a968b6c7f325",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 160,
+    "cache_creation_tokens": 185057,
+    "cache_read_tokens": 11252626,
+    "output_tokens": 69124,
+    "api_call_count": 81
+  },
+  "session_metrics": {
+    "turn_count": 4
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-26T07:55:23.341514Z",
+    "agent_lines": 141,
+    "agent_removed": 105,
+    "human_added": 10,
+    "human_modified": 3,
+    "human_removed": 0,
+    "total_committed": 154,
+    "total_lines_changed": 260,
+    "agent_percentage": 94.61538461538461,
+    "metric_version": 2
+  }
+}
