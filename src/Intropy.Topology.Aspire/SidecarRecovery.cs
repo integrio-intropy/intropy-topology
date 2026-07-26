@@ -28,20 +28,17 @@ internal sealed class AspireResourceStateMonitor(ResourceNotificationService not
 }
 
 /// <summary>
-/// Restarts Dapr sidecars that exit while initializing a component. Component initialization is
-/// fatal in daprd, and a broker can accept TCP connections shortly before it is ready to accept
-/// the component connection. Initial startup is gated separately; this service handles the
-/// remaining transient window without requiring dashboard intervention.
+/// Compatibility seam for the executable resource created by CommunityToolkit.Aspire.Hosting.Dapr 13.0.0.
+/// The toolkit's public sidecar model does not expose this executable, so audit this convention when
+/// upgrading the toolkit.
 /// </summary>
-internal sealed class BackendReadiness(IReadOnlyList<IBackendReadiness> backends) : IBackendReadiness
+internal static class DaprSidecarIdentity
 {
-    public async Task WaitUntilReadyAsync(TimeSpan timeout, CancellationToken cancellationToken)
-    {
-        foreach (var backend in backends)
-        {
-            await backend.WaitUntilReadyAsync(timeout, cancellationToken).ConfigureAwait(false);
-        }
-    }
+    private const string CliSuffix = "-dapr-cli";
+
+    public static string CliName(string componentName) => componentName + CliSuffix;
+
+    public static bool IsCli(string resourceName) => resourceName.EndsWith(CliSuffix, StringComparison.Ordinal);
 }
 
 /// <summary>Recovery configuration: which sidecars the scheduler owns and recovery must skip.</summary>
@@ -85,7 +82,7 @@ internal sealed class DaprSidecarRecovery(
 
     internal async Task HandleStateUpdateAsync(ResourceStateUpdate update, CancellationToken cancellationToken)
     {
-        if (!update.ResourceName.EndsWith("-dapr-cli", StringComparison.Ordinal))
+        if (!DaprSidecarIdentity.IsCli(update.ResourceName))
         {
             return;
         }

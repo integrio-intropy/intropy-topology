@@ -4,6 +4,18 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace Intropy.Topology.Aspire.Test;
 
+public sealed class DaprSidecarIdentityTests
+{
+    [Fact]
+    public void CliName_ShouldMatchThePinnedToolkitExecutableConvention()
+    {
+        // CommunityToolkit.Aspire.Hosting.Dapr 13.0.0 materializes this executable name.
+        Assert.Equal("order-extractor-dapr-cli", DaprSidecarIdentity.CliName("order-extractor"));
+        Assert.True(DaprSidecarIdentity.IsCli("order-extractor-dapr-cli"));
+        Assert.False(DaprSidecarIdentity.IsCli("order-extractor-dapr"));
+    }
+}
+
 public sealed class DaprSidecarRecoveryTests
 {
     private sealed class FakeStateMonitor : IResourceStateMonitor

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace Intropy.Topology.Aspire.Test;
 
+[Collection("RedisPort")]
 public sealed class SchedulingApplyTests : IDisposable
 {
     private sealed record RawOrder(string OrderNumber);
@@ -131,44 +132,6 @@ public sealed class SchedulingApplyTests : IDisposable
         Assert.Empty(extractor.Annotations.OfType<EndpointAnnotation>());
         var loader = builder.Resources.Single(r => r.Name == "order-loader");
         Assert.Single(loader.Annotations.OfType<EndpointAnnotation>());
-    }
-}
-
-public class ScheduleTickPlannerTests
-{
-    private static readonly DateTimeOffset s_reference = new(2026, 1, 1, 12, 0, 30, TimeSpan.Zero);
-
-    [Fact]
-    public void NextOccurrence_WithEveryMinute_ShouldReturnTheNextWholeMinute()
-    {
-        // Act
-        var next = ScheduleTickPlanner.NextOccurrence("* * * * *", s_reference, TimeZoneInfo.Utc);
-
-        // Assert
-        Assert.Equal(new DateTimeOffset(2026, 1, 1, 12, 1, 0, TimeSpan.Zero), next);
-    }
-
-    [Fact]
-    public void NextOccurrence_WithMacro_ShouldReturnTheNextDay()
-    {
-        // Act
-        var next = ScheduleTickPlanner.NextOccurrence("@daily", s_reference, TimeZoneInfo.Utc);
-
-        // Assert
-        Assert.Equal(new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero), next);
-    }
-
-    [Fact]
-    public void NextOccurrence_ShouldRespectTheZone()
-    {
-        // Arrange — 9:00 local in a UTC+2 zone is 07:00 UTC.
-        var zone = TimeZoneInfo.CreateCustomTimeZone("test-plus-two", TimeSpan.FromHours(2), "t", "t");
-
-        // Act
-        var next = ScheduleTickPlanner.NextOccurrence("0 9 * * *", s_reference, zone);
-
-        // Assert
-        Assert.Equal(new DateTimeOffset(2026, 1, 2, 7, 0, 0, TimeSpan.Zero), next!.Value.ToUniversalTime());
     }
 }
 

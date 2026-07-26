@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
@@ -12,7 +14,7 @@ namespace Intropy.Topology.Aspire;
 /// <summary>
 /// The Aspire run-backend. Discovers a system's validated topology, generates its Dapr
 /// components, and translates the model into Aspire resources — one project per component
-/// with a Dapr sidecar on its own staged component overlay, and RabbitMQ behind pub/sub —
+/// with a Dapr sidecar on its own staged component overlay, and Redis behind pub/sub —
 /// then runs it under DCP, subscribers before their publishers. Scheduled components are
 /// re-run on their cron ticks by the <see cref="ComponentScheduler"/> (CronJob emulation,
 /// with a "Run now" dashboard command). Aspire never sees the topology; it receives
@@ -64,21 +66,17 @@ public static class IntropyAspire
 
         // A plain Redis container rather than AddRedis: the generated pub/sub YAML speaks
         // passwordless to localhost:6380, while AddRedis injects a generated password.
+        EnsureHostPortAvailable(RedisPort);
         var redis = builder
             .AddContainer("redis", "docker.io/library/redis", "7")
             .WithEndpoint(port: RedisPort, targetPort: 6379);
-        WithTcpReadiness(builder, redis, RedisPort, TcpReadyHealthCheck.RedisHandshake);
-
-        // Everything a sidecar dials during component init. Sidecars must wait for these to be
+        // Everything a sidecar dials during component init. Sidecars must wait for Redis to be
         // *ready* (not merely running) — daprd treats a failed component init as fatal, so racing
         // a still-starting backend kills the sidecar. localhost:6380 is DCP's endpoint proxy,
         // which accepts connections from host start, so the probe must demand a PONG rather
         // than settle for an open socket.
-        var backends = new List<IResourceBuilder<IResource>> { redis };
-        var backendProbes = new List<TcpReadyHealthCheck>
-        {
-            new("localhost", RedisPort, TcpReadyHealthCheck.RedisHandshake),
-        };
+        var redisReadiness = new TcpReadyHealthCheck("localhost", RedisPort, TcpReadyHealthCheck.RedisHandshake);
+        WithTcpReadiness(builder, redis, redisReadiness);
 
         // Filled after the component loop; the hook closure only reads it at runtime.
         var sidecarWaits = new Dictionary<string, string[]>(StringComparer.Ordinal);
@@ -88,15 +86,13 @@ public static class IntropyAspire
         // every backend port answers and, for publishers, until every subscriber sidecar is running.
         builder.Eventing.Subscribe<BeforeResourceStartedEvent>(async (evt, cancellationToken) =>
         {
-            if (!evt.Resource.Name.EndsWith("-dapr-cli", StringComparison.Ordinal))
+            if (!DaprSidecarIdentity.IsCli(evt.Resource.Name))
             {
                 return;
             }
 
-            foreach (var probe in backendProbes)
-            {
-                await probe.WaitUntilReadyAsync(TimeSpan.FromMinutes(3), cancellationToken).ConfigureAwait(false);
-            }
+            await redisReadiness.WaitUntilReadyAsync(TimeSpan.FromMinutes(3), cancellationToken)
+                .ConfigureAwait(false);
 
             if (sidecarWaits.TryGetValue(evt.Resource.Name, out var subscriberSidecars))
             {
@@ -140,12 +136,12 @@ public static class IntropyAspire
                 AddRunNowCommand(project, component.Name);
             }
 
-            Wire(project, component, stagedPath, configDir, backends);
+            Wire(project, component, stagedPath, configDir, redis);
             resources[component.Name] = project;
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
 
-        RegisterDaprSidecarRecovery(builder, topology, backendProbes);
+        RegisterDaprSidecarRecovery(builder, topology, redisReadiness);
         RegisterScheduler(builder, topology);
 
         if (unresolved.Count > 0)
@@ -183,8 +179,8 @@ public static class IntropyAspire
 
             if (materialized.Length > 0)
             {
-                sidecarWaits[$"{publisher}-dapr-cli"] =
-                    [.. materialized.Select(s => $"{s}-dapr-cli")];
+                sidecarWaits[DaprSidecarIdentity.CliName(publisher)] =
+                    [.. materialized.Select(DaprSidecarIdentity.CliName)];
             }
         }
     }
@@ -218,19 +214,17 @@ public static class IntropyAspire
     /// sidecars are excluded: the scheduler owns their stop/start lifecycle.
     /// </summary>
     private static void RegisterDaprSidecarRecovery(
-        IDistributedApplicationBuilder builder, SystemTopology topology,
-        IReadOnlyList<TcpReadyHealthCheck> backendProbes)
+        IDistributedApplicationBuilder builder, SystemTopology topology, IBackendReadiness backendReadiness)
     {
         var schedulerOwned = topology.Components
             .Where(c => c.Schedule is not null)
-            .Select(c => $"{c.Name}-dapr-cli")
+            .Select(c => DaprSidecarIdentity.CliName(c.Name))
             .ToHashSet(StringComparer.Ordinal);
         builder.Services.AddSingleton(new DaprSidecarRecoveryOptions(schedulerOwned));
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<IResourceLifecycle, AspireResourceLifecycle>();
         builder.Services.AddSingleton<IResourceStateMonitor, AspireResourceStateMonitor>();
-        builder.Services.AddSingleton<IBackendReadiness>(
-            new BackendReadiness(backendProbes.Cast<IBackendReadiness>().ToArray()));
+        builder.Services.AddSingleton<IBackendReadiness>(backendReadiness);
         builder.Services.AddSingleton<DaprSidecarRecovery>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<DaprSidecarRecovery>());
     }
@@ -309,24 +303,38 @@ public static class IntropyAspire
         return edges.Keys.Any(Visit);
     }
 
+    private static void EnsureHostPortAvailable(int port)
+    {
+        try
+        {
+            using var listener = new TcpListener(IPAddress.Loopback, port);
+            listener.Start();
+        }
+        catch (SocketException ex)
+        {
+            throw new InvalidOperationException(
+                $"Redis requires host port {port}, but it is already in use. Stop the conflicting process and retry.", ex);
+        }
+    }
+
     private static void WithTcpReadiness(
-        IDistributedApplicationBuilder builder, IResourceBuilder<ContainerResource> container, int port,
-        ReadOnlyMemory<byte> handshake = default)
+        IDistributedApplicationBuilder builder,
+        IResourceBuilder<ContainerResource> container,
+        TcpReadyHealthCheck readiness)
     {
         var key = $"{container.Resource.Name}-tcp-ready";
-        builder.Services.AddHealthChecks().AddCheck(key, new TcpReadyHealthCheck("localhost", port, handshake));
+        builder.Services.AddHealthChecks().AddCheck(key, readiness);
         container.WithHealthCheck(key);
     }
 
-    private static void Wire<T>(
-        IResourceBuilder<T> resource,
+    private static void Wire(
+        IResourceBuilder<ProjectResource> project,
         ComponentModel component,
         string resourcesPath,
         string configDir,
-        IReadOnlyList<IResourceBuilder<IResource>> backends)
-        where T : IResourceWithEnvironment, IResourceWithWaitSupport
+        IResourceBuilder<ContainerResource> redis)
     {
-        resource
+        project
             .WithDaprSidecar(sidecar =>
             {
                 sidecar.WithOptions(new DaprSidecarOptions
@@ -334,17 +342,10 @@ public static class IntropyAspire
                     AppId = component.Name,
                     ResourcesPaths = [resourcesPath],
                 });
-                foreach (var backend in backends)
-                {
-                    sidecar.WaitFor(backend);
-                }
+                sidecar.WaitFor(redis);
             })
             .WithEnvironment("INTROPY__COMPONENT", component.Name)
-            .WithEnvironment("INTROPY__CONFIG", Path.Combine(configDir, $"{component.Name}.intropy.json"));
-
-        foreach (var backend in backends)
-        {
-            resource.WaitFor(backend);
-        }
+            .WithEnvironment("INTROPY__CONFIG", Path.Combine(configDir, $"{component.Name}.intropy.json"))
+            .WaitFor(redis);
     }
 }

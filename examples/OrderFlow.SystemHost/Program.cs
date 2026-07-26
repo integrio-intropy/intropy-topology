@@ -6,7 +6,7 @@ using Intropy.Topology.Generation;
 // the topology into Aspire resources and hands them to DCP; the other verbs generate/check/graph
 // from the identical model without touching Aspire.
 //
-//   dotnet run                       -> Aspire (dashboard: components + RabbitMQ + Dapr sidecars)
+//   dotnet run                       -> Aspire (dashboard: components + Redis + Dapr sidecars)
 //   dotnet run -- check              -> validate the topology
 //   dotnet run -- graph              -> print the SystemTopology JSON
 //   dotnet run -- generate ./out     -> write Dapr YAML + per-component config
