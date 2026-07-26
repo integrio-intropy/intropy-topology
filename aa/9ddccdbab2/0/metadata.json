@@ -1,0 +1,48 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "aa9ddccdbab2",
+  "session_id": "019f9d62-b18b-7f21-be6d-3de8e9b65d4c",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-26T07:55:22.897053Z",
+  "branch": "feat/system-host-graph-verb",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md",
+    "src/Intropy.Topology.Generation/IntropyGenerate.cs",
+    "src/Intropy.Topology.Generation/README.md",
+    "test/Intropy.Topology.Generation.Test/IntropyGenerateTests.cs",
+    "test/Intropy.Topology.Generation.Test/TestSystem.cs"
+  ],
+  "agent": "Pi",
+  "model": "gpt-5.6-terra",
+  "turn_id": "c42eef977dc4",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 58113,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1727488,
+    "output_tokens": 12300,
+    "api_call_count": 32
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-26T07:55:22.877241Z",
+    "agent_lines": 143,
+    "agent_removed": 107,
+    "human_added": 9,
+    "human_modified": 5,
+    "human_removed": 0,
+    "total_committed": 157,
+    "total_lines_changed": 264,
+    "agent_percentage": 94.6969696969697,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}

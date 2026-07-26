@@ -1,0 +1,99 @@
+# Task: Implement a `graph` verb on the Intropy system host
+
+## Context
+
+The `intropy` CLI's dashboard (`intropy dashboard`) no longer reads
+`.intropy/topology.json` files and has no heuristic fallback. Instead, for every
+scaffolded system host it finds (scaffold record with `role: system-host`), it runs:
+
+    dotnet run --project <host-dir> -v q -- graph
+
+and decodes **stdout** as a `topology.intropy.io/v1` document. If the verb is
+missing, fails, or prints anything before the JSON, the dashboard shows a
+"graph verb failed" error for that system. This task makes the system host
+(via the Intropy.Topology library, so every host gets it) support that verb.
+
+The host's `<SystemClass>.cs` already implements `ISystemDefinition` with the
+fluent builder — `AddExtractor("app-id").From(Connectors.X).Publishes(Topics.Y)
+.WithSchedule("* * * * *")`, `AddLoader("app-id").Subscribes(Topics.Y)
+.To(Connectors.X)` — so the topology must be derived from the built
+`SystemBuilder` model, not from config files. The CLI comment in
+`intropy-cli/internal/system/create.go` ("the model the host's `graph` verb
+prints") already anticipates this verb.
+
+## Behavior
+
+- When the process args contain the verb `graph` (i.e. `dotnet run ... -- graph`),
+  the host must NOT start the web host / Dapr / any runtime. It builds the system
+  definition, serializes the topology, writes it to **stdout**, and exits 0.
+- **stdout contract: the JSON document and nothing else.** All logging goes to
+  stderr. Verify with `dotnet run -v q -- graph | jq .` that stdout is clean —
+  the Go consumer uses a strict `json.Decoder` from byte 0 and rejects any
+  leading noise (build output, banners, log lines).
+- On failure (invalid definition, etc.): non-zero exit, error text on stderr.
+
+## Output schema — `topology.intropy.io/v1` (exact JSON keys, camelCase)
+
+```json
+{
+  "apiVersion": "topology.intropy.io/v1",
+  "kind": "SystemTopology",
+  "system": "<kebab-case system name>",
+  "components": [
+    {
+      "name": "<appId, as passed to AddExtractor/AddLoader>",
+      "kind": "extractor | loader | ...",
+      "subscribes":  [{ "pubsub": "...", "topic": "..." }],
+      "publishes":   [{ "port": "<optional>", "pubsub": "...", "topic": "..." }],
+      "connectors":  [{ "connector": "<name>", "direction": "in" | "out" }]
+    }
+  ],
+  "topics": [
+    {
+      "pubsub": "...", "topic": "...",
+      "contract": "<full C# contract type name>",
+      "publishers": ["<component name>"], "subscribers": ["<component name>"]
+    }
+  ],
+  "connectors": [
+    {
+      "name": "...", "externalSystem": "<optional>",
+      "transport": { "type": "file", "supportsInput": true, "supportsOutput": true },
+      "directions": ["in" | "out"], "usedBy": ["<component name>"]
+    }
+  ]
+}
+```
+
+Semantics the consumer relies on:
+- **Wiring is inlined on each component** (`subscribes`/`publishes`/`connectors`);
+  the top-level `topics[]`/`connectors[]` are lookup tables (contract, transport,
+  external system) the inline refs resolve against.
+- `apiVersion` must be exactly `topology.intropy.io/v1` — the reader rejects
+  anything else. Do not invent fields outside the schema (a schedule field, for
+  example, is NOT in v1; omit it).
+- Omit empty arrays/fields rather than emitting `[]`/`""` (all list fields are
+  optional in the reader).
+- Component `name` should equal the component's directory name relative to the
+  system root (the appId, which `sys create` derives from the scaffold) — the
+  dashboard uses it to link the graph node to the scaffolded project for
+  click-through. A mismatch degrades gracefully but breaks that linking.
+- Scope is the minimal topology model: extractor/loader blocks and file-transport
+  connectors are what `sys create` generates today (`ConnectorRef.Define(name,
+  Transport.File("./test/<name>"))` → transport type "file", supportsInput and
+  supportsOutput true). `apis`/`provides`/`consumes` exist in the schema but are
+  opaque to the consumer — emit them only if the model already has them.
+
+## Acceptance
+
+1. `dotnet run --project <a scaffolded host> -v q -- graph` prints exactly one
+   valid JSON document to stdout, exit 0; `... -- graph 2>/dev/null | jq -e
+   '.apiVersion == "topology.intropy.io/v1"'` passes.
+2. `dotnet run -- graph > out.json` piped through the intropy CLI's decoder
+   round-trips (the Go types live in `intropy-cli/internal/topology/topology.go`
+   on branch `feature/dashboard-v2` — mirror its JSON tags exactly; ideally add
+   a golden-file test in this repo pinned to that shape).
+3. Running the host *without* the verb behaves exactly as before.
+4. A host with two components sharing a topic emits one `topics[]` entry with
+   both `publishers`/`subscribers` filled in.
+                                                                                                                                                                                              Two things worth double-checking in that repo before/while implementing, since I c: whether a graph verb (or similar) already partially exists in Intropy.Topology(main's CLI comment implies it was planned), and whether dotnet run on that project keeps stdout clean with -v q — if MSBuild noise leaks through, the prompt's acceptance test #1 will catch it, and publishing/running the built DLL is the fallback the library README should
