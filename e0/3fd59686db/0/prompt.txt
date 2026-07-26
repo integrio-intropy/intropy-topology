@@ -1,0 +1,5 @@
+Can you do an ananlysis of the intropy.topology.aspire library and see if we are following aspire best practices or if there are some simplifications that can be done?
+
+---
+
+Implement 1-4
