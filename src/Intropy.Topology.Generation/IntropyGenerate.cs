@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Intropy.Topology;
 using Intropy.Topology.Model;
 
@@ -11,7 +12,12 @@ namespace Intropy.Topology.Generation;
 /// </summary>
 public static class IntropyGenerate
 {
-    private static readonly JsonSerializerOptions s_json = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions s_json = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
 
     /// <summary>Runs a generation CLI verb against the system discovered in <paramref name="assembly"/>.</summary>
     /// <param name="assembly">The assembly declaring the <see cref="ISystemDefinition"/>.</param>
@@ -49,96 +55,110 @@ public static class IntropyGenerate
 
     private static int Graph(Assembly assembly)
     {
-        var discovered = SystemDiscovery.Discover(assembly);
-        Console.WriteLine(JsonSerializer.Serialize(DisplayModel(discovered.Topology), s_json));
-        return 0;
+        try
+        {
+            var topology = SystemDiscovery.Discover(assembly).Topology;
+            Console.WriteLine(JsonSerializer.Serialize(GraphDocument.From(topology), s_json));
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"error: {ex.Message}");
+            return 1;
+        }
     }
 
-    /// <summary>
-    /// The graph verb's human-facing projection of the model: camelCase, kebab-case kinds,
-    /// short contract names, empty collections omitted. The wire format (plain model
-    /// serialization) is unchanged — this is presentation, not interchange.
-    /// </summary>
-    private static Dictionary<string, object> DisplayModel(SystemTopology topology)
+    /// <summary>Maps the validated internal model to the topology.intropy.io/v1 interchange contract.</summary>
+    private sealed record GraphDocument(
+        string ApiVersion,
+        string Kind,
+        string System,
+        IReadOnlyList<GraphComponent>? Components,
+        IReadOnlyList<GraphTopic>? Topics,
+        IReadOnlyList<GraphConnector>? Connectors)
     {
-        var model = new Dictionary<string, object>
+        public static GraphDocument From(SystemTopology topology) => new(
+            "topology.intropy.io/v1",
+            "SystemTopology",
+            topology.SystemName,
+            Optional(topology.Components.Select(GraphComponent.From)),
+            Optional(topology.Topics.Select(GraphTopic.From)),
+            Optional(topology.Connectors.Select(GraphConnector.From)));
+    }
+
+    private sealed record GraphComponent(
+        string Name,
+        string Kind,
+        IReadOnlyList<GraphTopicReference>? Subscribes,
+        IReadOnlyList<GraphPublication>? Publishes,
+        IReadOnlyList<GraphConnectorUse>? Connectors)
+    {
+        public static GraphComponent From(ComponentModel component) => new(
+            component.Name,
+            KebabCase(component.Kind.ToString()),
+            Optional(component.Subscribes.Select(t => new GraphTopicReference(t.PubSubName, t.TopicName))),
+            Optional(component.Publishes.Select(p => new GraphPublication(
+                p.Port == "default" ? null : p.Port, p.PubSubName, p.TopicName))),
+            Optional(component.Connectors.Select(c => new GraphConnectorUse(
+                c.ConnectorName, Direction(c.Direction)))));
+    }
+
+    private sealed record GraphTopicReference(
+        [property: JsonPropertyName("pubsub")] string PubSub,
+        string Topic);
+
+    private sealed record GraphPublication(
+        string? Port,
+        [property: JsonPropertyName("pubsub")] string PubSub,
+        string Topic);
+
+    private sealed record GraphConnectorUse(string Connector, string Direction);
+
+    private sealed record GraphTopic(
+        [property: JsonPropertyName("pubsub")] string PubSub,
+        string Topic,
+        string Contract,
+        IReadOnlyList<string>? Publishers,
+        IReadOnlyList<string>? Subscribers)
+    {
+        public static GraphTopic From(TopicResource topic) => new(
+            topic.PubSubName,
+            topic.TopicName,
+            topic.ContractTypeName,
+            Optional(topic.Publishers),
+            Optional(topic.Subscribers));
+    }
+
+    private sealed record GraphConnector(
+        string Name,
+        GraphTransport Transport,
+        IReadOnlyList<string>? Directions,
+        IReadOnlyList<string>? UsedBy)
+    {
+        public static GraphConnector From(ConnectorResource connector) => new(
+            connector.Name,
+            GraphTransport.From(connector.Transport),
+            Optional(connector.Directions.Select(Direction)),
+            Optional(connector.UsedBy));
+    }
+
+    private sealed record GraphTransport(string Type, bool SupportsInput, bool SupportsOutput)
+    {
+        public static GraphTransport From(Transport transport) => transport switch
         {
-            ["systemName"] = topology.SystemName,
-            ["components"] = topology.Components.Select(DisplayComponent).ToArray(),
-            ["topics"] = topology.Topics.Select(t => new Dictionary<string, object>
-            {
-                ["pubsub"] = t.PubSubName,
-                ["name"] = t.TopicName,
-                ["contract"] = ShortTypeName(t.ContractTypeName),
-            }).ToArray(),
+            FileTransport => new("file", SupportsInput: true, SupportsOutput: true),
+            _ => throw new InvalidOperationException($"Unsupported graph transport '{transport.GetType().Name}'."),
         };
-
-        if (topology.Connectors.Count > 0)
-        {
-            model["connectors"] = topology.Connectors.Select(c => new Dictionary<string, object>
-            {
-                ["name"] = c.Name,
-                ["transport"] = c.Transport.DaprType,
-                ["usedBy"] = c.UsedBy,
-            }).ToArray();
-        }
-
-        return model;
     }
 
-    private static Dictionary<string, object> DisplayComponent(ComponentModel component)
+    private static T[]? Optional<T>(IEnumerable<T> values)
     {
-        var entry = new Dictionary<string, object>
-        {
-            ["name"] = component.Name,
-            ["kind"] = KebabCase(component.Kind.ToString()),
-        };
-
-        if (component.Schedule is not null)
-        {
-            entry["schedule"] = component.Schedule;
-        }
-
-        if (component.Subscribes.Count > 0)
-        {
-            entry["subscribes"] = component.Subscribes
-                .Select(t => new Dictionary<string, object> { ["pubsub"] = t.PubSubName, ["topic"] = t.TopicName })
-                .ToArray();
-        }
-
-        if (component.Publishes.Count > 0)
-        {
-            entry["publishes"] = component.Publishes.Select(p =>
-            {
-                var edge = new Dictionary<string, object> { ["pubsub"] = p.PubSubName, ["topic"] = p.TopicName };
-                if (p.Port != "default")
-                {
-                    edge["port"] = p.Port;
-                }
-
-                return edge;
-            }).ToArray();
-        }
-
-        if (component.Connectors.Count > 0)
-        {
-            entry["connectors"] = component.Connectors
-                .Select(c => new Dictionary<string, object>
-                {
-                    ["name"] = c.ConnectorName,
-                    ["direction"] = c.Direction == ConnectorDirection.In ? "in" : "out",
-                })
-                .ToArray();
-        }
-
-        return entry;
+        var array = values.ToArray();
+        return array.Length > 0 ? array : null;
     }
 
-    private static string ShortTypeName(string fullName)
-    {
-        var index = fullName.LastIndexOfAny(['.', '+']);
-        return index >= 0 ? fullName[(index + 1)..] : fullName;
-    }
+    private static string Direction(ConnectorDirection direction) =>
+        direction == ConnectorDirection.In ? "in" : "out";
 
     private static string KebabCase(string pascal)
     {
