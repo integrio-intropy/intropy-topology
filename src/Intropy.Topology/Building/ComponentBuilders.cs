@@ -3,11 +3,11 @@ using Intropy.Topology.Model;
 namespace Intropy.Topology.Building;
 
 /// <summary>
-/// Grammar shared by every component builder. The self type keeps the fluent chain on the
-/// concrete builder, whose members are exactly that component's legal grammar — declaring
-/// an edge a block cannot have is a compile error, not a validation diagnostic. The
-/// component type is the typed handle the builder declares, exposed via
-/// <see cref="Component"/>. Not thread-safe.
+/// Base class for builders that declare a topology component and its permitted edges.
+/// Each derived builder exposes only the operations valid for its component kind, so
+/// invalid edges cannot be declared. Fluent methods return the derived builder type,
+/// and <see cref="Component"/> provides the typed component declared by the builder.
+/// Not thread-safe.
 /// </summary>
 /// <typeparam name="TSelf">The concrete component builder type.</typeparam>
 /// <typeparam name="TComponent">The typed component the builder declares.</typeparam>
