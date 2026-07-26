@@ -9,19 +9,6 @@ namespace Intropy.Topology.Aspire;
 /// <summary>A component the scheduler re-runs: its resource name and cron expression.</summary>
 internal sealed record ScheduledComponent(string Name, string Cron);
 
-/// <summary>Pure cron math, separated from the scheduler so it is trivially testable.</summary>
-internal static class ScheduleTickPlanner
-{
-    /// <summary>
-    /// The next occurrence of <paramref name="cron"/> strictly after <paramref name="after"/>
-    /// in <paramref name="zone"/>, or null when the expression never fires again. Cronos
-    /// accepts both five-field expressions and the <c>@daily</c>-style macros the shallow
-    /// Build-time validator admits.
-    /// </summary>
-    public static DateTimeOffset? NextOccurrence(string cron, DateTimeOffset after, TimeZoneInfo zone) =>
-        CronExpression.Parse(cron).GetNextOccurrence(after, zone);
-}
-
 /// <summary>
 /// The scheduler's view of the Aspire resource model: last known states plus start/wait
 /// commands. A seam so tick behavior is unit-testable without DCP.
@@ -154,7 +141,7 @@ internal sealed class ComponentScheduler(
             // The run-to-completion block shut its sidecar down when it exited, so bring
             // the sidecar back first — daprd must be accepting connections before the app
             // starts, or the app's first sidecar call fails.
-            var sidecar = $"{component}-dapr-cli";
+            var sidecar = DaprSidecarIdentity.CliName(component);
             if (lifecycle.IsStartable(sidecar))
             {
                 if (!await StartResourceAsync(sidecar, cancellationToken).ConfigureAwait(false))
@@ -207,7 +194,7 @@ internal sealed class ComponentScheduler(
             while (!stoppingToken.IsCancellationRequested)
             {
                 var now = timeProvider.GetUtcNow();
-                var next = ScheduleTickPlanner.NextOccurrence(component.Cron, now, TimeZoneInfo.Local);
+                var next = CronExpression.Parse(component.Cron).GetNextOccurrence(now, TimeZoneInfo.Local);
                 if (next is null)
                 {
                     logger.LogWarning(

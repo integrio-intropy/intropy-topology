@@ -107,7 +107,7 @@ dotnet run -- graph              # print the SystemTopology JSON
 dotnet run -- generate ./out     # write Dapr YAML + per-component config
 ```
 
-`generate` emits `components/<pubsub>.yaml` (RabbitMQ-backed pub/sub), one `components/binding.<connector>.yaml` per connector (root path absolutized), and `config/<component>.intropy.json` per component.
+`generate` emits `components/<pubsub>.yaml` (Redis-backed pub/sub), one `components/binding.<connector>.yaml` per connector (root path absolutized), and `config/<component>.intropy.json` per component.
 
 ## Next steps
 

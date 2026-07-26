@@ -33,7 +33,7 @@ component's own scaffold.
 |---------|-------------|
 | [Intropy.Topology](https://www.nuget.org/packages/Intropy.Topology) | Staged builders, refs, discovery, the immutable topology model, and validation |
 | Intropy.Topology.Generation | `SystemTopology` → Dapr component YAML + per-component runtime config; the `check`/`graph`/`generate` verbs |
-| Intropy.Topology.Aspire | Translates a discovered topology into a live .NET Aspire application (RabbitMQ-backed pub/sub, Dapr sidecars) |
+| Intropy.Topology.Aspire | Translates a discovered topology into a live .NET Aspire application (Redis-backed pub/sub, Dapr sidecars) |
 
 ## Quick start
 
@@ -101,7 +101,7 @@ dotnet run --project examples/OrderFlow.SystemHost -- generate ./out   # write D
 
 The Aspire backend is a one-way **translator**: it discovers the model, generates the system's Dapr
 components, and speaks Aspire's language (`AddProject`, `AddContainer`, `WithDaprSidecar`) to build
-the resource graph DCP runs — RabbitMQ behind pub/sub, one project with a Dapr sidecar per component,
+the resource graph DCP runs — Redis behind pub/sub, one project with a Dapr sidecar per component,
 subscribers started before their publishers. Each sidecar loads a staged overlay: the integration's
 own `local/dapr-components/` plus the generated system components, where a generated component with
 the same `metadata.name` replaces the local one. Aspire never sees the model — the same one-way

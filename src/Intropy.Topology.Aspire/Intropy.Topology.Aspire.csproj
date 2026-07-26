@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>.NET Aspire run-backend for Intropy.Topology. Discovers a system's validated topology, generates its Dapr components, and translates the model into Aspire resources (projects, RabbitMQ, Dapr sidecars) that DCP orchestrates for local F5.</Description>
+    <Description>.NET Aspire run-backend for Intropy.Topology. Discovers a system's validated topology, generates its Dapr components, and translates the model into Aspire resources (projects, Redis, Dapr sidecars) that DCP orchestrates for local F5.</Description>
     <PackageTags>intropy;topology;aspire;dapr;integration</PackageTags>
   </PropertyGroup>
 

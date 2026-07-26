@@ -38,7 +38,7 @@ public sealed class ComponentOverlayTests : IDisposable
     {
         // Arrange
         WriteLocalComponent("order-extractor", "inbound.yaml", "inbound", "bindings.localstorage");
-        var generated = WriteGeneratedComponent("pubsub-a.yaml", "pubsub-a", "pubsub.rabbitmq");
+        var generated = WriteGeneratedComponent("pubsub-a.yaml", "pubsub-a", "pubsub.redis");
 
         // Act
         var staged = ComponentOverlay.Stage(AppHostDir, "order-extractor", generated);
@@ -55,27 +55,27 @@ public sealed class ComponentOverlayTests : IDisposable
     [Fact]
     public void Stage_WithSameMetadataName_ShouldReplaceLocalWithGenerated()
     {
-        // Arrange — the tutorial's swap: local in-memory pubsub vs generated RabbitMQ-backed one,
+        // Arrange — the tutorial's swap: local in-memory pubsub vs generated Redis-backed one,
         // keyed on metadata.name even though the filenames differ.
         WriteLocalComponent("order-extractor", "pubsub.yaml", "pubsub", "pubsub.in-memory");
-        var generated = WriteGeneratedComponent("pubsub-generated.yaml", "pubsub", "pubsub.rabbitmq");
+        var generated = WriteGeneratedComponent("pubsub-generated.yaml", "pubsub", "pubsub.redis");
 
         // Act
         var staged = ComponentOverlay.Stage(AppHostDir, "order-extractor", generated);
 
         // Assert — one component named "pubsub" survives, and it is the generated one.
         var file = Assert.Single(Directory.GetFiles(staged));
-        Assert.Contains("pubsub.rabbitmq", File.ReadAllText(file), StringComparison.Ordinal);
+        Assert.Contains("pubsub.redis", File.ReadAllText(file), StringComparison.Ordinal);
     }
 
     [Fact]
     public void Stage_CalledAgain_ShouldDropFilesFromThePreviousRun()
     {
         // Arrange — a first staging leaves a file behind that the next topology no longer has.
-        var generated = WriteGeneratedComponent("pubsub-a.yaml", "pubsub-a", "pubsub.rabbitmq");
+        var generated = WriteGeneratedComponent("pubsub-a.yaml", "pubsub-a", "pubsub.redis");
         ComponentOverlay.Stage(AppHostDir, "order-extractor", generated);
         File.Delete(Path.Combine(generated, "pubsub-a.yaml"));
-        File.WriteAllText(Path.Combine(generated, "pubsub-b.yaml"), ComponentYaml("pubsub-b", "pubsub.rabbitmq"));
+        File.WriteAllText(Path.Combine(generated, "pubsub-b.yaml"), ComponentYaml("pubsub-b", "pubsub.redis"));
 
         // Act
         var staged = ComponentOverlay.Stage(AppHostDir, "order-extractor", generated);
@@ -105,7 +105,7 @@ public sealed class ComponentOverlayTests : IDisposable
             metadata:
               name: pubsub
             spec:
-              type: pubsub.rabbitmq
+              type: pubsub.redis
               version: v1
               metadata:
                 - name: hostname

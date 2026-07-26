@@ -58,6 +58,10 @@ backends (Redis, mock containers).
   > **Amended 2026-07-25:** the dev broker is now RabbitMQ (ADR 0005, amended) — an AMQP broker
   > Microcks' async minion can speak. Topic mocking stays out of scope, but the protocol barrier
   > noted above no longer applies.
+
+  > **Amended again 2026-07-25 (later):** the dev broker is back to Redis, on host port 6380
+  > (ADR 0005, amended again). The original protocol barrier applies once more: Microcks' async
+  > minion does not speak Redis, so topic mocking stays out of scope on protocol grounds too.
 - **Contract-testing provided APIs** (`MicrocksClient.TestEndpointAsync`) — deferred until workers
   implement real endpoints; today they are stubs.
 - **SFTP/blob external systems** keep container mocks (`atmoz/sftp`, Azurite).

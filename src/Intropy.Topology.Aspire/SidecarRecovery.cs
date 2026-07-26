@@ -28,33 +28,41 @@ internal sealed class AspireResourceStateMonitor(ResourceNotificationService not
 }
 
 /// <summary>
-/// Restarts Dapr sidecars that exit while initializing a component. Component initialization is
-/// fatal in daprd, and RabbitMQ can accept TCP connections shortly before it is ready to accept
-/// the component connection. Initial startup is gated separately; this service handles the
-/// remaining transient window without requiring dashboard intervention.
+/// Compatibility seam for the executable resource created by CommunityToolkit.Aspire.Hosting.Dapr 13.0.0.
+/// The toolkit's public sidecar model does not expose this executable, so audit this convention when
+/// upgrading the toolkit.
 /// </summary>
-internal sealed class BackendReadiness(IReadOnlyList<IBackendReadiness> backends) : IBackendReadiness
+internal static class DaprSidecarIdentity
 {
-    public async Task WaitUntilReadyAsync(TimeSpan timeout, CancellationToken cancellationToken)
-    {
-        foreach (var backend in backends)
-        {
-            await backend.WaitUntilReadyAsync(timeout, cancellationToken).ConfigureAwait(false);
-        }
-    }
+    private const string CliSuffix = "-dapr-cli";
+
+    public static string CliName(string componentName) => componentName + CliSuffix;
+
+    public static bool IsCli(string resourceName) => resourceName.EndsWith(CliSuffix, StringComparison.Ordinal);
 }
+
+/// <summary>Recovery configuration: which sidecars the scheduler owns and recovery must skip.</summary>
+internal sealed record DaprSidecarRecoveryOptions(IReadOnlySet<string> SchedulerOwnedSidecars);
 
 internal sealed class DaprSidecarRecovery(
     IResourceStateMonitor states,
     IResourceLifecycle lifecycle,
     IBackendReadiness backendReadiness,
+    DaprSidecarRecoveryOptions options,
+    TimeProvider time,
     ILogger<DaprSidecarRecovery> logger) : BackgroundService
 {
     private const int MaxAttemptsPerSidecar = 3;
     private static readonly TimeSpan s_backendReadyTimeout = TimeSpan.FromMinutes(3);
 
+    // DCP reports an executable as Running the moment its process launches, not when it is
+    // healthy — daprd lives ~1s before a fatal component-init exit. Only a stay in Running at
+    // least this long counts as having actually run; a scheduled sidecar that legitimately
+    // completes faster costs at most MaxAttemptsPerSidecar spurious restarts.
+    private static readonly TimeSpan s_minHealthyRunningDuration = TimeSpan.FromSeconds(10);
+
     private readonly ConcurrentDictionary<string, int> _attempts = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, byte> _hasReachedRunning = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _runningSince = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _gates = new(StringComparer.Ordinal);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -74,24 +82,35 @@ internal sealed class DaprSidecarRecovery(
 
     internal async Task HandleStateUpdateAsync(ResourceStateUpdate update, CancellationToken cancellationToken)
     {
-        if (!update.ResourceName.EndsWith("-dapr-cli", StringComparison.Ordinal))
+        if (!DaprSidecarIdentity.IsCli(update.ResourceName))
+        {
+            return;
+        }
+
+        // A scheduled component's sidecar is scheduler-owned: the run-to-completion block shuts
+        // its sidecar down after every run and the scheduler restarts it on the next tick
+        // (decision 0010), so its exits are lifecycle, not failure — however quick the run.
+        if (options.SchedulerOwnedSidecars.Contains(update.ResourceName))
         {
             return;
         }
 
         if (string.Equals(update.State, KnownResourceStates.Running, StringComparison.Ordinal))
         {
-            // A normal scheduled sidecar exits after its app completes. Remember that this
-            // instance was healthy so its later terminal state is not mistaken for a failed
-            // component initialization, and do not reset the recovery cap into a restart loop.
-            _hasReachedRunning.TryAdd(update.ResourceName, 0);
+            // Overwrite (not TryAdd): after a recovery restart the fresh instance's clock must
+            // start over, or its own early crash would be judged by the previous run's stamp.
+            _runningSince[update.ResourceName] = time.GetTimestamp();
             return;
         }
 
+        // A normal scheduled sidecar exits after its app completes — but only a sustained stay
+        // in Running proves that, so a component-init crash a moment after launch still recovers.
+        var ranHealthily = _runningSince.TryGetValue(update.ResourceName, out var since)
+            && time.GetElapsedTime(since) >= s_minHealthyRunningDuration;
         var failedBeforeRunning = string.Equals(update.State, KnownResourceStates.Finished, StringComparison.Ordinal)
             || string.Equals(update.State, KnownResourceStates.Exited, StringComparison.Ordinal);
         if (!string.Equals(update.State, KnownResourceStates.FailedToStart, StringComparison.Ordinal)
-            && (!failedBeforeRunning || _hasReachedRunning.ContainsKey(update.ResourceName)))
+            && (!failedBeforeRunning || ranHealthily))
         {
             return;
         }

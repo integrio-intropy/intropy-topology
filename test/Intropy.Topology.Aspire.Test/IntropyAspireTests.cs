@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using CommunityToolkit.Aspire.Hosting.Dapr;
@@ -7,6 +9,7 @@ using Intropy.Topology.Model;
 
 namespace Intropy.Topology.Aspire.Test;
 
+[Collection("RedisPort")]
 public sealed class IntropyAspireTests : IDisposable
 {
     private sealed record RawOrder(string OrderNumber);
@@ -50,7 +53,23 @@ public sealed class IntropyAspireTests : IDisposable
     }
 
     [Fact]
-    public void Apply_ShouldAddRabbitMqBackend()
+    public void Apply_WhenRedisPortIsOccupied_ShouldExplainHowToRecover()
+    {
+        // Arrange
+        using var listener = new TcpListener(IPAddress.Loopback, IntropyAspire.RedisPort);
+        listener.Start();
+        var builder = CreateBuilder();
+
+        // Act
+        var ex = Assert.Throws<InvalidOperationException>(() => IntropyAspire.Apply(builder, Topology(), GeneratedRoot));
+
+        // Assert
+        Assert.Contains("Redis requires host port 6380", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("Stop the conflicting process", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Apply_ShouldAddRedisBackend()
     {
         // Arrange
         var builder = CreateBuilder();
@@ -59,7 +78,7 @@ public sealed class IntropyAspireTests : IDisposable
         IntropyAspire.Apply(builder, Topology(), GeneratedRoot);
 
         // Assert
-        Assert.Contains(builder.Resources, r => r.Name == "rabbitmq");
+        Assert.Contains(builder.Resources, r => r.Name == "redis");
     }
 
     [Fact]

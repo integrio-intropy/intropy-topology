@@ -40,7 +40,7 @@ public sealed class GeneratedArtifacts
 
 /// <summary>
 /// Turns a validated <see cref="SystemTopology"/> into Dapr components and runtime config
-/// for the local run profile: pub/sub backed by RabbitMQ, file bindings anchored to the
+/// for the local run profile: pub/sub backed by Redis Streams, file bindings anchored to the
 /// SystemHost directory.
 /// </summary>
 public static class TopologyGenerator
@@ -86,14 +86,14 @@ public static class TopologyGenerator
             .Select(c => c.Name)
             .OrderBy(n => n, StringComparer.Ordinal);
 
+        // Redis Streams with consumer groups: an unacked or RETRY'd message is redelivered
+        // after the component's redeliverInterval instead of being dropped. Port 6380 because
+        // `dapr init` publishes its own dapr_redis on the host's 6379.
         var metadata = new[]
         {
-            ("hostname", "localhost"),
-            ("port", "5672"),
-            ("username", "guest"),
-            ("password", "guest"),
+            ("redisHost", "localhost:6380"),
         };
-        var yaml = DaprYaml.Component(pubSubName, "pubsub.rabbitmq", metadata, scopes);
+        var yaml = DaprYaml.Component(pubSubName, "pubsub.redis", metadata, scopes);
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{pubSubName}.yaml", yaml);
     }
 

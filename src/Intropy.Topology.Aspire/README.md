@@ -1,30 +1,18 @@
 # Intropy.Topology.Aspire
 
-The .NET Aspire **run-backend** for [`Intropy.Topology`](https://www.nuget.org/packages/Intropy.Topology).
-Turns a validated `SystemTopology` into a live, F5-able Aspire application — with Dapr.
+The .NET Aspire **run backend** for [`Intropy.Topology`](https://www.nuget.org/packages/Intropy.Topology).
 
-The adapter is a one-way **translator**. At AppHost startup it:
+It turns a validated `SystemTopology` into a local, F5-able Aspire application with Dapr. At AppHost startup it:
 
-1. **discovers** the system's validated topology from the assembly (`SystemDiscovery`),
-2. **generates** dev Dapr components in-memory (`Intropy.Topology.Generation`) to a temp folder, then
-3. **translates** the model into Aspire resources — a plain RabbitMQ container behind pub/sub,
-   `AddContainer` for declared mock external systems, one Microcks instance serving every
-   contract-backed mock, one `AddProject` (by folder convention) or dev-override container per
-   component, each with a Dapr sidecar (`app-id` = component name) whose `--resources-path`
-   points at the generated dev YAML — and runs it under DCP.
+1. discovers the validated system definition from the supplied assembly;
+2. generates Dapr components and per-component runtime configuration into a temporary directory; and
+3. translates the topology to Aspire resources: one Redis container for pub/sub and one sibling .NET project plus Dapr sidecar for each topology component.
 
-Aspire never sees the topology; it receives ordinary resources. This mirrors the one-way
-relationship Generation has with Dapr YAML, targeting a live object model instead of files.
-
-Components that declare a schedule (`WithSchedule`, [ADR 0010](../../docs/decisions/0010-schedule-as-activation-attribute.md))
-are re-run on their cron ticks by the `ComponentScheduler` — CronJob emulation for the dev
-loop: sidecar restarted first, overlapping ticks skipped with a warning, a "Run now"
-command on the dashboard, local time zone. Cronos (cron next-occurrence math) is this
-package's only dependency beyond Aspire itself.
+The adapter is deliberately one-way: Aspire receives ordinary resources; it does not need to understand the topology model.
 
 ## Usage
 
-One entry point in the AppHost, two backends of the same discovered truth:
+One SystemHost entry point selects the run or generation backend from the same discovered system definition:
 
 ```csharp
 using System.Reflection;
@@ -33,56 +21,32 @@ using Intropy.Topology.Generation;
 
 var assembly = Assembly.GetExecutingAssembly();
 return args is ["run", ..] or []
-    ? await IntropyAspire.RunAsync(assembly, args)     // → Aspire + DCP
-    : await IntropyGenerate.RunAsync(assembly, args);  // → generate | check | graph
+    ? await IntropyAspire.RunAsync(assembly, args)     // Aspire + DCP
+    : await IntropyGenerate.RunAsync(assembly, args);  // generate | check | graph
 ```
 
-Each component is resolved to the sibling project that runs it by folder convention
-(`order-extractor` → `../order-extractor/order-extractor.csproj`). A component can instead be mapped
-to a container image, and external systems can be mocked, via the `IDevProfile` seam on the system
-definition:
+## Project convention
 
-```csharp
-public sealed class OrderFulfillmentSystem : ISystemDefinition, IDevProfile
-{
-    public string SystemName => "order-fulfillment";
-    public void Define(SystemBuilder builder) { /* ... topology ... */ }
+Each topology component is resolved to a sibling project relative to the SystemHost:
 
-    public void ConfigureDev(DevBuilder dev)
-    {
-        dev.MockExternalSystem("webshop", "atmoz/sftp:latest", 2222);
-        dev.Override("erp-order-loader", "myregistry/erp-loader:1.0"); // run as a container, not a project
+- `order-extractor` resolves to `../order-extractor/src/*.csproj` when `src` contains exactly one project;
+- otherwise it resolves to `../order-extractor/order-extractor.csproj`.
 
-        // Contract-backed mocks, served by one Microcks instance (docs/decisions/0006):
-        dev.MockHttpExternalSystem("erp", "mocks/erp-orders-openapi.yaml", "erp-orders", "1.0.0");
-        dev.MockApi("freight-booking", "mocks/freight-api-openapi.yaml", "freight-booking-api", "1.0.0");
-    }
-}
-```
+A component's standalone Dapr resources live at `../<component>/local/dapr-components/`. For Aspire runs, they are staged with generated resources at the stable, inspectable path `obj/dapr-components/<component>/`; generated resources replace local resources with the same Dapr `metadata.name`.
 
-`MockHttpExternalSystem` points a `bindings.http` connector at a REST mock generated from the
-OpenAPI contract. `MockApi` mocks an *internal* API: its provider component is not started, and a
-generated Dapr `HTTPEndpoint` resource routes service invocation of the provider's app-id to the
-mock — so a single component can be debugged without running its siblings. Artifact paths resolve
-against the AppHost project directory; `serviceName`/`serviceVersion` must match the contract's
-`info.title`/`info.version`.
+## Runtime behavior
 
-Dev declarations never enter the `SystemTopology`, so the prod model stays pure.
+- Redis backs development pub/sub. It is published at host port `6380` because generated Dapr resources target `localhost:6380`; `dapr init` commonly reserves Redis's default `6379`.
+- Components receive `INTROPY__COMPONENT` and `INTROPY__CONFIG` environment variables. The latter points to that component's generated `.intropy.json` file.
+- A publisher waits for its subscribers during startup when the topic graph is acyclic. Dapr sidecars also wait for Redis readiness before they start.
+- An extractor declared with `WithSchedule` runs once at AppHost startup and is re-run on its cron ticks. The dashboard provides a **Run now** command; overlapping runs are skipped.
 
-## Prerequisites for `run`
+## Prerequisites
 
-- The [.NET Aspire](https://aspire.dev) tooling and an `Aspire.AppHost.Sdk` AppHost project.
-- Docker and [Dapr](https://docs.dapr.io) initialized locally (`dapr init`).
+- An AppHost project using the .NET Aspire SDK.
+- Docker.
+- The Dapr CLI initialized locally: `dapr init`.
 
-## Notes
+## Scope
 
-- Dev pub/sub is backed by RabbitMQ on a fixed host port (5672), and contract-backed mocks by Microcks
-  on 8585; the generated YAML points at them. This resolves the generate-before-run ordering; a port
-  conflict there is a known limitation.
-- Synchronous APIs (`Provides`/`Consumes`) create no Dapr component — Dapr service invocation
-  addresses providers by app-id, which the sidecars already establish. A `MockApi` declaration is
-  the exception: it emits an `HTTPEndpoint` resource named after the (skipped) provider.
-- Topic mocking is out of scope, though no longer for protocol reasons: Microcks' async minion
-  speaks AMQP, which the RabbitMQ dev broker uses (ADR 0006, amended).
-- The runtime-config contract injected into each project (`INTROPY__COMPONENT`, `INTROPY__CONFIG`)
-  is provisional until the Intropy Hosting framework consumes it.
+This package implements the repository's minimal topology model. Development overrides, external-system mocks, Microcks, API mocking, and additional transport/runtime backends remain on the `full-topology` branch; they are not supported here.
