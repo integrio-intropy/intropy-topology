@@ -22,5 +22,6 @@ public sealed class OrderSystem : ISystemDefinition
         builder.AddLoader("order-loader").Subscribes(Raw).To(Erp);
         builder.AddExtractor("fulfillment-extractor").Publishes(Fulfillment);
         builder.AddLoader("fulfillment-loader").Subscribes(Fulfillment);
+        builder.AddLoader("raw-audit").Subscribes(Raw);
     }
 }
