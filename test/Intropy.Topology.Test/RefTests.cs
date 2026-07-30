@@ -35,6 +35,31 @@ public class ConnectorRefTests
     }
 
     [Fact]
+    public void WithDeployed_ShouldReturnCopyWithDeployedTransport()
+    {
+        // Arrange
+        var connector = ConnectorRef.Define("pim", Transport.File("./test/pim"));
+
+        // Act
+        var deployed = connector.WithDeployed(Transport.Sftp());
+
+        // Assert
+        Assert.Null(connector.DeployedTransport);
+        Assert.Equal(Transport.Sftp(), deployed.DeployedTransport);
+        Assert.Equal(connector.Transport, deployed.Transport);
+    }
+
+    [Fact]
+    public void WithDeployed_WithNullTransport_ShouldThrowArgumentNullException()
+    {
+        // Arrange
+        var connector = ConnectorRef.Define("pim", Transport.File("./test/pim"));
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => connector.WithDeployed(null!));
+    }
+
+    [Fact]
     public void Equals_WithSameNameAndTransport_ShouldBeEqual()
     {
         // Arrange
@@ -58,6 +83,31 @@ public class TransportTests
         var file = Assert.IsType<FileTransport>(transport);
         Assert.Equal("bindings.localstorage", file.DaprType);
         Assert.Equal("./test/source", file.RootPath);
+    }
+
+    [Fact]
+    public void Sftp_ShouldExposeDaprTypeAndCapabilities()
+    {
+        // Act
+        var transport = Transport.Sftp();
+
+        // Assert
+        Assert.IsType<SftpTransport>(transport);
+        Assert.Equal("bindings.sftp", transport.DaprType);
+        Assert.False(transport.SupportsInput);
+        Assert.True(transport.SupportsOutput);
+    }
+
+    [Fact]
+    public void Sftp_ShouldRoundTripThroughTransportPolymorphicSerialization()
+    {
+        // Act
+        var json = System.Text.Json.JsonSerializer.Serialize<Transport>(Transport.Sftp());
+        var transport = System.Text.Json.JsonSerializer.Deserialize<Transport>(json);
+
+        // Assert
+        Assert.Equal("{\"$transport\":\"sftp\",\"DaprType\":\"bindings.sftp\"}", json);
+        Assert.Equal(Transport.Sftp(), transport);
     }
 
     [Theory]

@@ -13,9 +13,10 @@ internal static class TopologyRules
     // *attribute* introduced by decision 0010 is ITP210), ITP202 (missing trigger),
     // ITP203 (multiple TriggeredBy calls).
     // Retired with the minimal model (full versions live on the full-topology branch):
-    // ITP105/ITP106 (connector direction capability — the file transport supports both),
-    // ITP107 (unresolved connector — every connector now declares its transport),
-    // ITP501 (API provider — the API surface is not part of the minimal model).
+    // ITP105/ITP106 (the original local connector-direction capability rules; deployed
+    // transport capability is ITP211), ITP107 (unresolved connector — every connector now
+    // declares its local transport), ITP501 (API provider — the API surface is not part of
+    // the minimal model).
     private static readonly ITopologyRule[] Rules =
     [
         new Rules.DuplicateComponentNameRule(),
@@ -24,6 +25,7 @@ internal static class TopologyRules
         new Rules.DuplicateSubscriptionRule(),
         new Rules.TopicContractConflictRule(),
         new Rules.ConnectorConflictRule(),
+        new Rules.DeployedTransportCapabilityRule(),
         new Rules.MissingRequiredOutputRule(),
         new Rules.MissingRequiredSubscriptionRule(),
         new Rules.ScheduleExpressionRule(),

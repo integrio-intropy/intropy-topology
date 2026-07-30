@@ -206,14 +206,80 @@ public class ConnectorConflictRuleTests
         // Act & Assert
         Assert.Empty(s.DiagnosticsFor("ITP104"));
     }
+
+    [Fact]
+    public void Validate_WithSameLocalTransportButDifferentDeployedTransport_ShouldReportItp104()
+    {
+        // Arrange: a connector declaration includes both its local and deployed transport profiles
+        var s = SystemBuilder.Create("test-system");
+        s.AddTransactionalIntegration("first")
+            .To(ConnectorRef.Define("shared", Transport.File("./test/shared")).WithDeployed(Transport.Sftp()));
+        s.AddTransactionalIntegration("second")
+            .To(ConnectorRef.Define("shared", Transport.File("./test/shared")));
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP104"));
+
+        // Assert
+        Assert.Equal("shared", diagnostic.Target);
+        Assert.Contains("bindings.sftp", diagnostic.Message);
+    }
 }
 
 // ITP201 (invalid cron), ITP202 (missing trigger), and ITP203 (multiple TriggeredBy) are
 // retired: triggers were replaced by edges and activation/workload shape moved to the
 // component scaffold. ITP204/ITP205 (trigger kind / connector direction not allowed for a
 // block) are compile errors — the offending methods do not exist on the block's builder
-// type. ITP105/ITP106 (connector direction capability), ITP107 (unresolved connector), and
-// ITP501 (API provider) retired with the minimal model.
+// type. ITP105/ITP106 (the original local connector direction capability rules), ITP107
+// (unresolved connector), and ITP501 (API provider) retired with the minimal model.
+// ITP211 validates an explicitly declared deployed transport.
+
+public class DeployedTransportCapabilityRuleTests
+{
+    [Fact]
+    public void Validate_WithInputOnlyUnsupportedSftpDeployedTransport_ShouldReportItp211()
+    {
+        // Arrange
+        var connector = ConnectorRef.Define("shared", Transport.File("./test/shared"))
+            .WithDeployed(Transport.Sftp());
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("extractor").From(connector).Publishes(TestTopics.Raw);
+        s.AddLoader("loader").Subscribes(TestTopics.Raw);
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP211"));
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("extractor", diagnostic.Target);
+        Assert.Contains("does not support input required by From", diagnostic.Message);
+        Assert.Throws<TopologyValidationException>(() => s.Build());
+    }
+
+    [Fact]
+    public void Validate_WithSftpDeployedTransportForOutput_ShouldNotReportItp211()
+    {
+        // Arrange
+        var connector = ConnectorRef.Define("shared", Transport.File("./test/shared"))
+            .WithDeployed(Transport.Sftp());
+        var s = SystemBuilder.Create("test-system");
+        s.AddTransactionalIntegration("ti").To(connector);
+
+        // Act & Assert
+        Assert.Empty(s.DiagnosticsFor("ITP211"));
+    }
+
+    [Fact]
+    public void Validate_WithoutDeployedTransport_ShouldNotReportItp211()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddTransactionalIntegration("ti").From(TestConnectors.Pim).To(TestConnectors.Pim);
+
+        // Act & Assert
+        Assert.Empty(s.DiagnosticsFor("ITP211"));
+    }
+}
 
 public class MissingRequiredOutputRuleTests
 {

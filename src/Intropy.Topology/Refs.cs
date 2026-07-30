@@ -69,8 +69,14 @@ public sealed record ConnectorRef
     /// <summary>The connector's name (DNS-1123 label, e.g. <c>pim</c>).</summary>
     public string Name { get; }
 
-    /// <summary>The transport — the kind of Dapr binding the connector materializes as.</summary>
+    /// <summary>The local transport — the kind of Dapr binding the connector materializes as during F5 runs.</summary>
     public Transport Transport { get; }
+
+    /// <summary>
+    /// The transport shape used after deployment, or <see langword="null"/> when the local
+    /// transport also applies to deployed environments.
+    /// </summary>
+    public Transport? DeployedTransport { get; init; }
 
     private ConnectorRef(string name, Transport transport)
     {
@@ -91,6 +97,19 @@ public sealed record ConnectorRef
         ArgumentNullException.ThrowIfNull(transport);
         return new ConnectorRef(NameRules.RequireLabel(name, nameof(name)), transport);
     }
+
+    /// <summary>
+    /// Declares the value-free transport shape that materializes for deployment. Connection
+    /// values remain environment-owned deployment configuration; local F5 runs keep using
+    /// <see cref="Transport"/>.
+    /// </summary>
+    /// <param name="transport">The deployed Dapr binding transport shape.</param>
+    /// <returns>A connector reference with the deployed transport set.</returns>
+    public ConnectorRef WithDeployed(Transport transport)
+    {
+        ArgumentNullException.ThrowIfNull(transport);
+        return this with { DeployedTransport = transport };
+    }
 }
 
 /// <summary>
@@ -100,6 +119,7 @@ public sealed record ConnectorRef
 /// </summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$transport")]
 [JsonDerivedType(typeof(FileTransport), "file")]
+[JsonDerivedType(typeof(SftpTransport), "sftp")]
 public abstract record Transport
 {
     private protected Transport()
@@ -109,6 +129,14 @@ public abstract record Transport
     /// <summary>The Dapr binding component's <c>spec.type</c> (e.g. <c>bindings.localstorage</c>).</summary>
     public abstract string DaprType { get; }
 
+    /// <summary>Whether the transport can provide input to a component through <c>From</c>.</summary>
+    [JsonIgnore]
+    public abstract bool SupportsInput { get; }
+
+    /// <summary>Whether the transport can accept component output through <c>To</c>.</summary>
+    [JsonIgnore]
+    public abstract bool SupportsOutput { get; }
+
     /// <summary>
     /// Local file transport (<c>bindings.localstorage</c>): reads and writes files in a folder on
     /// the host. The folder is the endpoint. This is the default resolution
@@ -117,6 +145,12 @@ public abstract record Transport
     /// <param name="rootPath">The folder the binding reads and writes, relative to the SystemHost directory or absolute.</param>
     /// <exception cref="ArgumentException">The root path is null or whitespace.</exception>
     public static Transport File([ConstantExpected] string rootPath) => new FileTransport(rootPath);
+
+    /// <summary>
+    /// SFTP transport (<c>bindings.sftp</c>) for deployed environments. Its address,
+    /// credentials, and path are supplied by deployment configuration.
+    /// </summary>
+    public static Transport Sftp() => new SftpTransport();
 }
 
 /// <summary>
@@ -127,6 +161,14 @@ public sealed record FileTransport : Transport
 {
     /// <inheritdoc />
     public override string DaprType => "bindings.localstorage";
+
+    /// <inheritdoc />
+    [JsonIgnore]
+    public override bool SupportsInput => true;
+
+    /// <inheritdoc />
+    [JsonIgnore]
+    public override bool SupportsOutput => true;
 
     /// <summary>The folder the binding reads and writes, relative to the SystemHost directory or absolute.</summary>
     public string RootPath { get; }
@@ -139,4 +181,22 @@ public sealed record FileTransport : Transport
         ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
         RootPath = rootPath;
     }
+}
+
+/// <summary>
+/// Value-free SFTP output transport: a Dapr binding component of type <c>bindings.sftp</c>.
+/// Deployment configuration supplies its address, credentials, and path.
+/// </summary>
+public sealed record SftpTransport : Transport
+{
+    /// <inheritdoc />
+    public override string DaprType => "bindings.sftp";
+
+    /// <inheritdoc />
+    [JsonIgnore]
+    public override bool SupportsInput => false;
+
+    /// <inheritdoc />
+    [JsonIgnore]
+    public override bool SupportsOutput => true;
 }
