@@ -1,0 +1,362 @@
+Task: Search docs/solutions/ (and any institutional memory) for learnings relevant to: end-to-end/integration testing of Aspire-hosted systems, Dapr sidecar testing, test flakiness/startup races, polling/waiting patterns in tests, scaffold/codegen test templates, and test fixtures shared across repos. Repo cwd: /Users/robinhultman/dev/intropy/tooling/intropy-topology. Also check global scope if available. Return any applicable learnings with their file paths; say explicitly if nothing is found.
+
+## Acceptance Contract
+Acceptance level: attested
+Completion is not accepted from prose alone. End with a structured acceptance report.
+
+Criteria:
+- criterion-1: Return concrete findings with file paths and severity when applicable
+
+Required evidence: review-findings, residual-risks
+
+Finish with a fenced JSON block tagged `acceptance-report` in this shape:
+Use empty arrays when no items apply; array fields contain strings unless object entries are shown.
+`criteriaSatisfied[].status` must be exactly one of: satisfied, not-satisfied, not-applicable.
+`commandsRun[].result` must be exactly one of: passed, failed, not-run.
+`manualNotes` and `notes` are optional strings; an empty string means no note and does not satisfy `manual-notes` evidence.
+```acceptance-report
+{
+  "criteriaSatisfied": [
+    {
+      "id": "criterion-1",
+      "status": "satisfied",
+      "evidence": "specific proof"
+    }
+  ],
+  "changedFiles": [
+    "src/file.ts"
+  ],
+  "testsAddedOrUpdated": [
+    "test/file.test.ts"
+  ],
+  "commandsRun": [
+    {
+      "command": "command",
+      "result": "passed",
+      "summary": "short result"
+    }
+  ],
+  "validationOutput": [
+    "validation output or concise summary"
+  ],
+  "residualRisks": [
+    "none"
+  ],
+  "noStagedFiles": true,
+  "diffSummary": "short description of the diff",
+  "reviewFindings": [
+    "blocker: file.ts:12 - issue found, or no blockers"
+  ],
+  "manualNotes": "anything else the parent should know"
+}
+```
+
+---
+
+Task: Scope: testing infrastructure and conventions in the repo at /Users/robinhultman/dev/intropy/tooling/intropy-topology.
+
+Planning context: We are planning a new capability: scaffolded end-to-end "system flow tests" for Intropy integration systems. A new shared testing package (working name Intropy.Topology.Testing) would live in this repo, providing a reusable xUnit fixture/harness that boots a SystemHost's discovered topology via the existing IntropyAspire.Apply (Aspire.Hosting.Testing), waits for readiness, drops files into file-connector source folders, and asserts messages land in destination folders. Downstream, the intropy-cli (a Go CLI, NOT in this repo) will scaffold a thin test project per system that consumes this package.
+
+Research questions (repo = /Users/robinhultman/dev/intropy/tooling/intropy-topology):
+1. How is test/Intropy.Topology.Aspire.Test structured? Especially AspireDaprIntegrationTests.cs — how does it boot Apply with DistributedApplicationTestingBuilder, what traits/categories does it use, how long does it take, how does it gate on Docker/Dapr presence (skip conditions)?
+2. What are the test conventions: xUnit version, test naming (Method_WithCondition_ShouldExpectation), Arrange/Act/Assert comments, csproj layout (Directory.Packages.props centrally managed? test SDK versions), InternalsVisibleTo usage?
+3. How are the three packages versioned/published (csproj, Directory.Build.props, Directory.Packages.props, any pack/nuget config, GitHub workflows)? Is there CI that runs the Docker/Dapr integration tests?
+4. What in Intropy.Topology.Generation's TopologyGenerator output would a test harness need: shape of generated artifacts on disk (components dir, config dir names), and what ComponentOverlay.Stage produces under obj/dapr-components?
+5. Does anything in the repo already poll/wait for file outputs or assert message flow (e.g., helpers in the Aspire test project)?
+6. Report the exact public API surface of IntropyAspire (RunAsync, Apply visibility — internal? InternalsVisibleTo to the test project?) and SystemDiscovery.Discover / TopologyGenerator.Generate signatures, since the new testing package would call them.
+
+Return: concise structured findings with repo-relative file paths and the key signatures verbatim.
+
+## Acceptance Contract
+Acceptance level: attested
+Completion is not accepted from prose alone. End with a structured acceptance report.
+
+Criteria:
+- criterion-1: Return concrete findings with file paths and severity when applicable
+
+Required evidence: review-findings, residual-risks
+
+Finish with a fenced JSON block tagged `acceptance-report` in this shape:
+Use empty arrays when no items apply; array fields contain strings unless object entries are shown.
+`criteriaSatisfied[].status` must be exactly one of: satisfied, not-satisfied, not-applicable.
+`commandsRun[].result` must be exactly one of: passed, failed, not-run.
+`manualNotes` and `notes` are optional strings; an empty string means no note and does not satisfy `manual-notes` evidence.
+```acceptance-report
+{
+  "criteriaSatisfied": [
+    {
+      "id": "criterion-1",
+      "status": "satisfied",
+      "evidence": "specific proof"
+    }
+  ],
+  "changedFiles": [
+    "src/file.ts"
+  ],
+  "testsAddedOrUpdated": [
+    "test/file.test.ts"
+  ],
+  "commandsRun": [
+    {
+      "command": "command",
+      "result": "passed",
+      "summary": "short result"
+    }
+  ],
+  "validationOutput": [
+    "validation output or concise summary"
+  ],
+  "residualRisks": [
+    "none"
+  ],
+  "noStagedFiles": true,
+  "diffSummary": "short description of the diff",
+  "reviewFindings": [
+    "blocker: file.ts:12 - issue found, or no blockers"
+  ],
+  "manualNotes": "anything else the parent should know"
+}
+```
+
+---
+
+Task: Planning context: .NET 10 solution that will gain a shared testing library for end-to-end integration tests of Aspire AppHosts with Dapr sidecars. Tests boot the full AppHost via Aspire.Hosting.Testing (DistributedApplicationTestingBuilder), with Dapr sidecars per project (CommunityToolkit.Aspire.Hosting.Dapr), a Redis container for pubsub, and file-based Dapr bindings (localstorage) as system inputs/outputs. Tests must wait for: resources Running, sidecar component init, and eventual file outputs appearing in watched folders (poll with timeout). CI runners will need Docker + dapr CLI.
+
+Research questions:
+1. Current best practice (2025-2026, Aspire 9.x/13) for Aspire.Hosting.Testing: DistributedApplicationTestingBuilder lifecycle, ResourceNotificationService.WaitForResourceAsync patterns, waiting on resource health vs Running state, cancelling via TestContext cancellation, and known pitfalls (startup timeouts, port conflicts, parallel test runs colliding on fixed ports).
+2. Best practice patterns for polling-based assertions in .NET tests (eventual consistency): helpers/libraries or idiomatic hand-rolled loops with timeout+interval, and how to make failure messages diagnosable.
+3. Patterns for running Dapr sidecars under Aspire integration tests in CI (GitHub Actions): dapr init requirements, Docker availability, known CommunityToolkit Dapr testing guidance.
+4. Any guidance on xUnit vs TUnit vs Microsoft.Testing.Platform for this style of long-running integration test in 2026, particularly around timeouts, retries, and parallelism control (test collections, DisableParallelization).
+
+Return: concise, source-cited findings with actionable recommendations; flag anything where official docs are thin.
+
+## Acceptance Contract
+Acceptance level: attested
+Completion is not accepted from prose alone. End with a structured acceptance report.
+
+Criteria:
+- criterion-1: Return concrete findings with file paths and severity when applicable
+
+Required evidence: review-findings, residual-risks
+
+Finish with a fenced JSON block tagged `acceptance-report` in this shape:
+Use empty arrays when no items apply; array fields contain strings unless object entries are shown.
+`criteriaSatisfied[].status` must be exactly one of: satisfied, not-satisfied, not-applicable.
+`commandsRun[].result` must be exactly one of: passed, failed, not-run.
+`manualNotes` and `notes` are optional strings; an empty string means no note and does not satisfy `manual-notes` evidence.
+```acceptance-report
+{
+  "criteriaSatisfied": [
+    {
+      "id": "criterion-1",
+      "status": "satisfied",
+      "evidence": "specific proof"
+    }
+  ],
+  "changedFiles": [
+    "src/file.ts"
+  ],
+  "testsAddedOrUpdated": [
+    "test/file.test.ts"
+  ],
+  "commandsRun": [
+    {
+      "command": "command",
+      "result": "passed",
+      "summary": "short result"
+    }
+  ],
+  "validationOutput": [
+    "validation output or concise summary"
+  ],
+  "residualRisks": [
+    "none"
+  ],
+  "noStagedFiles": true,
+  "diffSummary": "short description of the diff",
+  "reviewFindings": [
+    "blocker: file.ts:12 - issue found, or no blockers"
+  ],
+  "manualNotes": "anything else the parent should know"
+}
+```
+
+---
+
+Task: Review the implementation plan at /Users/robinhultman/dev/intropy/tooling/intropy-topology/docs/plans/2026-07-29-001-feat-system-flow-tests-plan.md for internal coherence only: contradictions between sections, terminology drift (flow test vs system flow test vs integration test), unit dependency consistency (U-IDs, Requirements R1-R6 references), deferred-question consistency (do any 'resolved' claims contradict 'deferred' items?), template/skill conformity issues (frontmatter, section structure per ce-plan conventions), and ambiguity where two implementers would diverge. Do not assess technical feasibility or scope — coherence only. Return findings ranked by severity with quoted evidence.
+
+## Acceptance Contract
+Acceptance level: attested
+Completion is not accepted from prose alone. End with a structured acceptance report.
+
+Criteria:
+- criterion-1: Return concrete findings with file paths and severity when applicable
+
+Required evidence: review-findings, residual-risks
+
+Finish with a fenced JSON block tagged `acceptance-report` in this shape:
+Use empty arrays when no items apply; array fields contain strings unless object entries are shown.
+`criteriaSatisfied[].status` must be exactly one of: satisfied, not-satisfied, not-applicable.
+`commandsRun[].result` must be exactly one of: passed, failed, not-run.
+`manualNotes` and `notes` are optional strings; an empty string means no note and does not satisfy `manual-notes` evidence.
+```acceptance-report
+{
+  "criteriaSatisfied": [
+    {
+      "id": "criterion-1",
+      "status": "satisfied",
+      "evidence": "specific proof"
+    }
+  ],
+  "changedFiles": [
+    "src/file.ts"
+  ],
+  "testsAddedOrUpdated": [
+    "test/file.test.ts"
+  ],
+  "commandsRun": [
+    {
+      "command": "command",
+      "result": "passed",
+      "summary": "short result"
+    }
+  ],
+  "validationOutput": [
+    "validation output or concise summary"
+  ],
+  "residualRisks": [
+    "none"
+  ],
+  "noStagedFiles": true,
+  "diffSummary": "short description of the diff",
+  "reviewFindings": [
+    "blocker: file.ts:12 - issue found, or no blockers"
+  ],
+  "manualNotes": "anything else the parent should know"
+}
+```
+
+---
+
+Task: Review the implementation plan at /Users/robinhultman/dev/intropy/tooling/intropy-topology/docs/plans/2026-07-29-001-feat-system-flow-tests-plan.md for technical feasibility. The plan adds a shared Intropy.Topology.Testing package that boots a customer's real SystemHost via the internal IntropyAspire.Apply (Aspire.Hosting + Dapr sidecars + Redis), stages a temp copy of the system workspace, and polls file-connector destination folders for business-identity matches; plus phased downstream work in intropy-templates and intropy-cli.
+
+Verify against the actual code in /Users/robinhultman/dev/intropy/tooling/intropy-topology (and ~/dev/intropy/tooling/intropy-cli, ~/dev/intropy/tooling/intropy-templates where referenced):
+1. Architecture conflicts: does staging a copied workspace actually work with ProjectConvention.Resolve, ComponentOverlay.Stage (obj/dapr-components under apphost dir), and TopologyGenerator's absolute rootPath rooting? Any hidden coupling to the real workspace?
+2. Can a plain xUnit test project (no Aspire.AppHost.Sdk) boot Apply with only the ConfigureAspireToolchain DcpPublisher config shim, as the plan claims, based on what AspireDaprIntegrationTests actually does?
+3. Dependency/version gaps: the Testing package needs Aspire.Hosting 13.4.6 + testing bits; the scaffolded customer project will reference Intropy.Topology.Testing from NuGet while the SystemHost references Intropy.Topology.Aspire — any diamond-version or SDK (Aspire.AppHost.Sdk) conflicts?
+4. The extractor-schedule trigger problem: extractor sweeps on cron ticks (default every minute) via ComponentScheduler — is 'wait for the tick' or 'dashboard Run-now command' actually reachable from a test harness? Check Scheduling.cs for what a test could hook.
+5. Any claim in the plan that the code contradicts.
+Return: findings ranked by severity with file-path evidence; say explicitly what is sound.
+
+## Acceptance Contract
+Acceptance level: attested
+Completion is not accepted from prose alone. End with a structured acceptance report.
+
+Criteria:
+- criterion-1: Return concrete findings with file paths and severity when applicable
+
+Required evidence: review-findings, residual-risks
+
+Finish with a fenced JSON block tagged `acceptance-report` in this shape:
+Use empty arrays when no items apply; array fields contain strings unless object entries are shown.
+`criteriaSatisfied[].status` must be exactly one of: satisfied, not-satisfied, not-applicable.
+`commandsRun[].result` must be exactly one of: passed, failed, not-run.
+`manualNotes` and `notes` are optional strings; an empty string means no note and does not satisfy `manual-notes` evidence.
+```acceptance-report
+{
+  "criteriaSatisfied": [
+    {
+      "id": "criterion-1",
+      "status": "satisfied",
+      "evidence": "specific proof"
+    }
+  ],
+  "changedFiles": [
+    "src/file.ts"
+  ],
+  "testsAddedOrUpdated": [
+    "test/file.test.ts"
+  ],
+  "commandsRun": [
+    {
+      "command": "command",
+      "result": "passed",
+      "summary": "short result"
+    }
+  ],
+  "validationOutput": [
+    "validation output or concise summary"
+  ],
+  "residualRisks": [
+    "none"
+  ],
+  "noStagedFiles": true,
+  "diffSummary": "short description of the diff",
+  "reviewFindings": [
+    "blocker: file.ts:12 - issue found, or no blockers"
+  ],
+  "manualNotes": "anything else the parent should know"
+}
+```
+
+---
+
+Task: Review the implementation plan at /Users/robinhultman/dev/intropy/tooling/intropy-topology/docs/plans/2026-07-29-001-feat-system-flow-tests-plan.md for scope discipline and unjustified complexity. Context: the user's goal is 'scaffold an integration testing project from the topology + scaffolded host that completes the per-component unit test projects'. The plan spans 3 repos (intropy-topology testing package → intropy-templates skeleton → intropy-cli codegen) in 8 units.
+
+Challenge:
+1. Is the shared-package + staged-workspace + dogfood + template + CLI arc the smallest thing that delivers the goal, or is there gold-plating (e.g., is workspace staging over-engineered vs. cleaning folders in place; is U8 premature; are the polling primitives over-built for v1)?
+2. Are any requirements (R1-R6) unmoored from the user's actual ask?
+3. Are scope boundaries honest — anything smuggled in via 'Deferred to Follow-Up' that the plan actually depends on?
+4. Is the 3-repo full-path phasing right, or should the plan push more to follow-ups?
+Return: findings ranked by severity; explicit approval for parts that are right-sized.
+
+## Acceptance Contract
+Acceptance level: attested
+Completion is not accepted from prose alone. End with a structured acceptance report.
+
+Criteria:
+- criterion-1: Return concrete findings with file paths and severity when applicable
+
+Required evidence: review-findings, residual-risks
+
+Finish with a fenced JSON block tagged `acceptance-report` in this shape:
+Use empty arrays when no items apply; array fields contain strings unless object entries are shown.
+`criteriaSatisfied[].status` must be exactly one of: satisfied, not-satisfied, not-applicable.
+`commandsRun[].result` must be exactly one of: passed, failed, not-run.
+`manualNotes` and `notes` are optional strings; an empty string means no note and does not satisfy `manual-notes` evidence.
+```acceptance-report
+{
+  "criteriaSatisfied": [
+    {
+      "id": "criterion-1",
+      "status": "satisfied",
+      "evidence": "specific proof"
+    }
+  ],
+  "changedFiles": [
+    "src/file.ts"
+  ],
+  "testsAddedOrUpdated": [
+    "test/file.test.ts"
+  ],
+  "commandsRun": [
+    {
+      "command": "command",
+      "result": "passed",
+      "summary": "short result"
+    }
+  ],
+  "validationOutput": [
+    "validation output or concise summary"
+  ],
+  "residualRisks": [
+    "none"
+  ],
+  "noStagedFiles": true,
+  "diffSummary": "short description of the diff",
+  "reviewFindings": [
+    "blocker: file.ts:12 - issue found, or no blockers"
+  ],
+  "manualNotes": "anything else the parent should know"
+}
+```
