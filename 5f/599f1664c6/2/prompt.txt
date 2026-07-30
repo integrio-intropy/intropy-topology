@@ -360,3 +360,188 @@ Use empty arrays when no items apply; array fields contain strings unless object
   "manualNotes": "anything else the parent should know"
 }
 ```
+
+---
+
+Task: Read-only review of the current branch diff for the deployed connector transport feature. Focus on materialization, validation directions/capabilities, conflict behavior, generation/Aspire non-regression, and test gaps. Do not edit, stage, commit, or run broad tests. Report only concrete findings with severity and file/line references.
+
+---
+**Output:**
+Write your findings to exactly this path: /Users/robinhultman/dev/intropy/tooling/intropy-topology/.pi-subagents/artifacts/outputs/009f7693/tmp/correctness-review.md
+This path is authoritative for this run.
+Ignore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.
+
+## Acceptance Contract
+Acceptance level: attested
+Completion is not accepted from prose alone. End with a structured acceptance report.
+
+Criteria:
+- criterion-1: Return concrete findings with file paths and severity when applicable
+
+Required evidence: review-findings, residual-risks
+
+Finish with a fenced JSON block tagged `acceptance-report` in this shape:
+Use empty arrays when no items apply; array fields contain strings unless object entries are shown.
+`criteriaSatisfied[].status` must be exactly one of: satisfied, not-satisfied, not-applicable.
+`commandsRun[].result` must be exactly one of: passed, failed, not-run.
+`manualNotes` and `notes` are optional strings; an empty string means no note and does not satisfy `manual-notes` evidence.
+```acceptance-report
+{
+  "criteriaSatisfied": [
+    {
+      "id": "criterion-1",
+      "status": "satisfied",
+      "evidence": "specific proof"
+    }
+  ],
+  "changedFiles": [
+    "src/file.ts"
+  ],
+  "testsAddedOrUpdated": [
+    "test/file.test.ts"
+  ],
+  "commandsRun": [
+    {
+      "command": "command",
+      "result": "passed",
+      "summary": "short result"
+    }
+  ],
+  "validationOutput": [
+    "validation output or concise summary"
+  ],
+  "residualRisks": [
+    "none"
+  ],
+  "noStagedFiles": true,
+  "diffSummary": "short description of the diff",
+  "reviewFindings": [
+    "blocker: file.ts:12 - issue found, or no blockers"
+  ],
+  "manualNotes": "anything else the parent should know"
+}
+```
+
+---
+
+Task: Read-only review of the current branch diff for the deployed connector transport feature. Check exported API/serialization/graph compatibility and whether requirements are fully met. Do not edit, stage, commit, or run broad tests. Report only concrete findings with severity and file/line references.
+
+---
+**Output:**
+Write your findings to exactly this path: /Users/robinhultman/dev/intropy/tooling/intropy-topology/.pi-subagents/artifacts/outputs/009f7693/tmp/api-review.md
+This path is authoritative for this run.
+Ignore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.
+
+## Acceptance Contract
+Acceptance level: attested
+Completion is not accepted from prose alone. End with a structured acceptance report.
+
+Criteria:
+- criterion-1: Return concrete findings with file paths and severity when applicable
+
+Required evidence: review-findings, residual-risks
+
+Finish with a fenced JSON block tagged `acceptance-report` in this shape:
+Use empty arrays when no items apply; array fields contain strings unless object entries are shown.
+`criteriaSatisfied[].status` must be exactly one of: satisfied, not-satisfied, not-applicable.
+`commandsRun[].result` must be exactly one of: passed, failed, not-run.
+`manualNotes` and `notes` are optional strings; an empty string means no note and does not satisfy `manual-notes` evidence.
+```acceptance-report
+{
+  "criteriaSatisfied": [
+    {
+      "id": "criterion-1",
+      "status": "satisfied",
+      "evidence": "specific proof"
+    }
+  ],
+  "changedFiles": [
+    "src/file.ts"
+  ],
+  "testsAddedOrUpdated": [
+    "test/file.test.ts"
+  ],
+  "commandsRun": [
+    {
+      "command": "command",
+      "result": "passed",
+      "summary": "short result"
+    }
+  ],
+  "validationOutput": [
+    "validation output or concise summary"
+  ],
+  "residualRisks": [
+    "none"
+  ],
+  "noStagedFiles": true,
+  "diffSummary": "short description of the diff",
+  "reviewFindings": [
+    "blocker: file.ts:12 - issue found, or no blockers"
+  ],
+  "manualNotes": "anything else the parent should know"
+}
+```
+
+---
+
+Task: Final quality and PR management for the current feature branch. Review the deployed connector transport implementation against this requirement: ConnectorRef.WithDeployed; value-less polymorphic SftpTransport; ConnectorResource propagation; graph adds optional deployedTransport without apiVersion change; Build/check validates declared deployed transport SupportsInput/SupportsOutput for From/To; local generation and Aspire stay unchanged. Run the full build/test/format validation. Fix any concrete issues you find. Do not touch or include the pre-existing untracked docs/brainstorms/ or docs/plans/ directories. Stage only feature files explicitly (never git add .), create a production-quality conventional commit, push the feature branch, open a PR against main, and return the PR URL plus commands/results. Do not commit if checks fail.
+
+---
+**Output:**
+Write your findings to exactly this path: /Users/robinhultman/dev/intropy/tooling/intropy-topology/.pi-subagents/artifacts/outputs/1dad274c/tmp/final-quality.md
+This path is authoritative for this run.
+Ignore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.
+
+## Acceptance Contract
+Acceptance level: checked
+Completion is not accepted from prose alone. End with a structured acceptance report.
+
+Criteria:
+- criterion-1: Implement the requested change without widening scope
+
+Required evidence: changed-files, tests-added, commands-run, residual-risks, no-staged-files
+
+Review gate: required.
+
+Finish with a fenced JSON block tagged `acceptance-report` in this shape:
+Use empty arrays when no items apply; array fields contain strings unless object entries are shown.
+`criteriaSatisfied[].status` must be exactly one of: satisfied, not-satisfied, not-applicable.
+`commandsRun[].result` must be exactly one of: passed, failed, not-run.
+`manualNotes` and `notes` are optional strings; an empty string means no note and does not satisfy `manual-notes` evidence.
+```acceptance-report
+{
+  "criteriaSatisfied": [
+    {
+      "id": "criterion-1",
+      "status": "satisfied",
+      "evidence": "specific proof"
+    }
+  ],
+  "changedFiles": [
+    "src/file.ts"
+  ],
+  "testsAddedOrUpdated": [
+    "test/file.test.ts"
+  ],
+  "commandsRun": [
+    {
+      "command": "command",
+      "result": "passed",
+      "summary": "short result"
+    }
+  ],
+  "validationOutput": [
+    "validation output or concise summary"
+  ],
+  "residualRisks": [
+    "none"
+  ],
+  "noStagedFiles": true,
+  "diffSummary": "short description of the diff",
+  "reviewFindings": [
+    "blocker: file.ts:12 - issue found, or no blockers"
+  ],
+  "manualNotes": "anything else the parent should know"
+}
+```
