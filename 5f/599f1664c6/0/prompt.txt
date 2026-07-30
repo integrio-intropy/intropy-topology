@@ -1,0 +1,4 @@
+Can you implement this feature?
+intropy-topology — ConnectorRef.WithDeployed, a new value-less SftpTransport (registered in the polymorphic Transport set), ConnectorResource carries it, and the graph verb emits an
+   additive deployedTransport field (no apiVersion bump). A capability rule extends ADR 0002: .From()/.To() validate against the deployed transport's SupportsInput/SupportsOutput. Generation
+   and the Aspire local path are untouched.
