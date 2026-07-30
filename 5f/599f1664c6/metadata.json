@@ -3,7 +3,7 @@
   "checkpoint_id": "5f599f1664c6",
   "strategy": "manual-commit",
   "branch": "feat/deployed-connector-transport",
-  "checkpoints_count": 1,
+  "checkpoints_count": 3,
   "files_touched": [
     "src/Intropy.Topology.Generation/IntropyGenerate.cs",
     "src/Intropy.Topology/Building/TopologyMaterializer.cs",
@@ -25,13 +25,20 @@
       "compact_transcript": "/5f/599f1664c6/0/transcript.jsonl",
       "content_hash": "/5f/599f1664c6/0/content_hash.txt",
       "prompt": "/5f/599f1664c6/0/prompt.txt"
+    },
+    {
+      "metadata": "/5f/599f1664c6/1/metadata.json",
+      "transcript": "/5f/599f1664c6/1/full.jsonl",
+      "compact_transcript": "/5f/599f1664c6/1/transcript.jsonl",
+      "content_hash": "/5f/599f1664c6/1/content_hash.txt",
+      "prompt": "/5f/599f1664c6/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 120616,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 3548672,
-    "output_tokens": 17340,
-    "api_call_count": 52
+    "input_tokens": 120776,
+    "cache_creation_tokens": 185057,
+    "cache_read_tokens": 14801298,
+    "output_tokens": 86464,
+    "api_call_count": 133
   }
 }
