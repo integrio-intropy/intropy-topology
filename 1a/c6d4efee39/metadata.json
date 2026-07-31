@@ -3,7 +3,7 @@
   "checkpoint_id": "1ac6d4efee39",
   "strategy": "manual-commit",
   "branch": "docs/comment-guidance",
-  "checkpoints_count": 28,
+  "checkpoints_count": 32,
   "files_touched": [
     "AGENTS.md",
     "examples/OrderFlow.Contracts/Contracts.cs",
@@ -60,13 +60,20 @@
       "compact_transcript": "/1a/c6d4efee39/5/transcript.jsonl",
       "content_hash": "/1a/c6d4efee39/5/content_hash.txt",
       "prompt": "/1a/c6d4efee39/5/prompt.txt"
+    },
+    {
+      "metadata": "/1a/c6d4efee39/6/metadata.json",
+      "transcript": "/1a/c6d4efee39/6/full.jsonl",
+      "compact_transcript": "/1a/c6d4efee39/6/transcript.jsonl",
+      "content_hash": "/1a/c6d4efee39/6/content_hash.txt",
+      "prompt": "/1a/c6d4efee39/6/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 564116,
+    "input_tokens": 628901,
     "cache_creation_tokens": 451594,
-    "cache_read_tokens": 27400031,
-    "output_tokens": 210078,
-    "api_call_count": 304
+    "cache_read_tokens": 27757919,
+    "output_tokens": 217314,
+    "api_call_count": 314
   }
 }
