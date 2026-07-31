@@ -5,18 +5,6 @@ namespace Intropy.Topology.Validation;
 /// <summary>Runs every topology rule and collects the diagnostics.</summary>
 internal static class TopologyRules
 {
-    // Retired codes — do not reuse. Enforced at compile time by the block builders:
-    // ITP204 (trigger kind not allowed for the block kind), ITP205 (connector direction
-    // not allowed for the block kind). No longer meaningful since triggers were replaced
-    // by edges and activation/workload shape moved to the component scaffold: ITP201
-    // (invalid cron on the trigger-era ScheduleTrigger — its successor for the schedule
-    // *attribute* introduced by decision 0010 is ITP210), ITP202 (missing trigger),
-    // ITP203 (multiple TriggeredBy calls).
-    // Retired with the minimal model (full versions live on the full-topology branch):
-    // ITP105/ITP106 (the original local connector-direction capability rules; deployed
-    // transport capability is ITP211), ITP107 (unresolved connector — every connector now
-    // declares its local transport), ITP501 (API provider — the API surface is not part of
-    // the minimal model).
     private static readonly ITopologyRule[] Rules =
     [
         new Rules.DuplicateComponentNameRule(),

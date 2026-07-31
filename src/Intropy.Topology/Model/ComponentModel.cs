@@ -2,8 +2,8 @@ namespace Intropy.Topology.Model;
 
 /// <summary>
 /// One component in the system: an integration block or a container service, together
-/// with all of its edges and one activation attribute — an optional cron schedule
-/// (decision 0010). Everything else about the workload shape (hosting model, ports,
+/// with all of its edges and one activation attribute — an optional cron schedule.
+/// Everything else about the workload shape (hosting model, ports,
 /// process lifetime) lives in the component's own scaffold, not in the topology.
 /// </summary>
 public sealed record ComponentModel

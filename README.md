@@ -127,8 +127,7 @@ builder.AddExtractor("e").Subscribes(t);             // extractors read connecto
 Per block: extractors read a connector (`From`) and publish one topic; loaders subscribe to one
 topic and may write through a connector (a private local destination needs no declared edge);
 transactional integrations read/write connectors. Every topic must have both sides: `Build()`
-rejects a published topic nobody subscribes to and a subscription nothing publishes
-(ITP208/ITP209).
+rejects a published topic nobody subscribes to and a subscription nothing publishes.
 
 ## Requirements
 
@@ -142,9 +141,8 @@ Full documentation lives in [`docs/`](docs/index.md):
 - [Getting Started](docs/getting-started.md) — declare a complete order-flow topology
 - [Components](docs/concepts/components.md) — component kinds and block builders
 - [Topics](docs/concepts/topics.md) and [Connectors](docs/concepts/connectors.md) — refs, transports, materialize-from-usage
-- [Validation](docs/concepts/validation.md) — the ITP diagnostic codes and Build/TryBuild/Validate
+- [Validation](docs/concepts/validation.md) — the validation rules and Build/TryBuild/Validate
 - [Materialization](docs/concepts/materialization.md) — the immutable, deterministic output model
-- [ADR 0005](docs/decisions/0005-aspire-run-backend.md) — the discover → generate → run architecture
 
 ## Build and test
 

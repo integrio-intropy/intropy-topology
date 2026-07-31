@@ -11,12 +11,10 @@ public enum DiagnosticSeverity
 }
 
 /// <summary>One validation finding produced while building a topology.</summary>
-/// <param name="Code">The stable rule code (e.g. <c>ITP101</c>).</param>
 /// <param name="Severity">The finding's severity.</param>
 /// <param name="Message">A human-readable description of the violation.</param>
 /// <param name="Target">The component or resource name the finding is about, when applicable.</param>
 public sealed record TopologyDiagnostic(
-    string Code,
     DiagnosticSeverity Severity,
     string Message,
     string? Target);

@@ -1,3 +1,7 @@
+using Intropy.Topology.Building;
+using Intropy.Topology.Validation;
+using Intropy.Topology.Validation.Rules;
+
 namespace Intropy.Topology.Test.Validation;
 
 internal static class ValidationTestHelper
@@ -10,14 +14,16 @@ internal static class ValidationTestHelper
         return s;
     }
 
-    public static IReadOnlyList<TopologyDiagnostic> DiagnosticsFor(this SystemBuilder s, string code) =>
-        s.Validate().Where(d => d.Code == code).ToArray();
+    /// <summary>Runs a single rule against the materialized system, isolating it from the others.</summary>
+    public static IReadOnlyList<TopologyDiagnostic> DiagnosticsFor<TRule>(this SystemBuilder s)
+        where TRule : ITopologyRule, new() =>
+        new TRule().Evaluate(new ValidationContext(s, TopologyMaterializer.Materialize(s))).ToArray();
 }
 
 public class DuplicateComponentNameRuleTests
 {
     [Fact]
-    public void Validate_WithDuplicateComponentName_ShouldReportItp001()
+    public void Validate_WithDuplicateComponentName_ShouldReportError()
     {
         // Arrange: two components sharing one name
         var s = SystemBuilder.Create("test-system");
@@ -25,7 +31,7 @@ public class DuplicateComponentNameRuleTests
         s.AddLoader("dup").Subscribes(TestTopics.Raw);
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP001"));
+        var diagnostic = Assert.Single(s.DiagnosticsFor<DuplicateComponentNameRule>());
 
         // Assert
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
@@ -37,13 +43,13 @@ public class DuplicateComponentNameRuleTests
 public class EmptySystemRuleTests
 {
     [Fact]
-    public void Validate_WithNoComponents_ShouldReportItp002()
+    public void Validate_WithNoComponents_ShouldReportError()
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
 
         // Act & Assert
-        Assert.Single(s.DiagnosticsFor("ITP002"));
+        Assert.Single(s.DiagnosticsFor<EmptySystemRule>());
         Assert.Throws<TopologyValidationException>(() => s.Build());
     }
 }
@@ -51,7 +57,7 @@ public class EmptySystemRuleTests
 public class MultiplePublishesRuleTests
 {
     [Fact]
-    public void Validate_WithTwoPublishes_ShouldReportItp101()
+    public void Validate_WithTwoPublishes_ShouldReportError()
     {
         // Arrange: a component publishes exactly one topic
         var s = SystemBuilder.Create("test-system");
@@ -60,7 +66,7 @@ public class MultiplePublishesRuleTests
             .Publishes(TestTopics.Enriched);
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP101"));
+        var diagnostic = Assert.Single(s.DiagnosticsFor<DuplicatePortRule>());
 
         // Assert
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
@@ -71,13 +77,13 @@ public class MultiplePublishesRuleTests
     }
 
     [Fact]
-    public void Validate_WithSinglePublish_ShouldNotReportItp101()
+    public void Validate_WithSinglePublish_ShouldReportNothing()
     {
         // Arrange
         var s = SystemBuilder.Create("test-system").WithValidComponent();
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor("ITP101"));
+        Assert.Empty(s.DiagnosticsFor<DuplicatePortRule>());
     }
 }
 
@@ -87,7 +93,7 @@ public class ScheduleExpressionRuleTests
     [InlineData("not a cron")]
     [InlineData("* * * * * *")]
     [InlineData("@fortnightly")]
-    public void Validate_WithInvalidCron_ShouldReportItp210(string cron)
+    public void Validate_WithInvalidCron_ShouldReportError(string cron)
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
@@ -95,7 +101,7 @@ public class ScheduleExpressionRuleTests
         s.AddLoader("valid-sink").Subscribes(TestTopics.Raw);
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP210"));
+        var diagnostic = Assert.Single(s.DiagnosticsFor<ScheduleExpressionRule>());
 
         // Assert
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
@@ -108,7 +114,7 @@ public class ScheduleExpressionRuleTests
     [InlineData("0 9 * * 1-5")]
     [InlineData("@daily")]
     [InlineData("@MIDNIGHT")]
-    public void Validate_WithValidCron_ShouldNotReportItp210(string cron)
+    public void Validate_WithValidCron_ShouldReportNothing(string cron)
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
@@ -116,24 +122,24 @@ public class ScheduleExpressionRuleTests
         s.AddLoader("valid-sink").Subscribes(TestTopics.Raw);
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor("ITP210"));
+        Assert.Empty(s.DiagnosticsFor<ScheduleExpressionRule>());
     }
 
     [Fact]
-    public void Validate_WithoutSchedule_ShouldNotReportItp210()
+    public void Validate_WithoutSchedule_ShouldReportNothing()
     {
         // Arrange: the schedule is optional — an unscheduled extractor runs once at host start
         var s = SystemBuilder.Create("test-system").WithValidComponent();
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor("ITP210"));
+        Assert.Empty(s.DiagnosticsFor<ScheduleExpressionRule>());
     }
 }
 
 public class DuplicateSubscriptionRuleTests
 {
     [Fact]
-    public void Validate_WithDuplicateSubscription_ShouldReportItp102()
+    public void Validate_WithDuplicateSubscription_ShouldReportError()
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
@@ -142,7 +148,7 @@ public class DuplicateSubscriptionRuleTests
             .Subscribes(TestTopics.Raw);
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP102"));
+        var diagnostic = Assert.Single(s.DiagnosticsFor<DuplicateSubscriptionRule>());
 
         // Assert
         Assert.Equal("loader", diagnostic.Target);
@@ -152,7 +158,7 @@ public class DuplicateSubscriptionRuleTests
 public class TopicContractConflictRuleTests
 {
     [Fact]
-    public void Validate_WithSameTopicUnderTwoContracts_ShouldReportItp103()
+    public void Validate_WithSameTopicUnderTwoContracts_ShouldReportError()
     {
         // Arrange: identical (pubsub, topic) declared with two contract types
         var s = SystemBuilder.Create("test-system");
@@ -162,7 +168,7 @@ public class TopicContractConflictRuleTests
             .Publishes(TopicRef<EnrichedEvent>.Define("test-pubsub", "shared-topic"));
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP103"));
+        var diagnostic = Assert.Single(s.DiagnosticsFor<TopicContractConflictRule>());
 
         // Assert
         Assert.Contains(typeof(RawEvent).FullName!, diagnostic.Message);
@@ -173,7 +179,7 @@ public class TopicContractConflictRuleTests
 public class ConnectorConflictRuleTests
 {
     [Fact]
-    public void Validate_WithSameConnectorNameForTwoTransports_ShouldReportItp104()
+    public void Validate_WithSameConnectorNameForTwoTransports_ShouldReportError()
     {
         // Arrange: one connector name, two different transports (different file roots)
         var s = SystemBuilder.Create("test-system");
@@ -184,7 +190,7 @@ public class ConnectorConflictRuleTests
             .From(ConnectorRef.Define("shared", Transport.File("./test/other")));
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP104"));
+        var diagnostic = Assert.Single(s.DiagnosticsFor<ConnectorConflictRule>());
 
         // Assert
         Assert.Equal("shared", diagnostic.Target);
@@ -193,7 +199,7 @@ public class ConnectorConflictRuleTests
     }
 
     [Fact]
-    public void Validate_WithSameConnectorDeclaredTwiceIdentically_ShouldNotReportItp104()
+    public void Validate_WithSameConnectorDeclaredTwiceIdentically_ShouldReportNothing()
     {
         // Arrange: two usages of the same connector with the same transport
         var s = SystemBuilder.Create("test-system");
@@ -204,11 +210,11 @@ public class ConnectorConflictRuleTests
             .From(ConnectorRef.Define("shared", Transport.File("./test/shared")));
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor("ITP104"));
+        Assert.Empty(s.DiagnosticsFor<ConnectorConflictRule>());
     }
 
     [Fact]
-    public void Validate_WithSameLocalTransportButDifferentDeployedTransport_ShouldReportItp104()
+    public void Validate_WithSameLocalTransportButDifferentDeployedTransport_ShouldReportError()
     {
         // Arrange: a connector declaration includes both its local and deployed transport profiles
         var s = SystemBuilder.Create("test-system");
@@ -218,7 +224,7 @@ public class ConnectorConflictRuleTests
             .To(ConnectorRef.Define("shared", Transport.File("./test/shared")));
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP104"));
+        var diagnostic = Assert.Single(s.DiagnosticsFor<ConnectorConflictRule>());
 
         // Assert
         Assert.Equal("shared", diagnostic.Target);
@@ -226,18 +232,10 @@ public class ConnectorConflictRuleTests
     }
 }
 
-// ITP201 (invalid cron), ITP202 (missing trigger), and ITP203 (multiple TriggeredBy) are
-// retired: triggers were replaced by edges and activation/workload shape moved to the
-// component scaffold. ITP204/ITP205 (trigger kind / connector direction not allowed for a
-// block) are compile errors — the offending methods do not exist on the block's builder
-// type. ITP105/ITP106 (the original local connector direction capability rules), ITP107
-// (unresolved connector), and ITP501 (API provider) retired with the minimal model.
-// ITP211 validates an explicitly declared deployed transport.
-
 public class DeployedTransportCapabilityRuleTests
 {
     [Fact]
-    public void Validate_WithInputOnlyUnsupportedSftpDeployedTransport_ShouldReportItp211()
+    public void Validate_WithInputOnlyUnsupportedSftpDeployedTransport_ShouldReportError()
     {
         // Arrange
         var connector = ConnectorRef.Define("shared", Transport.File("./test/shared"))
@@ -247,7 +245,7 @@ public class DeployedTransportCapabilityRuleTests
         s.AddLoader("loader").Subscribes(TestTopics.Raw);
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP211"));
+        var diagnostic = Assert.Single(s.DiagnosticsFor<DeployedTransportCapabilityRule>());
 
         // Assert
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
@@ -257,7 +255,7 @@ public class DeployedTransportCapabilityRuleTests
     }
 
     [Fact]
-    public void Validate_WithSftpDeployedTransportForOutput_ShouldNotReportItp211()
+    public void Validate_WithSftpDeployedTransportForOutput_ShouldReportNothing()
     {
         // Arrange
         var connector = ConnectorRef.Define("shared", Transport.File("./test/shared"))
@@ -266,32 +264,32 @@ public class DeployedTransportCapabilityRuleTests
         s.AddTransactionalIntegration("ti").To(connector);
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor("ITP211"));
+        Assert.Empty(s.DiagnosticsFor<DeployedTransportCapabilityRule>());
     }
 
     [Fact]
-    public void Validate_WithoutDeployedTransport_ShouldNotReportItp211()
+    public void Validate_WithoutDeployedTransport_ShouldReportNothing()
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddTransactionalIntegration("ti").From(TestConnectors.Pim).To(TestConnectors.Pim);
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor("ITP211"));
+        Assert.Empty(s.DiagnosticsFor<DeployedTransportCapabilityRule>());
     }
 }
 
 public class MissingRequiredOutputRuleTests
 {
     [Fact]
-    public void Validate_WithExtractorWithoutPublishes_ShouldReportItp206()
+    public void Validate_WithExtractorWithoutPublishes_ShouldReportError()
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor").From(TestConnectors.Pim);
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP206"));
+        var diagnostic = Assert.Single(s.DiagnosticsFor<MissingRequiredOutputRule>());
 
         // Assert
         Assert.Equal("extractor", diagnostic.Target);
@@ -299,32 +297,32 @@ public class MissingRequiredOutputRuleTests
     }
 
     [Fact]
-    public void Validate_WithLoaderWithoutTo_ShouldNotReportItp206()
+    public void Validate_WithLoaderWithoutTo_ShouldReportNothing()
     {
-        // Arrange: a loader's destination may stay a private local component (decision 0008)
+        // Arrange: a loader's destination may stay a private local component
         var s = SystemBuilder.Create("test-system");
         s.AddLoader("loader").Subscribes(TestTopics.Raw);
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor("ITP206"));
+        Assert.Empty(s.DiagnosticsFor<MissingRequiredOutputRule>());
     }
 
     [Fact]
-    public void Validate_WithTransactionalIntegrationWithoutConnectors_ShouldNotReportItp206()
+    public void Validate_WithTransactionalIntegrationWithoutConnectors_ShouldReportNothing()
     {
-        // Arrange: TI has no required output; an empty one is only an ITP302 warning
+        // Arrange: TI has no required output; an empty one is only a no-edges warning
         var s = SystemBuilder.Create("test-system");
         s.AddTransactionalIntegration("ti");
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor("ITP206"));
+        Assert.Empty(s.DiagnosticsFor<MissingRequiredOutputRule>());
     }
 }
 
 public class MissingRequiredSubscriptionRuleTests
 {
     [Fact]
-    public void Validate_WithLoaderSubscribingToTwoTopics_ShouldReportItp207()
+    public void Validate_WithLoaderSubscribingToTwoTopics_ShouldReportError()
     {
         // Arrange: a loader consumes exactly one topic
         var s = SystemBuilder.Create("test-system");
@@ -334,35 +332,35 @@ public class MissingRequiredSubscriptionRuleTests
             .To(TestConnectors.Erp);
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP207"));
+        var diagnostic = Assert.Single(s.DiagnosticsFor<MissingRequiredSubscriptionRule>());
 
         // Assert
         Assert.Contains("exactly one topic", diagnostic.Message);
     }
 
     [Fact]
-    public void Validate_WithLoaderWithoutSubscription_ShouldReportItp207()
+    public void Validate_WithLoaderWithoutSubscription_ShouldReportError()
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddLoader("loader").To(TestConnectors.Erp);
 
         // Act & Assert
-        Assert.Single(s.DiagnosticsFor("ITP207"));
+        Assert.Single(s.DiagnosticsFor<MissingRequiredSubscriptionRule>());
     }
 }
 
 public class UnconsumedTopicRuleTests
 {
     [Fact]
-    public void Validate_WithPublishedButUnsubscribedTopic_ShouldReportItp208()
+    public void Validate_WithPublishedButUnsubscribedTopic_ShouldReportError()
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor").Publishes(TestTopics.Raw);
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP208"));
+        var diagnostic = Assert.Single(s.DiagnosticsFor<UnconsumedTopicRule>());
 
         // Assert
         Assert.Equal("raw-events", diagnostic.Target);
@@ -371,27 +369,27 @@ public class UnconsumedTopicRuleTests
     }
 
     [Fact]
-    public void Validate_WithSubscribedTopic_ShouldNotReportItp208()
+    public void Validate_WithSubscribedTopic_ShouldReportNothing()
     {
         // Arrange
         var s = SystemBuilder.Create("test-system").WithValidComponent();
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor("ITP208"));
+        Assert.Empty(s.DiagnosticsFor<UnconsumedTopicRule>());
     }
 }
 
 public class UnproducedTopicRuleTests
 {
     [Fact]
-    public void Validate_WithSubscribedButUnpublishedTopic_ShouldReportItp209()
+    public void Validate_WithSubscribedButUnpublishedTopic_ShouldReportError()
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddLoader("loader").Subscribes(TestTopics.Raw);
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP209"));
+        var diagnostic = Assert.Single(s.DiagnosticsFor<UnproducedTopicRule>());
 
         // Assert
         Assert.Equal("raw-events", diagnostic.Target);
@@ -411,22 +409,22 @@ public class UnproducedTopicRuleTests
         var diagnostics = s.Validate();
 
         // Assert
-        Assert.Equal("raw-events", Assert.Single(diagnostics, d => d.Code == "ITP208").Target);
-        Assert.Equal("raw-eventz", Assert.Single(diagnostics, d => d.Code == "ITP209").Target);
+        Assert.Equal("raw-events", Assert.Single(diagnostics, d => d.Message.Contains("no component subscribes")).Target);
+        Assert.Equal("raw-eventz", Assert.Single(diagnostics, d => d.Message.Contains("no component publishes")).Target);
     }
 }
 
 public class NoEdgesRuleTests
 {
     [Fact]
-    public void Validate_WithEdgelessComponent_ShouldWarnItp302ButBuild()
+    public void Validate_WithEdgelessComponent_ShouldWarnButBuild()
     {
         // Arrange: a TI with no edges violates no completeness rule
         var s = SystemBuilder.Create("test-system");
         s.AddTransactionalIntegration("ti");
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP302"));
+        var diagnostic = Assert.Single(s.DiagnosticsFor<NoEdgesRule>());
 
         // Assert
         Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
@@ -437,21 +435,21 @@ public class NoEdgesRuleTests
     }
 
     [Fact]
-    public void Validate_WithSubscribingComponent_ShouldNotWarnItp302()
+    public void Validate_WithSubscribingComponent_ShouldReportNothing()
     {
         // Arrange: a topic subscription is an edge
         var s = SystemBuilder.Create("test-system");
         s.AddLoader("loader").Subscribes(TestTopics.Raw).To(TestConnectors.Erp);
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor("ITP302"));
+        Assert.Empty(s.DiagnosticsFor<NoEdgesRule>());
     }
 }
 
 public class PubSubConnectorNameCollisionRuleTests
 {
     [Fact]
-    public void Validate_WithPubSubNameEqualToDerivedComponentName_ShouldReportItp401()
+    public void Validate_WithPubSubNameEqualToDerivedComponentName_ShouldReportError()
     {
         // Arrange: the connector "shared" derives the Dapr component name "binding.shared"
         var s = SystemBuilder.Create("test-system");
@@ -460,7 +458,7 @@ public class PubSubConnectorNameCollisionRuleTests
             .Publishes(TopicRef<RawEvent>.Define("binding.shared", "some-topic"));
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor("ITP401"));
+        var diagnostic = Assert.Single(s.DiagnosticsFor<PubSubConnectorNameCollisionRule>());
 
         // Assert
         Assert.Equal("binding.shared", diagnostic.Target);

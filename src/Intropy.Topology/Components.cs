@@ -33,7 +33,7 @@ public abstract class Component
 
     /// <summary>The cron schedule recorded by <c>WithSchedule</c>; null when the component
     /// runs once at host start. A later call replaces the value. Syntax is validated at
-    /// <see cref="SystemBuilder.Build"/> (ITP210).</summary>
+    /// <see cref="SystemBuilder.Build"/>.</summary>
     internal string? ScheduleCall { get; private set; }
 
     internal IReadOnlyList<TopicRef> SubscribeCalls => _subscribes;

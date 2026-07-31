@@ -31,7 +31,7 @@ public static class Connectors
 }
 ```
 
-Direction is not part of a connector's identity — it follows from usage: `From(connector)` reads, `To(connector)` writes. One connector name declared with two different transports is rejected at `Build()` as ITP104.
+Direction is not part of a connector's identity — it follows from usage: `From(connector)` reads, `To(connector)` writes. One connector name declared with two different transports is rejected at `Build()`.
 
 ## The file transport
 
@@ -60,6 +60,4 @@ public sealed record ConnectorResource
 
 ## Related
 
-- [Validation](validation.md) — ITP104, ITP401
-- [ADR 0002](../decisions/0002-connector-redefinition.md) — why "connector" means the connection point
-- [ADR 0009](../decisions/0009-minimal-model-for-system-tutorial.md) — the cut to the minimal model
+- [Validation](validation.md) — conflicting transports and name collisions

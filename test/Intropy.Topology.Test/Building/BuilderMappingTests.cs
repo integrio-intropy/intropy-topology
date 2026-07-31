@@ -147,7 +147,7 @@ public class BuilderMappingTests
     public void WithSchedule_WithNullOrWhitespace_ShouldThrowArgumentException(string? cron)
     {
         // Arrange: null/whitespace is an argument error at the call site; cron *syntax*
-        // is deferred to Build() (ITP210) so all diagnostics report at once.
+        // is deferred to Build() so all diagnostics report at once.
         var s = SystemBuilder.Create("test-system");
         var builder = s.AddExtractor("extractor");
 

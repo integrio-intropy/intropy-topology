@@ -1,7 +1,7 @@
 namespace Intropy.Topology.Validation.Rules;
 
 /// <summary>
-/// ITP101: a component must not publish more than one topic. Every <c>Publishes</c> call
+/// A component must not publish more than one topic. Every <c>Publishes</c> call
 /// records the single <c>default</c> output port; multi-output components (named ports)
 /// are not part of the minimal model.
 /// </summary>
@@ -14,7 +14,6 @@ internal sealed class DuplicatePortRule : ITopologyRule
             if (component.PublishCalls.Count > 1)
             {
                 yield return new TopologyDiagnostic(
-                    "ITP101",
                     DiagnosticSeverity.Error,
                     $"The component declares {component.PublishCalls.Count} Publishes calls; a component publishes exactly one topic.",
                     component.Name);
@@ -23,7 +22,7 @@ internal sealed class DuplicatePortRule : ITopologyRule
     }
 }
 
-/// <summary>ITP102: a component must not subscribe to the same topic more than once.</summary>
+/// <summary>A component must not subscribe to the same topic more than once.</summary>
 internal sealed class DuplicateSubscriptionRule : ITopologyRule
 {
     public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
@@ -37,7 +36,6 @@ internal sealed class DuplicateSubscriptionRule : ITopologyRule
             foreach (var group in duplicates)
             {
                 yield return new TopologyDiagnostic(
-                    "ITP102",
                     DiagnosticSeverity.Error,
                     $"The topic '{group.Key.TopicName}' on pubsub '{group.Key.PubSubName}' is subscribed to more than once by the same component.",
                     component.Name);
@@ -46,7 +44,7 @@ internal sealed class DuplicateSubscriptionRule : ITopologyRule
     }
 }
 
-/// <summary>ITP103: one topic must not be used with two different event contract types.</summary>
+/// <summary>One topic must not be used with two different event contract types.</summary>
 internal sealed class TopicContractConflictRule : ITopologyRule
 {
     public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
@@ -63,7 +61,6 @@ internal sealed class TopicContractConflictRule : ITopologyRule
                 ", ",
                 group.Select(t => t.ContractType.FullName ?? t.ContractType.Name).Distinct().Order(StringComparer.Ordinal));
             yield return new TopologyDiagnostic(
-                "ITP103",
                 DiagnosticSeverity.Error,
                 $"The topic '{group.Key.TopicName}' on pubsub '{group.Key.PubSubName}' is declared with conflicting contract types: {contracts}.",
                 group.Key.TopicName);
@@ -84,7 +81,7 @@ internal sealed class TopicContractConflictRule : ITopologyRule
     }
 }
 
-/// <summary>ITP104: one connector name must not be declared with two different transports.</summary>
+/// <summary>One connector name must not be declared with two different transports.</summary>
 internal sealed class ConnectorConflictRule : ITopologyRule
 {
     public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
@@ -106,7 +103,6 @@ internal sealed class ConnectorConflictRule : ITopologyRule
                     .Distinct(StringComparer.Ordinal)
                     .Order(StringComparer.Ordinal);
                 yield return new TopologyDiagnostic(
-                    "ITP104",
                     DiagnosticSeverity.Error,
                     $"The connector '{group.Key}' is declared with conflicting transports: {string.Join(", ", transportTypes)}.",
                     group.Key);
@@ -124,7 +120,7 @@ internal sealed class ConnectorConflictRule : ITopologyRule
 }
 
 /// <summary>
-/// ITP211: an explicitly declared deployed transport must support every connector direction
+/// An explicitly declared deployed transport must support every connector direction
 /// used by the component. A connector without a deployed transport continues to use its local
 /// transport for deployment and needs no additional validation.
 /// </summary>
@@ -145,7 +141,6 @@ internal sealed class DeployedTransportCapabilityRule : ITopologyRule
                 var operation = direction == Intropy.Topology.Model.ConnectorDirection.In ? "From" : "To";
                 var capability = direction == Intropy.Topology.Model.ConnectorDirection.In ? "input" : "output";
                 yield return new TopologyDiagnostic(
-                    "ITP211",
                     DiagnosticSeverity.Error,
                     $"The connector '{connector.Name}' declares deployed transport '{transport.DaprType}', which does not support {capability} required by {operation}.",
                     component.Name);

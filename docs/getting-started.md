@@ -114,4 +114,4 @@ dotnet run -- generate ./out     # write Dapr YAML + per-component config
 - [Components](concepts/components.md) — the component kinds and their block builders
 - [Topics](concepts/topics.md) — the asynchronous edge between components
 - [Connectors](concepts/connectors.md) — the file transport and derived binding names
-- [Validation](concepts/validation.md) — the ITP diagnostic codes
+- [Validation](concepts/validation.md) — the validation rules

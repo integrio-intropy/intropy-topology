@@ -52,7 +52,7 @@ public sealed class TopologyValidationException : Exception
         foreach (var diagnostic in diagnostics)
         {
             builder.AppendLine();
-            builder.Append(CultureInfo.InvariantCulture, $"  {diagnostic.Code} [{diagnostic.Severity}]");
+            builder.Append(CultureInfo.InvariantCulture, $"  [{diagnostic.Severity}]");
             if (diagnostic.Target is not null)
             {
                 builder.Append(CultureInfo.InvariantCulture, $" {diagnostic.Target}:");
