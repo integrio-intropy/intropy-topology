@@ -1,0 +1,121 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "1ac6d4efee39",
+  "session_id": "019fb7ad-f178-7a34-8cc2-5ae2ce7ef260",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-31T11:25:11.935115Z",
+  "branch": "docs/comment-guidance",
+  "checkpoints_count": 6,
+  "save_step_count": 6,
+  "files_touched": [
+    "examples/OrderFlow.Contracts/Contracts.cs",
+    "examples/OrderFlow.SystemHost/Connectors.cs",
+    "examples/OrderFlow.SystemHost/OrderFlowSystem.cs",
+    "examples/order-loader/Program.cs",
+    "src/Intropy.Topology.Aspire/IntropyAspire.cs",
+    "src/Intropy.Topology.Generation/Generation.cs",
+    "src/Intropy.Topology/Building/ComponentBuilders.cs",
+    "src/Intropy.Topology/Components.cs",
+    "src/Intropy.Topology/Model/Resources.cs",
+    "src/Intropy.Topology/Refs.cs",
+    "test/Intropy.Topology.Test/Building/EndToEndTests.cs"
+  ],
+  "agent": "Pi",
+  "model": "gpt-5.6-sol",
+  "turn_id": "408e85fc1936",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 301864,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 5253632,
+    "output_tokens": 32032,
+    "api_call_count": 58
+  },
+  "session_metrics": {
+    "turn_count": 6
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-31T11:25:11.891424Z",
+    "agent_lines": 0,
+    "agent_removed": 5,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 43,
+    "total_committed": 5,
+    "total_lines_changed": 48,
+    "agent_percentage": 10.416666666666668,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 71,
+      "user_lines_removed": 43,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "AGENTS.md": 38,
+        "examples/OrderFlow.Contracts/Contracts.cs": 8,
+        "examples/OrderFlow.SystemHost/Connectors.cs": 3,
+        "examples/OrderFlow.SystemHost/OrderFlowSystem.cs": 5,
+        "examples/order-loader/Program.cs": 2,
+        "src/Intropy.Topology.Aspire/IntropyAspire.cs": 3,
+        "src/Intropy.Topology/Components.cs": 3,
+        "src/Intropy.Topology/Model/Resources.cs": 2,
+        "src/Intropy.Topology/Refs.cs": 7
+      },
+      "user_removed_per_file": {
+        "examples/OrderFlow.Contracts/Contracts.cs": 1,
+        "examples/OrderFlow.SystemHost/Connectors.cs": 3,
+        "examples/OrderFlow.SystemHost/OrderFlowSystem.cs": 4,
+        "examples/order-loader/Program.cs": 4,
+        "src/Intropy.Topology.Aspire/IntropyAspire.cs": 7,
+        "src/Intropy.Topology/Components.cs": 6,
+        "src/Intropy.Topology/Model/Resources.cs": 3,
+        "src/Intropy.Topology/Refs.cs": 15
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 75,
+      "agent_lines_removed": 47
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 75,
+      "agent_lines_removed": 47
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 76,
+      "agent_lines_removed": 48
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 76,
+      "agent_lines_removed": 48
+    },
+    {
+      "checkpoint_number": 6,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 76,
+      "agent_lines_removed": 48
+    },
+    {
+      "checkpoint_number": 7,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 76,
+      "agent_lines_removed": 48
+    }
+  ]
+}
