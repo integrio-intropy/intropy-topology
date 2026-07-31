@@ -3,7 +3,7 @@
   "checkpoint_id": "7a33353d03de",
   "strategy": "manual-commit",
   "branch": "feat/platform-service-development-mocks",
-  "checkpoints_count": 3,
+  "checkpoints_count": 7,
   "files_touched": [
     "Directory.Packages.props",
     "examples/OrderFlow.SystemHost/OrderFlowDevelopment.cs",
@@ -48,13 +48,20 @@
       "compact_transcript": "/7a/33353d03de/1/transcript.jsonl",
       "content_hash": "/7a/33353d03de/1/content_hash.txt",
       "prompt": "/7a/33353d03de/1/prompt.txt"
+    },
+    {
+      "metadata": "/7a/33353d03de/2/metadata.json",
+      "transcript": "/7a/33353d03de/2/full.jsonl",
+      "compact_transcript": "/7a/33353d03de/2/transcript.jsonl",
+      "content_hash": "/7a/33353d03de/2/content_hash.txt",
+      "prompt": "/7a/33353d03de/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 348864,
+    "input_tokens": 431071,
     "cache_creation_tokens": 185057,
-    "cache_read_tokens": 22848402,
-    "output_tokens": 97536,
-    "api_call_count": 192
+    "cache_read_tokens": 23783314,
+    "output_tokens": 105765,
+    "api_call_count": 219
   }
 }
