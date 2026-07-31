@@ -15,10 +15,11 @@ internal static class TopologyMaterializer
         var components = new List<ComponentModel>();
         var topics = new Dictionary<(string PubSub, string Topic), TopicAccumulator>();
         var connectors = new Dictionary<string, ConnectorAccumulator>();
+        var services = new Dictionary<string, ServiceAccumulator>(StringComparer.Ordinal);
 
         foreach (var component in builder.Components)
         {
-            components.Add(MaterializeComponent(component, topics, connectors));
+            components.Add(MaterializeComponent(component, topics, connectors, services));
         }
 
         return new SystemTopology
@@ -48,13 +49,18 @@ internal static class TopologyMaterializer
                     UsedBy = [.. c.Value.UsedBy],
                 })
                 .ToArray(),
+            Services = services
+                .OrderBy(s => s.Key, StringComparer.Ordinal)
+                .Select(s => new ServiceResource { AppId = s.Key, Consumers = [.. s.Value.Consumers] })
+                .ToArray(),
         };
     }
 
     private static ComponentModel MaterializeComponent(
         Component component,
         Dictionary<(string PubSub, string Topic), TopicAccumulator> topics,
-        Dictionary<string, ConnectorAccumulator> connectors)
+        Dictionary<string, ConnectorAccumulator> connectors,
+        Dictionary<string, ServiceAccumulator> services)
     {
         var subscribes = new List<TopicSubscription>();
         foreach (var topic in component.SubscribeCalls)
@@ -90,6 +96,22 @@ internal static class TopologyMaterializer
             }
         }
 
+        var serviceAppIds = new List<string>();
+        var seenServices = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var service in component.ServiceCalls)
+        {
+            if (!services.TryGetValue(service.AppId, out var accumulator))
+            {
+                services[service.AppId] = accumulator = new ServiceAccumulator();
+            }
+
+            accumulator.Consumers.Add(component.Name);
+            if (seenServices.Add(service.AppId))
+            {
+                serviceAppIds.Add(service.AppId);
+            }
+        }
+
         return new ComponentModel
         {
             Name = component.Name,
@@ -98,6 +120,7 @@ internal static class TopologyMaterializer
             Subscribes = subscribes,
             Publishes = publishes,
             Connectors = connectorEdges,
+            Uses = serviceAppIds,
         };
     }
 
@@ -136,6 +159,11 @@ internal static class TopologyMaterializer
         public string ContractTypeName { get; } = contractTypeName;
         public SortedSet<string> Publishers { get; } = new(StringComparer.Ordinal);
         public SortedSet<string> Subscribers { get; } = new(StringComparer.Ordinal);
+    }
+
+    private sealed class ServiceAccumulator
+    {
+        public SortedSet<string> Consumers { get; } = new(StringComparer.Ordinal);
     }
 
     private sealed class ConnectorAccumulator(Transport transport, Transport? deployedTransport)

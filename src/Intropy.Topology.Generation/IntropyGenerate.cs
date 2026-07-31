@@ -43,10 +43,11 @@ public static class IntropyGenerate
         try
         {
             var discovered = SystemDiscovery.Discover(assembly);
+            DevelopmentDiscovery.Discover(assembly, discovered.Topology, Directory.GetCurrentDirectory());
             Console.WriteLine($"ok: '{discovered.Topology.SystemName}' is valid ({discovered.Topology.Components.Count} components).");
             return 0;
         }
-        catch (TopologyValidationException ex)
+        catch (Exception ex) when (ex is TopologyValidationException or DevelopmentValidationException or InvalidOperationException)
         {
             Console.Error.WriteLine($"error: {ex.Message}");
             return 1;
@@ -75,7 +76,8 @@ public static class IntropyGenerate
         string System,
         IReadOnlyList<GraphComponent>? Components,
         IReadOnlyList<GraphTopic>? Topics,
-        IReadOnlyList<GraphConnector>? Connectors)
+        IReadOnlyList<GraphConnector>? Connectors,
+        IReadOnlyList<GraphService>? Services)
     {
         public static GraphDocument From(SystemTopology topology) => new(
             "topology.intropy.io/v1",
@@ -83,7 +85,8 @@ public static class IntropyGenerate
             topology.SystemName,
             Optional(topology.Components.Select(GraphComponent.From)),
             Optional(topology.Topics.Select(GraphTopic.From)),
-            Optional(topology.Connectors.Select(GraphConnector.From)));
+            Optional(topology.Connectors.Select(GraphConnector.From)),
+            Optional(topology.Services.Select(GraphService.From)));
     }
 
     private sealed record GraphComponent(
@@ -91,7 +94,8 @@ public static class IntropyGenerate
         string Kind,
         IReadOnlyList<GraphTopicReference>? Subscribes,
         IReadOnlyList<GraphPublication>? Publishes,
-        IReadOnlyList<GraphConnectorUse>? Connectors)
+        IReadOnlyList<GraphConnectorUse>? Connectors,
+        IReadOnlyList<string>? Uses)
     {
         public static GraphComponent From(ComponentModel component) => new(
             component.Name,
@@ -100,7 +104,8 @@ public static class IntropyGenerate
             Optional(component.Publishes.Select(p => new GraphPublication(
                 p.Port == "default" ? null : p.Port, p.PubSubName, p.TopicName))),
             Optional(component.Connectors.Select(c => new GraphConnectorUse(
-                c.ConnectorName, Direction(c.Direction)))));
+                c.ConnectorName, Direction(c.Direction)))),
+            Optional(component.Uses));
     }
 
     private sealed record GraphTopicReference(
@@ -144,6 +149,11 @@ public static class IntropyGenerate
             Optional(connector.UsedBy));
     }
 
+    private sealed record GraphService(string AppId, IReadOnlyList<string>? Consumers)
+    {
+        public static GraphService From(ServiceResource service) => new(service.AppId, Optional(service.Consumers));
+    }
+
     private sealed record GraphTransport(string Type, bool SupportsInput, bool SupportsOutput)
     {
         public static GraphTransport From(Transport transport) => transport switch
@@ -181,19 +191,27 @@ public static class IntropyGenerate
 
     private static int Generate(Assembly assembly, string[] args)
     {
-        var directory = args.Skip(1).FirstOrDefault(a => !a.StartsWith('-')) ?? "./out";
-
-        var discovered = SystemDiscovery.Discover(assembly);
-        var artifacts = TopologyGenerator.Generate(discovered.Topology);
-        artifacts.WriteTo(directory);
-
-        Console.WriteLine($"generated {artifacts.Files.Count} files to '{directory}':");
-        foreach (var file in artifacts.Files)
+        try
         {
-            Console.WriteLine($"  {file.RelativePath}");
-        }
+            var directory = args.Skip(1).FirstOrDefault(a => !a.StartsWith('-')) ?? "./out";
+            var discovered = SystemDiscovery.Discover(assembly);
+            var development = DevelopmentDiscovery.Discover(assembly, discovered.Topology, Directory.GetCurrentDirectory());
+            var artifacts = TopologyGenerator.Generate(discovered.Topology, development);
+            artifacts.WriteTo(directory);
 
-        return 0;
+            Console.WriteLine($"generated {artifacts.Files.Count} files to '{directory}':");
+            foreach (var file in artifacts.Files)
+            {
+                Console.WriteLine($"  {file.RelativePath}");
+            }
+
+            return 0;
+        }
+        catch (Exception ex) when (ex is TopologyValidationException or DevelopmentValidationException or InvalidOperationException)
+        {
+            Console.Error.WriteLine($"error: {ex.Message}");
+            return 1;
+        }
     }
 
     private static int Unknown(string verb)

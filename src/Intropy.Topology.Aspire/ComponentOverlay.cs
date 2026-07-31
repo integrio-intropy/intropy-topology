@@ -1,13 +1,9 @@
 namespace Intropy.Topology.Aspire;
 
 /// <summary>
-/// Stages the effective Dapr component set for one integration: everything from its own
-/// <c>local/dapr-components/</c> passes through, then the system's generated components overlay
-/// it — a generated component with the same <c>metadata.name</c> replaces the local one, new
-/// names are added. The staged set lands at a stable, inspectable path under the AppHost's
-/// <c>obj/dapr-components/&lt;component&gt;/</c> and is regenerated on every start; the
-/// integration's sidecar gets it as its resources path. Standalone runs load the local
-/// directory instead — same names, different backing.
+/// Stages the effective Dapr resource set for one integration. Local resources are copied first;
+/// generated resources replace only an identical <c>(apiVersion, kind, metadata.name)</c> identity.
+/// A generated HTTP endpoint is staged only for a component named in its scopes.
 /// </summary>
 internal static class ComponentOverlay
 {
@@ -21,70 +17,99 @@ internal static class ComponentOverlay
         }
 
         Directory.CreateDirectory(stagedDir);
-
-        // metadata.name -> staged file, so a generated component can replace its local counterpart.
-        var stagedByName = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var file in ComponentFiles(ProjectConvention.LocalComponentsDir(appHostDirectory, componentName)))
-        {
-            var target = Path.Combine(stagedDir, Path.GetFileName(file));
-            File.Copy(file, target);
-            if (MetadataName(File.ReadAllText(file)) is { } name)
-            {
-                stagedByName[name] = target;
-            }
-        }
-
-        foreach (var file in ComponentFiles(generatedComponentsDir))
-        {
-            var name = MetadataName(File.ReadAllText(file));
-            if (name is not null && stagedByName.TryGetValue(name, out var replaced))
-            {
-                File.Delete(replaced);
-            }
-
-            var target = Path.Combine(stagedDir, Path.GetFileName(file));
-            File.Copy(file, target, overwrite: true);
-            if (name is not null)
-            {
-                stagedByName[name] = target;
-            }
-        }
-
+        var stagedByName = new Dictionary<string, StagedResource>(StringComparer.Ordinal);
+        CopyResources(ProjectConvention.LocalComponentsDir(appHostDirectory, componentName), stagedDir, stagedByName, componentName, generated: false);
+        CopyResources(generatedComponentsDir, stagedDir, stagedByName, componentName, generated: true);
         return stagedDir;
     }
 
-    /// <summary>
-    /// The top-level <c>metadata.name</c> of a Dapr resource YAML. Only the unindented
-    /// <c>metadata:</c> block qualifies — <c>spec.metadata</c> entries are indented past it.
-    /// </summary>
-    internal static string? MetadataName(string yaml)
+    /// <summary>The top-level <c>metadata.name</c> of a single-document Dapr resource YAML.</summary>
+    internal static string? MetadataName(string yaml) => Parse(yaml, "resource")?.Identity.Name;
+
+    private static void CopyResources(
+        string sourceDirectory,
+        string stagedDirectory,
+        Dictionary<string, StagedResource> stagedByName,
+        string componentName,
+        bool generated)
     {
-        var lines = yaml.Split('\n');
-        for (var i = 0; i < lines.Length; i++)
+        foreach (var file in ComponentFiles(sourceDirectory))
         {
-            if (lines[i].TrimEnd() != "metadata:")
+            var yaml = File.ReadAllText(file);
+            var resource = Parse(yaml, file) ?? throw new InvalidOperationException($"Dapr resource '{file}' has no metadata.name.");
+            if (generated && resource.IsHttpEndpoint && !resource.Scopes.Contains(componentName, StringComparer.Ordinal))
             {
                 continue;
             }
 
-            for (var j = i + 1; j < lines.Length && lines[j].StartsWith(' '); j++)
+            if (stagedByName.TryGetValue(resource.Identity.Name, out var existing))
             {
-                var entry = lines[j].Trim();
-                if (entry.StartsWith("name:", StringComparison.Ordinal))
+                if (existing.IsGenerated == generated
+                    || existing.Identity.ApiVersion != resource.Identity.ApiVersion
+                    || existing.Identity.Kind != resource.Identity.Kind
+                    || existing.Identity.Name != resource.Identity.Name)
                 {
-                    return entry["name:".Length..].Trim().Trim('"', '\'');
+                    throw new InvalidOperationException(
+                        $"Dapr resource '{file}' conflicts with an existing resource named '{resource.Identity.Name}'; replacement requires a unique matching apiVersion, kind, and metadata.name.");
                 }
+
+                var prior = Path.Combine(stagedDirectory, existing.Identity.FileName);
+                File.Delete(prior);
             }
+
+            var targetName = Path.GetFileName(file);
+            var target = Path.Combine(stagedDirectory, targetName);
+            File.Copy(file, target, overwrite: true);
+            stagedByName[resource.Identity.Name] = new StagedResource(resource.Identity with { FileName = targetName }, generated);
+        }
+    }
+
+    private static Resource? Parse(string yaml, string source)
+    {
+        if (yaml.Split("---", StringSplitOptions.None).Length > 1)
+        {
+            throw new InvalidOperationException($"Dapr resource '{source}' contains multiple YAML documents.");
         }
 
-        return null;
+        string? apiVersion = null;
+        string? kind = null;
+        string? name = null;
+        var scopes = new List<string>();
+        var inMetadata = false;
+        var inScopes = false;
+        foreach (var raw in yaml.Split('\n'))
+        {
+            var line = raw.TrimEnd();
+            if (line.StartsWith("apiVersion:", StringComparison.Ordinal)) apiVersion = Value(line);
+            if (line.StartsWith("kind:", StringComparison.Ordinal)) kind = Value(line);
+            if (line == "metadata:") { inMetadata = true; inScopes = false; continue; }
+            if (line == "scopes:") { inScopes = true; inMetadata = false; continue; }
+            if (inMetadata && raw.StartsWith(' ') && line.TrimStart().StartsWith("name:", StringComparison.Ordinal)) name = Value(line.TrimStart());
+            if (inScopes && line.TrimStart().StartsWith("- ", StringComparison.Ordinal)) scopes.Add(Value(line.TrimStart()[2..]));
+            if (!raw.StartsWith(' ') && !line.TrimStart().StartsWith("- ", StringComparison.Ordinal)
+                && line.Length > 0 && line is not "metadata:" and not "scopes:") { inMetadata = false; inScopes = false; }
+        }
+
+        return name is null || apiVersion is null || kind is null
+            ? null
+            : new Resource(new ResourceIdentity(apiVersion, kind, name, Path.GetFileName(source)), scopes);
     }
+
+    private static string Value(string line) => line[(line.IndexOf(':', StringComparison.Ordinal) + 1)..].Trim().Trim('"', '\'');
 
     private static IEnumerable<string> ComponentFiles(string directory) =>
         Directory.Exists(directory)
             ? Directory.EnumerateFiles(directory)
-                .Where(f => f.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase)
-                    || f.EndsWith(".yml", StringComparison.OrdinalIgnoreCase))
-                .OrderBy(f => f, StringComparer.Ordinal)
+                .Where(file => file.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) || file.EndsWith(".yml", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(file => file, StringComparer.Ordinal)
             : [];
+
+    private sealed record StagedResource(ResourceIdentity Identity, bool IsGenerated);
+
+    private sealed record Resource(ResourceIdentity Identity, IReadOnlyList<string> Scopes)
+    {
+        public bool IsHttpEndpoint => Identity.Kind == "HTTPEndpoint";
+    }
+
+    private sealed record ResourceIdentity(string ApiVersion, string Kind, string Name, string FileName);
 }

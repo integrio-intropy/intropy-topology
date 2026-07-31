@@ -56,6 +56,23 @@ public sealed record TopicRef<T> : TopicRef
 }
 
 /// <summary>
+/// Identifies a platform service by the Dapr app ID callers use. The service materializes
+/// from component usage; this reference neither owns nor deploys its provider.
+/// </summary>
+public sealed record ServiceRef
+{
+    /// <summary>The service's Dapr app ID (DNS-1123 label).</summary>
+    public string AppId { get; }
+
+    private ServiceRef(string appId) => AppId = NameRules.RequireLabel(appId, nameof(appId));
+
+    /// <summary>Declares a reusable external platform-service identity.</summary>
+    /// <param name="appId">The Dapr app ID callers invoke.</param>
+    /// <exception cref="ArgumentException">The app ID is not a valid DNS-1123 label.</exception>
+    public static ServiceRef Define([ConstantExpected] string appId) => new(appId);
+}
+
+/// <summary>
 /// A connector — the named connection point between the system and the outside world.
 /// Every edge block reaches the outside world through a connector. Its transport selects
 /// the Dapr binding type it materializes as; the Dapr binding component's name is always

@@ -33,6 +33,7 @@ internal static class TopologyRules
         new Rules.UnproducedTopicRule(),
         new Rules.NoEdgesRule(),
         new Rules.PubSubConnectorNameCollisionRule(),
+        new Rules.ServiceUsageRule(),
     ];
 
     public static IReadOnlyList<TopologyDiagnostic> Run(SystemBuilder builder, SystemTopology topology)
