@@ -1,0 +1,82 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "1ac6d4efee39",
+  "session_id": "019fb7c4-8d6f-72fb-bcc4-6b3086ffd128",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-31T11:25:12.31224Z",
+  "branch": "docs/comment-guidance",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "examples/OrderFlow.Contracts/Contracts.cs",
+    "examples/OrderFlow.SystemHost/Connectors.cs",
+    "examples/OrderFlow.SystemHost/OrderFlowSystem.cs",
+    "examples/order-loader/Program.cs",
+    "src/Intropy.Topology.Aspire/IntropyAspire.cs",
+    "src/Intropy.Topology.Generation/Generation.cs",
+    "src/Intropy.Topology/Building/ComponentBuilders.cs",
+    "src/Intropy.Topology/Components.cs",
+    "src/Intropy.Topology/Model/Resources.cs",
+    "src/Intropy.Topology/Refs.cs"
+  ],
+  "agent": "Pi",
+  "model": "gpt-5.6-sol",
+  "turn_id": "30637cbf169c",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 173559,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1172992,
+    "output_tokens": 10767,
+    "api_call_count": 23
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-31T11:25:12.281345Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 1,
+    "human_removed": 46,
+    "total_committed": 0,
+    "total_lines_changed": 48,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 75,
+      "user_lines_removed": 47,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "AGENTS.md": 38,
+        "examples/OrderFlow.Contracts/Contracts.cs": 8,
+        "examples/OrderFlow.SystemHost/Connectors.cs": 3,
+        "examples/OrderFlow.SystemHost/OrderFlowSystem.cs": 5,
+        "examples/order-loader/Program.cs": 2,
+        "src/Intropy.Topology.Aspire/IntropyAspire.cs": 3,
+        "src/Intropy.Topology.Generation/Generation.cs": 3,
+        "src/Intropy.Topology/Building/ComponentBuilders.cs": 1,
+        "src/Intropy.Topology/Components.cs": 3,
+        "src/Intropy.Topology/Model/Resources.cs": 2,
+        "src/Intropy.Topology/Refs.cs": 7
+      },
+      "user_removed_per_file": {
+        "examples/OrderFlow.Contracts/Contracts.cs": 1,
+        "examples/OrderFlow.SystemHost/Connectors.cs": 3,
+        "examples/OrderFlow.SystemHost/OrderFlowSystem.cs": 4,
+        "examples/order-loader/Program.cs": 4,
+        "src/Intropy.Topology.Aspire/IntropyAspire.cs": 7,
+        "src/Intropy.Topology.Generation/Generation.cs": 3,
+        "src/Intropy.Topology/Building/ComponentBuilders.cs": 1,
+        "src/Intropy.Topology/Components.cs": 6,
+        "src/Intropy.Topology/Model/Resources.cs": 3,
+        "src/Intropy.Topology/Refs.cs": 15
+      }
+    }
+  ]
+}
