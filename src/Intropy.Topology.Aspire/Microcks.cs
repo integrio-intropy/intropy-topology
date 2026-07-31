@@ -1,7 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Intropy.Topology.Generation;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Intropy.Topology.Aspire;
@@ -37,11 +36,11 @@ internal sealed class MicrocksImporter(
     DevelopmentManifest development,
     MockReadiness readiness,
     IHttpClientFactory clients,
-    ILogger<MicrocksImporter> logger) : BackgroundService
+    ILogger<MicrocksImporter> logger)
 {
     private static readonly TimeSpan s_timeout = TimeSpan.FromMinutes(3);
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    internal async Task ImportAsync(CancellationToken cancellationToken)
     {
         var client = clients.CreateClient(nameof(MicrocksImporter));
         client.BaseAddress = new Uri("http://localhost:8585");
@@ -49,10 +48,10 @@ internal sealed class MicrocksImporter(
         {
             try
             {
-                await ImportAndVerifyAsync(client, mock, stoppingToken).ConfigureAwait(false);
+                await ImportAndVerifyAsync(client, mock, cancellationToken).ConfigureAwait(false);
                 readiness.Complete(mock.AppId);
             }
-            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
                 readiness.Fail(mock.AppId, new InvalidOperationException(
                     $"Microcks could not import or verify service '{mock.AppId}' from '{mock.ArtifactPath}'.", ex));
@@ -100,11 +99,7 @@ internal sealed class MicrocksImporter(
             response.EnsureSuccessStatusCode();
             await using var responseStream = await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false);
             using var services = await JsonDocument.ParseAsync(responseStream, cancellationToken: deadline.Token).ConfigureAwait(false);
-            var entries = services.RootElement.TryGetProperty("content", out var contentProperty) ? contentProperty : services.RootElement;
-            var matches = entries.EnumerateArray().Count(service =>
-                service.GetProperty("name").GetString() == mock.Title
-                && service.GetProperty("version").GetString() == mock.Version
-                && service.GetProperty("type").GetString() == "REST");
+            var matches = CountMatchingServices(services.RootElement, mock);
             if (matches == 1)
             {
                 return;
@@ -117,5 +112,24 @@ internal sealed class MicrocksImporter(
 
             await Task.Delay(TimeSpan.FromSeconds(1), deadline.Token).ConfigureAwait(false);
         }
+    }
+
+    internal static int CountMatchingServices(JsonElement root, OpenApiMock mock)
+    {
+        var entries = root;
+        if (entries.ValueKind == JsonValueKind.Object && entries.TryGetProperty("content", out var contentProperty))
+        {
+            entries = contentProperty;
+        }
+
+        if (entries.ValueKind != JsonValueKind.Array)
+        {
+            throw new InvalidOperationException("Microcks services response was not an array.");
+        }
+
+        return entries.EnumerateArray().Count(service =>
+            service.GetProperty("name").GetString() == mock.Title
+            && service.GetProperty("version").GetString() == mock.Version
+            && service.GetProperty("type").GetString() == "REST");
     }
 }

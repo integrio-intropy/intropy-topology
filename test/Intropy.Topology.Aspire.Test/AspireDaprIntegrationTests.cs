@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Intropy.Topology;
@@ -28,6 +30,7 @@ public sealed class AspireDaprIntegrationTests : IAsyncDisposable
     private sealed record RawOrder(string OrderNumber);
 
     private static readonly TopicRef<RawOrder> s_raw = TopicRef<RawOrder>.Define("pubsub-a", "order-raw");
+    private static readonly ServiceRef s_idempotency = ServiceRef.Define("idempotency-service");
     private readonly string _workspace = Directory.CreateTempSubdirectory("intropy-aspire-dapr-").FullName;
 
     [AspireDaprFact]
@@ -67,6 +70,62 @@ public sealed class AspireDaprIntegrationTests : IAsyncDisposable
         finally
         {
             await application.StopAsync(CancellationToken.None);
+            await WaitForPortReleaseAsync(IntropyAspire.RedisPort);
+        }
+    }
+
+    [AspireDaprFact]
+    [Trait("Category", "Integration")]
+    public async Task Apply_WithDevelopmentMock_ShouldImportContractBeforeStartingConsumer()
+    {
+        // Arrange
+        var appHostDirectory = Directory.CreateDirectory(Path.Combine(_workspace, "system-host")).FullName;
+        WriteWebProject("order-extractor");
+        WriteWebProject("order-loader");
+        var artifactPath = Path.Combine(_workspace, "idempotency-service.openapi.yaml");
+        await File.WriteAllTextAsync(
+            artifactPath,
+            """
+            openapi: 3.0.3
+            info:
+              title: Idempotency Service
+              version: 1.0.0
+            paths:
+              /status:
+                post:
+                  responses:
+                    '200':
+                      description: Processing may proceed.
+            """);
+        var topology = TopologyWithService();
+        var development = new DevelopmentManifest([
+            new OpenApiMock("idempotency-service", artifactPath, "Idempotency Service", "1.0.0")]);
+        var generatedRoot = Path.Combine(_workspace, "generated");
+        TopologyGenerator.Generate(topology, development).WriteTo(generatedRoot);
+        var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions
+        {
+            ProjectDirectory = appHostDirectory,
+        });
+        ConfigureAspireToolchain(builder);
+        IntropyAspire.Apply(builder, topology, generatedRoot, development);
+
+        await using var application = builder.Build();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+
+        try
+        {
+            // Act
+            await application.StartAsync(timeout.Token);
+            var notifications = application.Services.GetRequiredService<ResourceNotificationService>();
+            await notifications.WaitForResourceAsync("order-loader", KnownResourceStates.Running, timeout.Token);
+
+            // Assert — the consumer cannot start until its OpenAPI contract has been imported.
+        }
+        finally
+        {
+            await application.StopAsync(CancellationToken.None);
+            await WaitForPortReleaseAsync(IntropyAspire.RedisPort);
+            await WaitForPortReleaseAsync(IntropyAspire.MicrocksPort);
         }
     }
 
@@ -82,6 +141,32 @@ public sealed class AspireDaprIntegrationTests : IAsyncDisposable
         system.AddExtractor("order-extractor").Publishes(s_raw);
         system.AddLoader("order-loader").Subscribes(s_raw);
         return system.Build();
+    }
+
+    private static SystemTopology TopologyWithService()
+    {
+        var system = SystemBuilder.Create("order-flow");
+        system.AddExtractor("order-extractor").Publishes(s_raw);
+        system.AddLoader("order-loader").Subscribes(s_raw).Uses(s_idempotency);
+        return system.Build();
+    }
+
+    private static async Task WaitForPortReleaseAsync(int port)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        while (true)
+        {
+            try
+            {
+                using var listener = new TcpListener(IPAddress.Loopback, port);
+                listener.Start();
+                return;
+            }
+            catch (SocketException) when (!timeout.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(100), timeout.Token);
+            }
+        }
     }
 
     private static void ConfigureAspireToolchain(IDistributedApplicationBuilder builder)

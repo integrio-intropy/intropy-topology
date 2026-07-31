@@ -107,7 +107,12 @@ public static class IntropyAspire
             builder.Services.AddSingleton(development);
             builder.Services.AddSingleton(mockReadiness);
             builder.Services.AddHttpClient(nameof(MicrocksImporter));
-            builder.Services.AddHostedService<MicrocksImporter>();
+            builder.Services.AddSingleton<MicrocksImporter>();
+            microcks.OnResourceReady(async (_, evt, cancellationToken) =>
+            {
+                var importer = evt.Services.GetRequiredService<MicrocksImporter>();
+                await importer.ImportAsync(cancellationToken).ConfigureAwait(false);
+            });
         }
 
         // Filled after the component loop; the hook closure only reads it at runtime.
