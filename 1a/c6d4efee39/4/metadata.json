@@ -1,0 +1,55 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "1ac6d4efee39",
+  "session_id": "79eaa33b-4037-4dc5-95db-3d7d6f3e8959",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-31T11:25:13.362166Z",
+  "branch": "docs/comment-guidance",
+  "checkpoints_count": 1,
+  "save_step_count": 2,
+  "files_touched": [
+    "examples/OrderFlow.Contracts/Contracts.cs",
+    "examples/OrderFlow.SystemHost/Connectors.cs",
+    "examples/OrderFlow.SystemHost/OrderFlowSystem.cs",
+    "examples/order-loader/Program.cs",
+    "src/Intropy.Topology.Aspire/IntropyAspire.cs",
+    "src/Intropy.Topology/Components.cs",
+    "src/Intropy.Topology/Model/Resources.cs",
+    "src/Intropy.Topology/Refs.cs"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "adf4d7006bbb",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 87,
+    "cache_creation_tokens": 179758,
+    "cache_read_tokens": 4836327,
+    "output_tokens": 49480,
+    "api_call_count": 48
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-31T11:25:13.329979Z",
+    "agent_lines": 33,
+    "agent_removed": 43,
+    "human_added": 5,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 38,
+    "total_lines_changed": 86,
+    "agent_percentage": 88.37209302325581,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
