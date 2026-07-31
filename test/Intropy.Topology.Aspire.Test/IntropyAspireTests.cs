@@ -82,6 +82,21 @@ public sealed class IntropyAspireTests : IDisposable
     }
 
     [Fact]
+    public void Apply_WithDevelopmentMocks_ShouldAddOneMicrocksResource()
+    {
+        // Arrange
+        var builder = CreateBuilder();
+        var development = new DevelopmentManifest([
+            new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency", "1")]);
+
+        // Act
+        IntropyAspire.Apply(builder, Topology(), GeneratedRoot, development);
+
+        // Assert
+        Assert.Contains(builder.Resources, resource => resource.Name == "microcks");
+    }
+
+    [Fact]
     public void Apply_ShouldAddProjectPerComponent_WithSidecarAppId()
     {
         // Arrange

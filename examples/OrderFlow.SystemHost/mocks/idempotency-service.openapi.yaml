@@ -1,0 +1,22 @@
+openapi: 3.0.3
+info:
+  title: Idempotency Service
+  version: 1.0.0
+paths:
+  /status:
+    post:
+      responses:
+        '200':
+          description: Processing may proceed.
+          content:
+            application/json:
+              schema:
+                type: object
+              example:
+                action: Proceed
+                reason: NoPreviousData
+  /commit:
+    post:
+      responses:
+        '200':
+          description: Committed.

@@ -10,6 +10,8 @@
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Dapr" Version="13.0.0" />
     <PackageVersion Include="Cronos" Version="0.13.0" />
+    <PackageVersion Include="Microsoft.OpenApi" Version="3.9.0" />
+    <PackageVersion Include="Microsoft.OpenApi.YamlReader" Version="3.9.0" />
   </ItemGroup>
 
   <ItemGroup>
