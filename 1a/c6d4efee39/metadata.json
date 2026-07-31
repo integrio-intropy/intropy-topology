@@ -1,0 +1,37 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "1ac6d4efee39",
+  "strategy": "manual-commit",
+  "branch": "docs/comment-guidance",
+  "checkpoints_count": 16,
+  "files_touched": [
+    "AGENTS.md",
+    "examples/OrderFlow.Contracts/Contracts.cs",
+    "examples/OrderFlow.SystemHost/Connectors.cs",
+    "examples/OrderFlow.SystemHost/OrderFlowSystem.cs",
+    "examples/order-loader/Program.cs",
+    "src/Intropy.Topology.Aspire/IntropyAspire.cs",
+    "src/Intropy.Topology.Generation/Generation.cs",
+    "src/Intropy.Topology/Building/ComponentBuilders.cs",
+    "src/Intropy.Topology/Components.cs",
+    "src/Intropy.Topology/Model/Resources.cs",
+    "src/Intropy.Topology/Refs.cs",
+    "test/Intropy.Topology.Test/Building/EndToEndTests.cs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/1a/c6d4efee39/0/metadata.json",
+      "transcript": "/1a/c6d4efee39/0/full.jsonl",
+      "compact_transcript": "/1a/c6d4efee39/0/transcript.jsonl",
+      "content_hash": "/1a/c6d4efee39/0/content_hash.txt",
+      "prompt": "/1a/c6d4efee39/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 88410,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3405760,
+    "output_tokens": 11489,
+    "api_call_count": 75
+  }
+}
