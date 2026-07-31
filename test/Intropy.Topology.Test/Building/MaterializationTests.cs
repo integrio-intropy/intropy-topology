@@ -61,6 +61,24 @@ public class MaterializationTests
     }
 
     [Fact]
+    public void Build_WithDeployedConnectorTransport_ShouldMaterializeBothTransportProfiles()
+    {
+        // Arrange
+        var connector = ConnectorRef.Define("pim", Transport.File("./test/pim"))
+            .WithDeployed(Transport.Sftp());
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("extractor").Publishes(TestTopics.Raw);
+        s.AddLoader("loader").Subscribes(TestTopics.Raw).To(connector);
+
+        // Act
+        var materialized = Assert.Single(s.Build().Connectors);
+
+        // Assert
+        Assert.Equal(Transport.File("./test/pim"), materialized.Transport);
+        Assert.Equal(Transport.Sftp(), materialized.DeployedTransport);
+    }
+
+    [Fact]
     public void Build_WithDuplicateSameDirectionConnectorCalls_ShouldDedupeSilently()
     {
         // Arrange

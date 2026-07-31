@@ -132,12 +132,14 @@ public static class IntropyGenerate
     private sealed record GraphConnector(
         string Name,
         GraphTransport Transport,
+        GraphTransport? DeployedTransport,
         IReadOnlyList<string>? Directions,
         IReadOnlyList<string>? UsedBy)
     {
         public static GraphConnector From(ConnectorResource connector) => new(
             connector.Name,
             GraphTransport.From(connector.Transport),
+            connector.DeployedTransport is { } deployedTransport ? GraphTransport.From(deployedTransport) : null,
             Optional(connector.Directions.Select(Direction)),
             Optional(connector.UsedBy));
     }
@@ -146,7 +148,8 @@ public static class IntropyGenerate
     {
         public static GraphTransport From(Transport transport) => transport switch
         {
-            FileTransport => new("file", SupportsInput: true, SupportsOutput: true),
+            FileTransport => new("file", transport.SupportsInput, transport.SupportsOutput),
+            SftpTransport => new("sftp", transport.SupportsInput, transport.SupportsOutput),
             _ => throw new InvalidOperationException($"Unsupported graph transport '{transport.GetType().Name}'."),
         };
     }

@@ -94,13 +94,15 @@ internal sealed class ConnectorConflictRule : ITopologyRule
         foreach (var group in usages.GroupBy(c => c.Name, StringComparer.Ordinal))
         {
             var transports = group
-                .Select(c => c.Transport)
+                .Select(c => (Local: c.Transport, Deployed: c.DeployedTransport))
                 .Distinct()
                 .ToArray();
             if (transports.Length > 1)
             {
                 var transportTypes = transports
-                    .Select(t => t.DaprType)
+                    .Select(t => t.Deployed is null
+                        ? t.Local.DaprType
+                        : $"{t.Local.DaprType} (deployed: {t.Deployed.DaprType})")
                     .Distinct(StringComparer.Ordinal)
                     .Order(StringComparer.Ordinal);
                 yield return new TopologyDiagnostic(
@@ -119,4 +121,38 @@ internal sealed class ConnectorConflictRule : ITopologyRule
             yield return connector;
         }
     }
+}
+
+/// <summary>
+/// ITP211: an explicitly declared deployed transport must support every connector direction
+/// used by the component. A connector without a deployed transport continues to use its local
+/// transport for deployment and needs no additional validation.
+/// </summary>
+internal sealed class DeployedTransportCapabilityRule : ITopologyRule
+{
+    public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
+    {
+        foreach (var component in context.Builder.Components)
+        {
+            foreach (var (connector, direction) in component.ConnectorCalls)
+            {
+                var transport = connector.DeployedTransport;
+                if (transport is null || Supports(direction, transport))
+                {
+                    continue;
+                }
+
+                var operation = direction == Intropy.Topology.Model.ConnectorDirection.In ? "From" : "To";
+                var capability = direction == Intropy.Topology.Model.ConnectorDirection.In ? "input" : "output";
+                yield return new TopologyDiagnostic(
+                    "ITP211",
+                    DiagnosticSeverity.Error,
+                    $"The connector '{connector.Name}' declares deployed transport '{transport.DaprType}', which does not support {capability} required by {operation}.",
+                    component.Name);
+            }
+        }
+    }
+
+    private static bool Supports(Intropy.Topology.Model.ConnectorDirection direction, Transport transport) =>
+        direction == Intropy.Topology.Model.ConnectorDirection.In ? transport.SupportsInput : transport.SupportsOutput;
 }

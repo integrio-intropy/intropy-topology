@@ -51,7 +51,7 @@ public class IntropyGenerateTests
         Assert.Equal("extractor", extractor.GetProperty("kind").GetString());
         Assert.False(extractor.TryGetProperty("schedule", out _));
         Assert.False(extractor.TryGetProperty("subscribes", out _));
-        Assert.Equal("webshop", extractor.GetProperty("connectors")[0].GetProperty("connector").GetString());
+        Assert.Equal("erp", extractor.GetProperty("connectors")[0].GetProperty("connector").GetString());
         Assert.Equal("in", extractor.GetProperty("connectors")[0].GetProperty("direction").GetString());
         Assert.Equal("pubsub-a", extractor.GetProperty("publishes")[0].GetProperty("pubsub").GetString());
         Assert.False(extractor.GetProperty("publishes")[0].TryGetProperty("pubSub", out _));
@@ -63,8 +63,15 @@ public class IntropyGenerateTests
         Assert.Equal("file", webshop.GetProperty("transport").GetProperty("type").GetString());
         Assert.True(webshop.GetProperty("transport").GetProperty("supportsInput").GetBoolean());
         Assert.True(webshop.GetProperty("transport").GetProperty("supportsOutput").GetBoolean());
-        Assert.Equal(["in"], webshop.GetProperty("directions").EnumerateArray().Select(value => value.GetString()));
-        Assert.Equal(["order-extractor"], webshop.GetProperty("usedBy").EnumerateArray().Select(value => value.GetString()));
+        var deployedTransport = webshop.GetProperty("deployedTransport");
+        Assert.Equal("sftp", deployedTransport.GetProperty("type").GetString());
+        Assert.False(deployedTransport.GetProperty("supportsInput").GetBoolean());
+        Assert.True(deployedTransport.GetProperty("supportsOutput").GetBoolean());
+        Assert.False(root.GetProperty("connectors").EnumerateArray()
+            .Single(connector => connector.GetProperty("name").GetString() == "erp")
+            .TryGetProperty("deployedTransport", out _));
+        Assert.Equal(["out"], webshop.GetProperty("directions").EnumerateArray().Select(value => value.GetString()));
+        Assert.Equal(["order-loader"], webshop.GetProperty("usedBy").EnumerateArray().Select(value => value.GetString()));
     }
 
     [Fact]

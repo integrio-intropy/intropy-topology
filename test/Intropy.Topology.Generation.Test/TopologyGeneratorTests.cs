@@ -70,13 +70,13 @@ public class TopologyGeneratorTests
     [Fact]
     public void Generate_ShouldScope_BindingToItsUsers()
     {
-        // Act — webshop is used only by order-extractor.
+        // Act — webshop is used only by order-loader.
         var yaml = Content("components/binding.webshop.yaml");
 
         // Assert
         Assert.Contains("scopes:", yaml, StringComparison.Ordinal);
-        Assert.Contains("- \"order-extractor\"", yaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("order-loader", yaml, StringComparison.Ordinal);
+        Assert.Contains("- \"order-loader\"", yaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("order-extractor", yaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public class TopologyGeneratorTests
         Assert.Contains("\"System\": \"order-fulfillment\"", json, StringComparison.Ordinal);
         Assert.Contains("\"Component\": \"order-extractor\"", json, StringComparison.Ordinal);
         Assert.Contains("\"Kind\": \"Extractor\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"binding.webshop\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"binding.erp\"", json, StringComparison.Ordinal);
         Assert.Contains("\"Direction\": \"In\"", json, StringComparison.Ordinal);
     }
 
