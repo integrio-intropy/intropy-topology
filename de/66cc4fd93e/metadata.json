@@ -3,13 +3,44 @@
   "checkpoint_id": "de66cc4fd93e",
   "strategy": "manual-commit",
   "branch": "docs/comment-guidance",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "CLAUDE.md",
+    "README.md",
+    "docs/concepts/components.md",
+    "docs/concepts/connectors.md",
+    "docs/concepts/topics.md",
     "docs/concepts/validation.md",
+    "docs/decisions/0001-staged-per-block-builders.md",
+    "docs/decisions/0002-connector-redefinition.md",
+    "docs/decisions/0003-per-block-components.md",
+    "docs/decisions/0004-edges-over-triggers.md",
+    "docs/decisions/0005-aspire-run-backend.md",
+    "docs/decisions/0006-microcks-dev-mocks.md",
+    "docs/decisions/0007-defer-connector-external-system.md",
+    "docs/decisions/0008-topic-completeness-over-loader-connectors.md",
+    "docs/decisions/0009-minimal-model-for-system-tutorial.md",
+    "docs/decisions/0010-schedule-as-activation-attribute.md",
+    "docs/getting-started.md",
     "docs/index.md",
+    "src/Intropy.Topology.Aspire/Scheduling.cs",
+    "src/Intropy.Topology.Aspire/SidecarRecovery.cs",
+    "src/Intropy.Topology.Generation/README.md",
+    "src/Intropy.Topology/Building/ComponentBuilders.cs",
+    "src/Intropy.Topology/Components.cs",
+    "src/Intropy.Topology/Model/ComponentModel.cs",
+    "src/Intropy.Topology/TopologyDiagnostic.cs",
+    "src/Intropy.Topology/TopologyValidationException.cs",
+    "src/Intropy.Topology/Validation/Rules/ActivationRules.cs",
+    "src/Intropy.Topology/Validation/Rules/CompletenessRules.cs",
+    "src/Intropy.Topology/Validation/Rules/StructureRules.cs",
+    "src/Intropy.Topology/Validation/Rules/TopicAndConnectorRules.cs",
     "src/Intropy.Topology/Validation/Rules/UsageAndCollisionRules.cs",
-    "test/Intropy.Topology.Test/Building/BuilderMappingTests.cs"
+    "src/Intropy.Topology/Validation/TopologyRules.cs",
+    "test/Intropy.Topology.Test/Building/BuilderMappingTests.cs",
+    "test/Intropy.Topology.Test/Building/MaterializationTests.cs",
+    "test/Intropy.Topology.Test/Validation/BuildValidationTests.cs",
+    "test/Intropy.Topology.Test/Validation/RuleTests.cs"
   ],
   "sessions": [
     {
@@ -18,13 +49,20 @@
       "compact_transcript": "/de/66cc4fd93e/0/transcript.jsonl",
       "content_hash": "/de/66cc4fd93e/0/content_hash.txt",
       "prompt": "/de/66cc4fd93e/0/prompt.txt"
+    },
+    {
+      "metadata": "/de/66cc4fd93e/1/metadata.json",
+      "transcript": "/de/66cc4fd93e/1/full.jsonl",
+      "compact_transcript": "/de/66cc4fd93e/1/transcript.jsonl",
+      "content_hash": "/de/66cc4fd93e/1/content_hash.txt",
+      "prompt": "/de/66cc4fd93e/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 160,
-    "cache_creation_tokens": 185057,
-    "cache_read_tokens": 11252626,
-    "output_tokens": 69124,
-    "api_call_count": 81
+    "input_tokens": 245,
+    "cache_creation_tokens": 363807,
+    "cache_read_tokens": 15942799,
+    "output_tokens": 118238,
+    "api_call_count": 128
   }
 }
