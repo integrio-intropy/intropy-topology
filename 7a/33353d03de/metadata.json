@@ -1,0 +1,53 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "7a33353d03de",
+  "strategy": "manual-commit",
+  "branch": "feat/platform-service-development-mocks",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "Directory.Packages.props",
+    "examples/OrderFlow.SystemHost/OrderFlowDevelopment.cs",
+    "examples/OrderFlow.SystemHost/OrderFlowSystem.cs",
+    "examples/OrderFlow.SystemHost/Services.cs",
+    "examples/OrderFlow.SystemHost/mocks/business-incident-service.openapi.yaml",
+    "examples/OrderFlow.SystemHost/mocks/idempotency-service.openapi.yaml",
+    "src/Intropy.Topology.Aspire/ComponentOverlay.cs",
+    "src/Intropy.Topology.Aspire/IntropyAspire.cs",
+    "src/Intropy.Topology.Aspire/Microcks.cs",
+    "src/Intropy.Topology.Aspire/Scheduling.cs",
+    "src/Intropy.Topology.Generation/Development.cs",
+    "src/Intropy.Topology.Generation/Generation.cs",
+    "src/Intropy.Topology.Generation/Intropy.Topology.Generation.csproj",
+    "src/Intropy.Topology.Generation/IntropyGenerate.cs",
+    "src/Intropy.Topology/Building/ComponentBuilders.cs",
+    "src/Intropy.Topology/Building/TopologyMaterializer.cs",
+    "src/Intropy.Topology/Components.cs",
+    "src/Intropy.Topology/Model/ComponentModel.cs",
+    "src/Intropy.Topology/Model/Resources.cs",
+    "src/Intropy.Topology/Model/SystemTopology.cs",
+    "src/Intropy.Topology/Refs.cs",
+    "src/Intropy.Topology/Validation/Rules/ServiceRules.cs",
+    "src/Intropy.Topology/Validation/TopologyRules.cs",
+    "test/Intropy.Topology.Aspire.Test/ComponentOverlayTests.cs",
+    "test/Intropy.Topology.Aspire.Test/IntropyAspireTests.cs",
+    "test/Intropy.Topology.Generation.Test/TopologyGeneratorTests.cs",
+    "test/Intropy.Topology.Test/Building/EndToEndTests.cs",
+    "test/Intropy.Topology.Test/ServiceTests.cs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/7a/33353d03de/0/metadata.json",
+      "transcript": "/7a/33353d03de/0/full.jsonl",
+      "compact_transcript": "/7a/33353d03de/0/transcript.jsonl",
+      "content_hash": "/7a/33353d03de/0/content_hash.txt",
+      "prompt": "/7a/33353d03de/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 348704,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 11595776,
+    "output_tokens": 28412,
+    "api_call_count": 111
+  }
+}
