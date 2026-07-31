@@ -3,12 +3,9 @@ using Intropy.Topology.Model;
 namespace Intropy.Topology;
 
 /// <summary>
-/// The shared substance of every declared component: its identity plus the recorded
-/// declaration calls. Block-specific subclasses (<see cref="ExtractorComponent"/>, ...)
-/// give each declaration a typed, holdable handle; the fluent builders in
-/// <c>Intropy.Topology.Building</c> are the only writers. Calls only record intent;
-/// completeness and cross-component checks run when <see cref="SystemBuilder.Build"/>
-/// is called, so every violation in the system is reported at once. Not thread-safe.
+/// Represents a declared topology component and its recorded edges. Declaration methods
+/// record intent; <see cref="SystemBuilder.Build"/> performs completeness and
+/// cross-component validation. Instances are mutable during declaration and not thread-safe.
 /// </summary>
 public abstract class Component
 {

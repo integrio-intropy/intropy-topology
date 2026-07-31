@@ -80,7 +80,7 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
 }
 
 /// <summary>Fluent builder for a transactional integration: a synchronous block that
-/// reads/writes external systems through connectors; it publishes no topics (v1).</summary>
+/// reads/writes external systems through connectors; it publishes no topics.</summary>
 public sealed class TransactionalIntegrationBuilder
     : ComponentBuilder<TransactionalIntegrationBuilder, TransactionalIntegrationComponent>
 {

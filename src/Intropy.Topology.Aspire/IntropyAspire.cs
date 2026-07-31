@@ -12,13 +12,9 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace Intropy.Topology.Aspire;
 
 /// <summary>
-/// The Aspire run-backend. Discovers a system's validated topology, generates its Dapr
-/// components, and translates the model into Aspire resources — one project per component
-/// with a Dapr sidecar on its own staged component overlay, and Redis behind pub/sub —
-/// then runs it under DCP, subscribers before their publishers. Scheduled components are
-/// re-run on their cron ticks by the <see cref="ComponentScheduler"/> (CronJob emulation,
-/// with a "Run now" dashboard command). Aspire never sees the topology; it receives
-/// ordinary resources.
+/// Runs a discovered topology as a local Aspire application with Dapr sidecars. Components
+/// start subscribers before publishers when the topic graph is acyclic, and scheduled
+/// components run on their cron ticks.
 /// </summary>
 public static class IntropyAspire
 {

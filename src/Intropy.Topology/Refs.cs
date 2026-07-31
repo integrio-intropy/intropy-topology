@@ -5,11 +5,8 @@ using Intropy.Topology.Validation;
 namespace Intropy.Topology;
 
 /// <summary>
-/// Reference to a pub/sub topic: a Dapr pubsub component name plus a topic name.
-/// Topics are declared as static fields — in a scaffolded <c>Topics.cs</c> for
-/// system-internal topics, or in a shared contracts package for cross-system topics;
-/// the declaration site is the visibility marker. The backing pubsub resource
-/// materializes from usage; there is no <c>AddTopic</c> on the builder.
+/// Identifies a pub/sub topic by its Dapr component and topic names. The backing
+/// resource materializes only when a component uses the reference.
 /// </summary>
 public abstract record TopicRef
 {
@@ -30,9 +27,8 @@ public abstract record TopicRef
 }
 
 /// <summary>
-/// A <see cref="TopicRef"/> typed with its event contract <typeparamref name="T"/>.
-/// The type parameter documents the contract at the declaration site and lets future
-/// generation/codegen reflect on it; topology-level wiring only uses the names.
+/// A <see cref="TopicRef"/> whose generic argument identifies the event contract. Topology
+/// wiring uses the topic names, while <see cref="TopicRef.ContractType"/> exposes the type.
 /// </summary>
 /// <typeparam name="T">The event contract type published on the topic.</typeparam>
 public sealed record TopicRef<T> : TopicRef
@@ -56,13 +52,9 @@ public sealed record TopicRef<T> : TopicRef
 }
 
 /// <summary>
-/// A connector — the named connection point between the system and the outside world.
-/// Every edge block reaches the outside world through a connector. Its transport selects
-/// the Dapr binding type it materializes as; the Dapr binding component's name is always
-/// derived (<c>binding.&lt;connector-name&gt;</c>), never declared. Connectors are declared
-/// in the SystemHost (typically a scaffolded <c>Connectors.cs</c>); they are system-owned and
-/// never shared across systems. Direction is not part of the identity — it follows from
-/// usage (<c>From</c> / <c>To</c>).
+/// Identifies a system-owned connection point and the Dapr binding transport used to
+/// materialize it. Direction follows from <c>From</c> and <c>To</c> usage; the binding
+/// component name is derived as <c>binding.&lt;connector-name&gt;</c>.
 /// </summary>
 public sealed record ConnectorRef
 {

@@ -1,7 +1,5 @@
-// A deliberately minimal Intropy component worker. It reads the identity and runtime config the
-// Aspire run-backend injects, logs them, and exposes an endpoint so its Dapr sidecar has an app to
-// talk to. A real worker would use the (future) Intropy Hosting framework to bind subscriptions,
-// publishes, and connectors from the same INTROPY__CONFIG contract.
+// This minimal worker logs the identity and runtime config injected by the Aspire backend.
+// The endpoint keeps an application channel available for its Dapr sidecar.
 
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();

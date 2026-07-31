@@ -41,12 +41,12 @@ public sealed class GeneratedArtifacts
 /// <summary>
 /// Turns a validated <see cref="SystemTopology"/> into Dapr components and runtime config
 /// for the local run profile: pub/sub backed by Redis Streams, file bindings anchored to the
-/// SystemHost directory.
+/// SystemHost directory. Output order is deterministic.
 /// </summary>
 public static class TopologyGenerator
 {
-    // WhenWritingNull keeps unscheduled components' config byte-identical to before the
-    // Schedule attribute existed; no other emitted property is ever null.
+    // Schedule is the only emitted property that is ever null; omitting it keeps
+    // unscheduled components' config free of a redundant attribute.
     private static readonly JsonSerializerOptions s_json = new()
     {
         WriteIndented = true,
