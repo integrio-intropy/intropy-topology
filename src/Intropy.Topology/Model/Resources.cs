@@ -3,9 +3,8 @@ using System.Text.Json.Serialization;
 namespace Intropy.Topology.Model;
 
 /// <summary>
-/// A topic materialized from usage, with both sides of the edge precomputed
-/// (<see cref="Publishers"/> and <see cref="Subscribers"/> feed the future Dapr pubsub
-/// component's <c>scopes</c>).
+/// A topic materialized from usage, with its publishing and subscribing component names
+/// precomputed in ordinal sort order.
 /// </summary>
 public sealed record TopicResource
 {

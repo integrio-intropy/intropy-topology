@@ -88,8 +88,8 @@ internal sealed class DaprSidecarRecovery(
         }
 
         // A scheduled component's sidecar is scheduler-owned: the run-to-completion block shuts
-        // its sidecar down after every run and the scheduler restarts it on the next tick
-        // (decision 0010), so its exits are lifecycle, not failure — however quick the run.
+        // its sidecar down after every run and the scheduler restarts it on the next tick,
+        // so its exits are lifecycle, not failure — however quick the run.
         if (options.SchedulerOwnedSidecars.Contains(update.ResourceName))
         {
             return;

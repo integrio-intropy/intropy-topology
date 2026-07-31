@@ -5,8 +5,8 @@ public class BuildValidationTests
     private static SystemBuilder SystemWithThreeViolations()
     {
         var s = SystemBuilder.Create("test-system");
-        // ITP206: extractor with no Publishes; ITP001: duplicate name; ITP208: published
-        // topic nobody subscribes.
+        // Extractor with no Publishes; duplicate component name; published topic nobody
+        // subscribes to.
         s.AddExtractor("dup").From(TestConnectors.Pim);
         s.AddExtractor("dup").Publishes(TestTopics.Raw);
         return s;
@@ -22,9 +22,9 @@ public class BuildValidationTests
         var exception = Assert.Throws<TopologyValidationException>(() => s.Build());
 
         // Assert
-        Assert.Contains(exception.Diagnostics, d => d.Code == "ITP001");
-        Assert.Contains(exception.Diagnostics, d => d.Code == "ITP206");
-        Assert.Contains(exception.Diagnostics, d => d.Code == "ITP208");
+        Assert.Contains(exception.Diagnostics, d => d.Message.Contains("must be unique"));
+        Assert.Contains(exception.Diagnostics, d => d.Message.Contains("must publish"));
+        Assert.Contains(exception.Diagnostics, d => d.Message.Contains("no component subscribes"));
     }
 
     [Fact]
@@ -37,9 +37,10 @@ public class BuildValidationTests
         var exception = Assert.Throws<TopologyValidationException>(() => s.Build());
 
         // Assert
-        Assert.Contains("ITP001", exception.Message);
-        Assert.Contains("ITP206", exception.Message);
-        Assert.Contains("ITP208", exception.Message);
+        Assert.Contains("[Error]", exception.Message);
+        Assert.Contains("must be unique", exception.Message);
+        Assert.Contains("must publish", exception.Message);
+        Assert.Contains("no component subscribes", exception.Message);
         Assert.Contains("dup", exception.Message);
     }
 
@@ -61,7 +62,7 @@ public class BuildValidationTests
     [Fact]
     public void TryBuild_WithValidSystemAndWarnings_ShouldReturnTrueWithWarnings()
     {
-        // Arrange: a valid component plus an edgeless transactional integration (ITP302 warning)
+        // Arrange: a valid component plus an edgeless transactional integration (warning only)
         var s = SystemBuilder.Create("test-system").WithValidComponent();
         s.AddTransactionalIntegration("idle");
 
@@ -71,7 +72,7 @@ public class BuildValidationTests
         // Assert
         Assert.True(ok);
         Assert.NotNull(topology);
-        Assert.Contains(diagnostics, d => d.Code == "ITP302" && d.Severity == DiagnosticSeverity.Warning);
+        Assert.Contains(diagnostics, d => d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("no edges"));
     }
 
     [Fact]

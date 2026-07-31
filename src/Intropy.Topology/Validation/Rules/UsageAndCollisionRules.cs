@@ -1,6 +1,6 @@
 namespace Intropy.Topology.Validation.Rules;
 
-/// <summary>ITP302 (warning): a component with no edges at all is likely unfinished.</summary>
+/// <summary>Warning: a component with no edges at all is likely unfinished.</summary>
 internal sealed class NoEdgesRule : ITopologyRule
 {
     public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
@@ -15,7 +15,6 @@ internal sealed class NoEdgesRule : ITopologyRule
             if (!hasEdges)
             {
                 yield return new TopologyDiagnostic(
-                    "ITP302",
                     DiagnosticSeverity.Warning,
                     "The component has no edges (no subscriptions, publishes, or connectors); it is likely unfinished.",
                     component.Name);
@@ -25,7 +24,7 @@ internal sealed class NoEdgesRule : ITopologyRule
 }
 
 /// <summary>
-/// ITP401: a pubsub name must not equal a connector's derived Dapr binding component name
+/// A pubsub name must not equal a connector's derived Dapr binding component name
 /// (<c>binding.&lt;connector-name&gt;</c>) — both become Dapr Component names in the same
 /// Kubernetes namespace.
 /// </summary>
@@ -41,7 +40,6 @@ internal sealed class PubSubConnectorNameCollisionRule : ITopologyRule
             .Where(c => pubSubNames.Contains(c.DaprComponentName)))
         {
             yield return new TopologyDiagnostic(
-                "ITP401",
                 DiagnosticSeverity.Error,
                 $"The pubsub name '{connector.DaprComponentName}' equals the Dapr binding component name derived from connector '{connector.Name}'; both become Dapr Component names in the same namespace.",
                 connector.DaprComponentName);

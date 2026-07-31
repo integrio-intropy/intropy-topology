@@ -12,7 +12,7 @@ graph LR
 
 A `TopicRef<T>` names a topic on a Dapr pubsub component and carries the event contract type `T` at the declaration site. It is the asynchronous interface between components. Publishing to (`Publishes`) or subscribing to (`Subscribes`) a topic is what brings the topic (and its pubsub) into the model.
 
-A component publishes at most one topic — a second `Publishes` call on the same component is rejected at `Build()` as ITP101. (Multi-output components with named ports live on the `full-topology` branch.) Every topic needs both sides: a published topic nobody subscribes to is ITP208, a subscription nothing publishes is ITP209.
+A component publishes at most one topic — a second `Publishes` call on the same component is rejected at `Build()`. (Multi-output components with named ports live on the `full-topology` branch.) Every topic needs both sides: a published topic nobody subscribes to is an error, and so is a subscription nothing publishes.
 
 ## Declaring topics
 
@@ -30,7 +30,7 @@ Both the pubsub name and the topic name are DNS-1123 names, validated at `Define
 
 ## The contract type
 
-The type parameter is the topic's event contract. It flows into the materialized model as `ContractTypeName` (the type's full name) and pins the topic to one contract: using the same topic with two different contract types anywhere in the system is rejected at `Build()` as ITP103.
+The type parameter is the topic's event contract. It flows into the materialized model as `ContractTypeName` (the type's full name) and pins the topic to one contract: using the same topic with two different contract types anywhere in the system is rejected at `Build()`.
 
 ## Materialized topics
 
@@ -53,4 +53,4 @@ public sealed record TopicResource
 
 - [Components](components.md) — `Publishes` and `Subscribes` per block kind
 - [Materialization](materialization.md) — how usage folds into resources
-- [Validation](validation.md) — ITP101, ITP102, ITP103, ITP208, ITP209, ITP401
+- [Validation](validation.md) — topic completeness, contract conflicts, and name collisions

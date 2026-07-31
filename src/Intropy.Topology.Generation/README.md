@@ -9,7 +9,7 @@ It produces, deterministically:
 - one Dapr **pub/sub** component per distinct `PubSubName` (dev: Redis-backed),
 - one Dapr **binding** per connector (`type` from `Transport.DaprType`, `scopes` from `UsedBy`);
   in dev, `bindings.http` connectors with a declared `MockHttpExternalSystem` point at the
-  contract-backed mock server (fixed port 8585, see `docs/decisions/0006`),
+  contract-backed mock server (fixed port 8585),
 - one Dapr **HTTPEndpoint** per dev-mocked internal API (`MockApi`), named after the provider's
   app-id so service invocation resolves to the mock (dev profile only),
 - a per-component `*.intropy.json` describing that component's identity and edges.

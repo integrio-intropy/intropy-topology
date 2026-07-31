@@ -119,6 +119,6 @@ public class MaterializationTests
         Assert.Equal(["erp", "pim"], topology.Connectors.Select(c => c.Name));
     }
 
-    // A second edge that a block cannot legally have (formerly the ITP203/204/205 family)
-    // is a compile error: the block builders expose only that block's legal edge methods.
+    // A second edge that a block cannot legally have is a compile error: the block
+    // builders expose only that block's legal edge methods.
 }

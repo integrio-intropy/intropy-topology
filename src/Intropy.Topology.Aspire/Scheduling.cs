@@ -93,7 +93,7 @@ internal sealed class AspireResourceLifecycle(
 /// unlike Kubernetes' UTC default), a tick that lands while the previous run is still in
 /// progress is skipped with a warning (concurrencyPolicy: Forbid), and the sidecar is
 /// started before the app because a run-to-completion block shuts its sidecar down when
-/// it exits. See decision 0010.
+/// it exits.
 /// </summary>
 internal sealed class ComponentScheduler(
     IReadOnlyList<ScheduledComponent> components,
