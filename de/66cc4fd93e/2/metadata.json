@@ -1,0 +1,83 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "de66cc4fd93e",
+  "session_id": "e2a08e81-f543-4dd8-aa54-2e446f947ff5",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-31T09:22:17.179291Z",
+  "branch": "docs/comment-guidance",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    "src/Intropy.Topology/Components.cs",
+    "src/Intropy.Topology/Validation/TopologyRules.cs"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5",
+  "turn_id": "b4368a0239c0",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 36,
+    "cache_creation_tokens": 86779,
+    "cache_read_tokens": 1478694,
+    "output_tokens": 37186,
+    "api_call_count": 19
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-31T09:22:17.158708Z",
+    "agent_lines": 0,
+    "agent_removed": 5,
+    "human_added": 138,
+    "human_modified": 11,
+    "human_removed": 0,
+    "total_committed": 138,
+    "total_lines_changed": 1191,
+    "agent_percentage": 0.41981528127623846,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 1040,
+      "user_lines_removed": 45,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "AGENTS.md": 38,
+        "docs/brainstorms/2026-07-30-message-journeys-requirements.md": 148,
+        "docs/brainstorms/2026-08-04-deployed-connector-transport-requirements.md": 94,
+        "docs/plans/2026-07-29-001-feat-system-flow-tests-plan.md": 473,
+        "docs/plans/2026-08-04-001-feat-deployed-connector-transport-plan.md": 252,
+        "examples/OrderFlow.Contracts/Contracts.cs": 8,
+        "examples/OrderFlow.SystemHost/Connectors.cs": 3,
+        "examples/OrderFlow.SystemHost/OrderFlowSystem.cs": 5,
+        "examples/order-loader/Program.cs": 2,
+        "src/Intropy.Topology.Aspire/IntropyAspire.cs": 3,
+        "src/Intropy.Topology/Components.cs": 3,
+        "src/Intropy.Topology/Model/Resources.cs": 2,
+        "src/Intropy.Topology/Refs.cs": 7,
+        "src/Intropy.Topology/Validation/TopologyRules.cs": 2
+      },
+      "user_removed_per_file": {
+        "examples/OrderFlow.Contracts/Contracts.cs": 1,
+        "examples/OrderFlow.SystemHost/Connectors.cs": 3,
+        "examples/OrderFlow.SystemHost/OrderFlowSystem.cs": 4,
+        "examples/order-loader/Program.cs": 4,
+        "src/Intropy.Topology.Aspire/IntropyAspire.cs": 7,
+        "src/Intropy.Topology/Components.cs": 6,
+        "src/Intropy.Topology/Model/Resources.cs": 3,
+        "src/Intropy.Topology/Refs.cs": 15,
+        "src/Intropy.Topology/Validation/TopologyRules.cs": 2
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1326,
+      "agent_lines_removed": 45
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+I recently introduced WithDeployed to model dependency on an external service of some kind. I wonder if we should redesign this to something like ConsumesApi, api not necessarily being an asyncapi or an openapi but a combination of transport and contract
+
+---
+
+which branch were you working on?
