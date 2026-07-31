@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "de66cc4fd93e",
+  "strategy": "manual-commit",
+  "branch": "docs/comment-guidance",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "CLAUDE.md",
+    "docs/concepts/validation.md",
+    "docs/index.md",
+    "src/Intropy.Topology/Validation/Rules/UsageAndCollisionRules.cs",
+    "test/Intropy.Topology.Test/Building/BuilderMappingTests.cs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/de/66cc4fd93e/0/metadata.json",
+      "transcript": "/de/66cc4fd93e/0/full.jsonl",
+      "compact_transcript": "/de/66cc4fd93e/0/transcript.jsonl",
+      "content_hash": "/de/66cc4fd93e/0/content_hash.txt",
+      "prompt": "/de/66cc4fd93e/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 160,
+    "cache_creation_tokens": 185057,
+    "cache_read_tokens": 11252626,
+    "output_tokens": 69124,
+    "api_call_count": 81
+  }
+}
