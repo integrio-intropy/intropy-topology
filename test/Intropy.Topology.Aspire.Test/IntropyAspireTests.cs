@@ -16,8 +16,8 @@ public sealed class IntropyAspireTests : IDisposable
     private sealed record RawOrder(string OrderNumber);
 
     private static readonly TopicRef<RawOrder> s_raw = TopicRef<RawOrder>.Define("pubsub-a", "order-raw");
-    private static readonly ConnectorRef s_webshop = ConnectorRef.Define("webshop", Transport.File("./test/webshop"));
-    private static readonly ConnectorRef s_erp = ConnectorRef.Define("erp", Transport.File("./test/erp"));
+    private static readonly ConnectorRef s_webshop = ConnectorRef.Define("webshop", Transport.Sftp());
+    private static readonly ConnectorRef s_erp = ConnectorRef.Define("erp", Transport.Sftp());
 
     private const string GeneratedRoot = "/tmp/intropy-aspire-test";
 
@@ -87,8 +87,9 @@ public sealed class IntropyAspireTests : IDisposable
     {
         // Arrange
         var builder = CreateBuilder();
-        var development = new DevelopmentManifest([
-            new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency", "1")]);
+        var development = new DevelopmentManifest(
+            [new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency", "1")],
+            []);
 
         // Act
         IntropyAspire.Apply(builder, Topology(), GeneratedRoot, development);

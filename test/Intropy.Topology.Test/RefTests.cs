@@ -6,11 +6,11 @@ public class ConnectorRefTests
     public void Define_WithValidName_ShouldExposeProperties()
     {
         // Act
-        var connector = ConnectorRef.Define("pim", Transport.File("./test/pim"));
+        var connector = ConnectorRef.Define("pim", Transport.Sftp());
 
         // Assert
         Assert.Equal("pim", connector.Name);
-        Assert.Equal(Transport.File("./test/pim"), connector.Transport);
+        Assert.Equal(Transport.Sftp(), connector.Transport);
     }
 
     [Theory]
@@ -23,7 +23,7 @@ public class ConnectorRefTests
         // Act & Assert: Define carries [ConstantExpected] (CA1857 fires on this non-constant
         // argument, proving the attribute works); suppressed here to test the runtime guard.
 #pragma warning disable CA1857
-        Assert.Throws<ArgumentException>(() => ConnectorRef.Define(name, Transport.File("./test/pim")));
+        Assert.Throws<ArgumentException>(() => ConnectorRef.Define(name, Transport.Sftp()));
 #pragma warning restore CA1857
     }
 
@@ -35,36 +35,11 @@ public class ConnectorRefTests
     }
 
     [Fact]
-    public void WithDeployed_ShouldReturnCopyWithDeployedTransport()
-    {
-        // Arrange
-        var connector = ConnectorRef.Define("pim", Transport.File("./test/pim"));
-
-        // Act
-        var deployed = connector.WithDeployed(Transport.Sftp());
-
-        // Assert
-        Assert.Null(connector.DeployedTransport);
-        Assert.Equal(Transport.Sftp(), deployed.DeployedTransport);
-        Assert.Equal(connector.Transport, deployed.Transport);
-    }
-
-    [Fact]
-    public void WithDeployed_WithNullTransport_ShouldThrowArgumentNullException()
-    {
-        // Arrange
-        var connector = ConnectorRef.Define("pim", Transport.File("./test/pim"));
-
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => connector.WithDeployed(null!));
-    }
-
-    [Fact]
     public void Equals_WithSameNameAndTransport_ShouldBeEqual()
     {
         // Arrange
-        var first = ConnectorRef.Define("pim", Transport.File("./test/pim"));
-        var second = ConnectorRef.Define("pim", Transport.File("./test/pim"));
+        var first = ConnectorRef.Define("pim", Transport.Sftp());
+        var second = ConnectorRef.Define("pim", Transport.Sftp());
 
         // Assert
         Assert.Equal(first, second);
@@ -74,18 +49,6 @@ public class ConnectorRefTests
 public class TransportTests
 {
     [Fact]
-    public void File_ShouldExposeDaprTypeAndRootPath()
-    {
-        // Act
-        var transport = Transport.File("./test/source");
-
-        // Assert
-        var file = Assert.IsType<FileTransport>(transport);
-        Assert.Equal("bindings.localstorage", file.DaprType);
-        Assert.Equal("./test/source", file.RootPath);
-    }
-
-    [Fact]
     public void Sftp_ShouldExposeDaprTypeAndCapabilities()
     {
         // Act
@@ -94,7 +57,7 @@ public class TransportTests
         // Assert
         Assert.IsType<SftpTransport>(transport);
         Assert.Equal("bindings.sftp", transport.DaprType);
-        Assert.False(transport.SupportsInput);
+        Assert.True(transport.SupportsInput);
         Assert.True(transport.SupportsOutput);
     }
 
@@ -110,24 +73,6 @@ public class TransportTests
         Assert.Equal(Transport.Sftp(), transport);
     }
 
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void File_WithEmptyRootPath_ShouldThrowArgumentException(string rootPath)
-    {
-        // Act & Assert: [ConstantExpected] suppressed to test the runtime guard
-#pragma warning disable CA1857
-        Assert.Throws<ArgumentException>(() => Transport.File(rootPath));
-#pragma warning restore CA1857
-    }
-
-    [Fact]
-    public void Equals_WithSameRootPath_ShouldBeEqual()
-    {
-        // Assert
-        Assert.Equal(Transport.File("./test/source"), Transport.File("./test/source"));
-        Assert.NotEqual(Transport.File("./test/source"), Transport.File("./test/other"));
-    }
 }
 
 public class TopicRefTests

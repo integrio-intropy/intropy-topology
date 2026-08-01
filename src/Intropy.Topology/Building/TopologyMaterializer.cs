@@ -44,7 +44,6 @@ internal static class TopologyMaterializer
                 {
                     Name = c.Key,
                     Transport = c.Value.Transport,
-                    DeployedTransport = c.Value.DeployedTransport,
                     Directions = [.. c.Value.Directions.Order()],
                     UsedBy = [.. c.Value.UsedBy],
                 })
@@ -146,7 +145,7 @@ internal static class TopologyMaterializer
         if (!connectors.TryGetValue(connector.Name, out var accumulator))
         {
             // First-seen wins on identity; conflicting declarations are reported by validation.
-            accumulator = new ConnectorAccumulator(connector.Transport, connector.DeployedTransport);
+            accumulator = new ConnectorAccumulator(connector.Transport);
             connectors[connector.Name] = accumulator;
         }
 
@@ -166,10 +165,9 @@ internal static class TopologyMaterializer
         public SortedSet<string> Consumers { get; } = new(StringComparer.Ordinal);
     }
 
-    private sealed class ConnectorAccumulator(Transport transport, Transport? deployedTransport)
+    private sealed class ConnectorAccumulator(Transport transport)
     {
         public Transport Transport { get; } = transport;
-        public Transport? DeployedTransport { get; } = deployedTransport;
         public HashSet<ConnectorDirection> Directions { get; } = [];
         public SortedSet<string> UsedBy { get; } = new(StringComparer.Ordinal);
     }

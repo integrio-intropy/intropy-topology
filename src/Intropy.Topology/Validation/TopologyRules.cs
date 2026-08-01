@@ -13,7 +13,7 @@ internal static class TopologyRules
         new Rules.DuplicateSubscriptionRule(),
         new Rules.TopicContractConflictRule(),
         new Rules.ConnectorConflictRule(),
-        new Rules.DeployedTransportCapabilityRule(),
+        new Rules.ConnectorTransportCapabilityRule(),
         new Rules.MissingRequiredOutputRule(),
         new Rules.MissingRequiredSubscriptionRule(),
         new Rules.ScheduleExpressionRule(),

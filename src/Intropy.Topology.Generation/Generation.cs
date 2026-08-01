@@ -53,11 +53,6 @@ public static class TopologyGenerator
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
-    /// <summary>Generates the artifacts for a topology.</summary>
-    /// <param name="topology">The validated topology.</param>
-    /// <returns>The generated artifacts.</returns>
-    public static GeneratedArtifacts Generate(SystemTopology topology) => Generate(topology, new DevelopmentManifest([]));
-
     /// <summary>Generates local artifacts, including validated development mock endpoints when declared.</summary>
     /// <param name="topology">The validated topology.</param>
     /// <param name="development">The optional validated development substitutions.</param>
@@ -74,7 +69,13 @@ public static class TopologyGenerator
 
         foreach (var connector in topology.Connectors)
         {
-            files.Add(BindingComponent(connector));
+            var resolution = development.Files.SingleOrDefault(file => file.ConnectorName == connector.Name);
+            if (resolution is null)
+            {
+                throw new InvalidOperationException($"Connector '{connector.Name}' has no local file resolution in the development manifest.");
+            }
+
+            files.Add(BindingComponent(connector, resolution));
         }
 
         foreach (var mock in development.Mocks)
@@ -109,18 +110,14 @@ public static class TopologyGenerator
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{pubSubName}.yaml", yaml);
     }
 
-    private static GeneratedFile BindingComponent(ConnectorResource connector)
+    private static GeneratedFile BindingComponent(ConnectorResource connector, ConnectorFileResolution resolution)
     {
-        var metadata = new List<(string, string)>();
-        if (connector.Transport is FileTransport file)
-        {
-            // Artifacts land in per-run temp dirs and the sidecar's cwd is not guaranteed,
-            // so anchor the folder at generation time (cwd = the SystemHost directory).
-            metadata.Add(("rootPath", Path.GetFullPath(file.RootPath)));
-        }
-
+        // Local runs resolve every connector to a localstorage folder. The manifest path is
+        // already absolute (anchored at the SystemHost directory); artifacts land in per-run
+        // temp dirs and the sidecar's cwd is not guaranteed, so an absolute path is required.
+        var metadata = new List<(string, string)> { ("rootPath", resolution.RootPath) };
         var yaml = DaprYaml.Component(
-            connector.DaprComponentName, connector.Transport.DaprType, metadata, connector.UsedBy);
+            connector.DaprComponentName, "bindings.localstorage", metadata, connector.UsedBy);
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{connector.DaprComponentName}.yaml", yaml);
     }
 

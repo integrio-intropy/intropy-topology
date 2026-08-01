@@ -60,18 +60,43 @@ public class IntropyGenerateTests
         Assert.Equal("Intropy.Topology.Generation.Test.RawOrder", rawTopic.GetProperty("contract").GetString());
         Assert.Equal(["order-extractor"], rawTopic.GetProperty("publishers").EnumerateArray().Select(value => value.GetString()));
         Assert.Equal(["order-loader", "raw-audit"], rawTopic.GetProperty("subscribers").EnumerateArray().Select(value => value.GetString()));
-        Assert.Equal("file", webshop.GetProperty("transport").GetProperty("type").GetString());
+        Assert.Equal("sftp", webshop.GetProperty("transport").GetProperty("type").GetString());
         Assert.True(webshop.GetProperty("transport").GetProperty("supportsInput").GetBoolean());
         Assert.True(webshop.GetProperty("transport").GetProperty("supportsOutput").GetBoolean());
-        var deployedTransport = webshop.GetProperty("deployedTransport");
-        Assert.Equal("sftp", deployedTransport.GetProperty("type").GetString());
-        Assert.False(deployedTransport.GetProperty("supportsInput").GetBoolean());
-        Assert.True(deployedTransport.GetProperty("supportsOutput").GetBoolean());
-        Assert.False(root.GetProperty("connectors").EnumerateArray()
-            .Single(connector => connector.GetProperty("name").GetString() == "erp")
-            .TryGetProperty("deployedTransport", out _));
+        Assert.False(webshop.TryGetProperty("deployedTransport", out _));
         Assert.Equal(["out"], webshop.GetProperty("directions").EnumerateArray().Select(value => value.GetString()));
         Assert.Equal(["order-loader"], webshop.GetProperty("usedBy").EnumerateArray().Select(value => value.GetString()));
+    }
+
+    [Fact]
+    public async Task RunAsync_Graph_WithoutDevelopmentFlag_ShouldOmitDevelopmentSection()
+    {
+        // Act
+        var (code, output, _) = await Capture(() => IntropyGenerate.RunAsync(s_assembly, ["graph"]));
+        using var json = JsonDocument.Parse(output);
+
+        // Assert
+        Assert.Equal(0, code);
+        Assert.False(json.RootElement.TryGetProperty("development", out _));
+    }
+
+    [Fact]
+    public async Task RunAsync_Graph_WithDevelopmentFlag_ShouldEmitDevelopmentSection()
+    {
+        // Act
+        var (code, output, _) = await Capture(() => IntropyGenerate.RunAsync(s_assembly, ["graph", "--development"]));
+        using var json = JsonDocument.Parse(output);
+        var development = json.RootElement.GetProperty("development");
+
+        // Assert: no mocks declared in this assembly; both connectors resolve to ./test folders
+        Assert.Equal(0, code);
+        Assert.False(development.TryGetProperty("mocks", out _));
+        var files = development.GetProperty("files").EnumerateArray().ToArray();
+        Assert.Equal(2, files.Length);
+        var webshop = files.Single(file => file.GetProperty("connector").GetString() == "webshop");
+        Assert.Equal(Path.GetFullPath("./test/webshop"), webshop.GetProperty("rootPath").GetString());
+        var erp = files.Single(file => file.GetProperty("connector").GetString() == "erp");
+        Assert.Equal(Path.GetFullPath("./test/erp"), erp.GetProperty("rootPath").GetString());
     }
 
     [Fact]

@@ -54,28 +54,10 @@ public class MaterializationTests
 
         // Assert
         Assert.Equal("pim", connector.Name);
-        Assert.Equal(Transport.File("./test/pim"), connector.Transport);
+        Assert.Equal(Transport.Sftp(), connector.Transport);
         Assert.Equal("binding.pim", connector.DaprComponentName);
         Assert.Equal([ConnectorDirection.In, ConnectorDirection.Out], connector.Directions);
         Assert.Equal(["ti"], connector.UsedBy);
-    }
-
-    [Fact]
-    public void Build_WithDeployedConnectorTransport_ShouldMaterializeBothTransportProfiles()
-    {
-        // Arrange
-        var connector = ConnectorRef.Define("pim", Transport.File("./test/pim"))
-            .WithDeployed(Transport.Sftp());
-        var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("extractor").Publishes(TestTopics.Raw);
-        s.AddLoader("loader").Subscribes(TestTopics.Raw).To(connector);
-
-        // Act
-        var materialized = Assert.Single(s.Build().Connectors);
-
-        // Assert
-        Assert.Equal(Transport.File("./test/pim"), materialized.Transport);
-        Assert.Equal(Transport.Sftp(), materialized.DeployedTransport);
     }
 
     [Fact]
@@ -100,7 +82,7 @@ public class MaterializationTests
     public void Build_ShouldSortResourcesDeterministically()
     {
         // Arrange: declare in non-alphabetical order
-        var erp = ConnectorRef.Define("erp", Transport.File("./test/erp"));
+        var erp = ConnectorRef.Define("erp", Transport.Sftp());
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("zeta")
             .Publishes(TopicRef<RawEvent>.Define("test-pubsub", "zzz-topic"))

@@ -91,15 +91,13 @@ internal sealed class ConnectorConflictRule : ITopologyRule
         foreach (var group in usages.GroupBy(c => c.Name, StringComparer.Ordinal))
         {
             var transports = group
-                .Select(c => (Local: c.Transport, Deployed: c.DeployedTransport))
+                .Select(c => c.Transport)
                 .Distinct()
                 .ToArray();
             if (transports.Length > 1)
             {
                 var transportTypes = transports
-                    .Select(t => t.Deployed is null
-                        ? t.Local.DaprType
-                        : $"{t.Local.DaprType} (deployed: {t.Deployed.DaprType})")
+                    .Select(t => t.DaprType)
                     .Distinct(StringComparer.Ordinal)
                     .Order(StringComparer.Ordinal);
                 yield return new TopologyDiagnostic(
@@ -120,11 +118,9 @@ internal sealed class ConnectorConflictRule : ITopologyRule
 }
 
 /// <summary>
-/// An explicitly declared deployed transport must support every connector direction
-/// used by the component. A connector without a deployed transport continues to use its local
-/// transport for deployment and needs no additional validation.
+/// A connector's declared transport must support every direction the connector is used in.
 /// </summary>
-internal sealed class DeployedTransportCapabilityRule : ITopologyRule
+internal sealed class ConnectorTransportCapabilityRule : ITopologyRule
 {
     public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
     {
@@ -132,8 +128,8 @@ internal sealed class DeployedTransportCapabilityRule : ITopologyRule
         {
             foreach (var (connector, direction) in component.ConnectorCalls)
             {
-                var transport = connector.DeployedTransport;
-                if (transport is null || Supports(direction, transport))
+                var transport = connector.Transport;
+                if (Supports(direction, transport))
                 {
                     continue;
                 }
@@ -142,7 +138,7 @@ internal sealed class DeployedTransportCapabilityRule : ITopologyRule
                 var capability = direction == Intropy.Topology.Model.ConnectorDirection.In ? "input" : "output";
                 yield return new TopologyDiagnostic(
                     DiagnosticSeverity.Error,
-                    $"The connector '{connector.Name}' declares deployed transport '{transport.DaprType}', which does not support {capability} required by {operation}.",
+                    $"The connector '{connector.Name}' declares transport '{transport.DaprType}', which does not support {capability} required by {operation}.",
                     component.Name);
             }
         }

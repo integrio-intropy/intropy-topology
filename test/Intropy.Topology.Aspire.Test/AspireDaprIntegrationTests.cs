@@ -42,7 +42,7 @@ public sealed class AspireDaprIntegrationTests : IAsyncDisposable
         WriteWebProject("order-extractor");
         WriteWebProject("order-loader");
         var generatedRoot = Path.Combine(_workspace, "generated");
-        TopologyGenerator.Generate(Topology()).WriteTo(generatedRoot);
+        TopologyGenerator.Generate(Topology(), new DevelopmentManifest([], [])).WriteTo(generatedRoot);
         var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions
         {
             ProjectDirectory = appHostDirectory,
@@ -98,8 +98,9 @@ public sealed class AspireDaprIntegrationTests : IAsyncDisposable
                       description: Processing may proceed.
             """);
         var topology = TopologyWithService();
-        var development = new DevelopmentManifest([
-            new OpenApiMock("idempotency-service", artifactPath, "Idempotency Service", "1.0.0")]);
+        var development = new DevelopmentManifest(
+            [new OpenApiMock("idempotency-service", artifactPath, "Idempotency Service", "1.0.0")],
+            []);
         var generatedRoot = Path.Combine(_workspace, "generated");
         TopologyGenerator.Generate(topology, development).WriteTo(generatedRoot);
         var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions

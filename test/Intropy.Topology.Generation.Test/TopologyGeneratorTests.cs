@@ -6,12 +6,14 @@ namespace Intropy.Topology.Generation.Test;
 public class TopologyGeneratorTests
 {
     private static readonly SystemTopology s_topology = SystemDiscovery.Discover(typeof(OrderSystem).Assembly).Topology;
+    private static readonly DevelopmentManifest s_development =
+        DevelopmentDiscovery.Discover(typeof(OrderSystem).Assembly, s_topology, Directory.GetCurrentDirectory());
 
     [Fact]
     public void Generate_ShouldEmit_OnePubSubComponentPerDistinctPubSubName()
     {
         // Act
-        var artifacts = TopologyGenerator.Generate(s_topology);
+        var artifacts = TopologyGenerator.Generate(s_topology, s_development);
 
         // Assert
         Assert.Contains(artifacts.Files, f => f.RelativePath == "components/pubsub-a.yaml");
@@ -57,14 +59,30 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Generate_WithFileTransport_ShouldAbsolutizeRootPath()
+    public void Generate_WithFileResolution_ShouldAbsolutizeRootPath()
     {
-        // Act — artifacts land in per-run temp dirs, so the folder is anchored at generation time.
+        // Act — artifacts land in per-run temp dirs, so the development resolution is absolute.
         var yaml = Content("components/binding.webshop.yaml");
 
         // Assert
         Assert.Contains("- name: \"rootPath\"", yaml, StringComparison.Ordinal);
         Assert.Contains($"value: \"{Path.GetFullPath("./test/webshop")}\"", yaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generate_WithUnresolvedConnector_ShouldThrow()
+    {
+        // Arrange — a connector used by the topology but absent from the development manifest
+        var topic = TopicRef<string>.Define("orders", "created");
+        var connector = ConnectorRef.Define("erp", Transport.Sftp());
+        var builder = SystemBuilder.Create("orders");
+        builder.AddExtractor("extractor").From(connector).Publishes(topic);
+        builder.AddLoader("loader").Subscribes(topic);
+
+        // Act & Assert
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            TopologyGenerator.Generate(builder.Build(), new DevelopmentManifest([], [])));
+        Assert.Contains("erp", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -122,8 +140,9 @@ public class TopologyGeneratorTests
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("extractor").Publishes(topic).Uses(service);
         builder.AddLoader("loader").Subscribes(topic).Uses(service);
-        var manifest = new DevelopmentManifest([
-            new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency Service", "1.0/rc")]);
+        var manifest = new DevelopmentManifest(
+            [new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency Service", "1.0/rc")],
+            []);
 
         // Act
         var yaml = TopologyGenerator.Generate(builder.Build(), manifest).Files
@@ -140,8 +159,8 @@ public class TopologyGeneratorTests
     public void Generate_ShouldBeDeterministic()
     {
         // Act
-        var first = TopologyGenerator.Generate(s_topology);
-        var second = TopologyGenerator.Generate(s_topology);
+        var first = TopologyGenerator.Generate(s_topology, s_development);
+        var second = TopologyGenerator.Generate(s_topology, s_development);
 
         // Assert
         Assert.Equal(
@@ -151,7 +170,7 @@ public class TopologyGeneratorTests
 
     private static string Content(string relativePath)
     {
-        var artifacts = TopologyGenerator.Generate(s_topology);
+        var artifacts = TopologyGenerator.Generate(s_topology, s_development);
         return artifacts.Files.Single(f => f.RelativePath == relativePath).Content;
     }
 }

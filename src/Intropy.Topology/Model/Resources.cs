@@ -40,15 +40,8 @@ public sealed record ConnectorResource
     /// <summary>The connector's name (DNS-1123 label).</summary>
     public required string Name { get; init; }
 
-    /// <summary>The local transport — the kind of Dapr binding the connector materializes during F5 runs.</summary>
+    /// <summary>The deployed transport shape — the kind of Dapr binding the connector materializes as after deployment.</summary>
     public required Transport Transport { get; init; }
-
-    /// <summary>
-    /// The value-free deployed transport shape, or <see langword="null"/> when the local
-    /// transport also applies to deployed environments.
-    /// </summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Transport? DeployedTransport { get; init; }
 
     /// <summary>The derived Dapr binding component name: <c>binding.&lt;connector-name&gt;</c>.</summary>
     public string DaprComponentName => $"binding.{Name}";

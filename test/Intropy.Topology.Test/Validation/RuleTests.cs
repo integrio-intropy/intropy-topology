@@ -179,103 +179,32 @@ public class TopicContractConflictRuleTests
 public class ConnectorConflictRuleTests
 {
     [Fact]
-    public void Validate_WithSameConnectorNameForTwoTransports_ShouldReportError()
-    {
-        // Arrange: one connector name, two different transports (different file roots)
-        var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("first")
-            .From(ConnectorRef.Define("shared", Transport.File("./test/one")))
-            .Publishes(TestTopics.Raw);
-        s.AddTransactionalIntegration("second")
-            .From(ConnectorRef.Define("shared", Transport.File("./test/other")));
-
-        // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor<ConnectorConflictRule>());
-
-        // Assert
-        Assert.Equal("shared", diagnostic.Target);
-        Assert.Contains("conflicting transports", diagnostic.Message);
-        Assert.Contains("bindings.localstorage", diagnostic.Message);
-    }
-
-    [Fact]
     public void Validate_WithSameConnectorDeclaredTwiceIdentically_ShouldReportNothing()
     {
         // Arrange: two usages of the same connector with the same transport
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("first")
-            .From(ConnectorRef.Define("shared", Transport.File("./test/shared")))
+            .From(ConnectorRef.Define("shared", Transport.Sftp()))
             .Publishes(TestTopics.Raw);
         s.AddTransactionalIntegration("second")
-            .From(ConnectorRef.Define("shared", Transport.File("./test/shared")));
+            .From(ConnectorRef.Define("shared", Transport.Sftp()));
 
         // Act & Assert
         Assert.Empty(s.DiagnosticsFor<ConnectorConflictRule>());
     }
-
-    [Fact]
-    public void Validate_WithSameLocalTransportButDifferentDeployedTransport_ShouldReportError()
-    {
-        // Arrange: a connector declaration includes both its local and deployed transport profiles
-        var s = SystemBuilder.Create("test-system");
-        s.AddTransactionalIntegration("first")
-            .To(ConnectorRef.Define("shared", Transport.File("./test/shared")).WithDeployed(Transport.Sftp()));
-        s.AddTransactionalIntegration("second")
-            .To(ConnectorRef.Define("shared", Transport.File("./test/shared")));
-
-        // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor<ConnectorConflictRule>());
-
-        // Assert
-        Assert.Equal("shared", diagnostic.Target);
-        Assert.Contains("bindings.sftp", diagnostic.Message);
-    }
 }
 
-public class DeployedTransportCapabilityRuleTests
+public class ConnectorTransportCapabilityRuleTests
 {
     [Fact]
-    public void Validate_WithInputOnlyUnsupportedSftpDeployedTransport_ShouldReportError()
+    public void Validate_WithBidirectionalTransport_ShouldReportNothing()
     {
-        // Arrange
-        var connector = ConnectorRef.Define("shared", Transport.File("./test/shared"))
-            .WithDeployed(Transport.Sftp());
-        var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("extractor").From(connector).Publishes(TestTopics.Raw);
-        s.AddLoader("loader").Subscribes(TestTopics.Raw);
-
-        // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor<DeployedTransportCapabilityRule>());
-
-        // Assert
-        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
-        Assert.Equal("extractor", diagnostic.Target);
-        Assert.Contains("does not support input required by From", diagnostic.Message);
-        Assert.Throws<TopologyValidationException>(() => s.Build());
-    }
-
-    [Fact]
-    public void Validate_WithSftpDeployedTransportForOutput_ShouldReportNothing()
-    {
-        // Arrange
-        var connector = ConnectorRef.Define("shared", Transport.File("./test/shared"))
-            .WithDeployed(Transport.Sftp());
-        var s = SystemBuilder.Create("test-system");
-        s.AddTransactionalIntegration("ti").To(connector);
-
-        // Act & Assert
-        Assert.Empty(s.DiagnosticsFor<DeployedTransportCapabilityRule>());
-    }
-
-    [Fact]
-    public void Validate_WithoutDeployedTransport_ShouldReportNothing()
-    {
-        // Arrange
+        // Arrange: SFTP supports both directions
         var s = SystemBuilder.Create("test-system");
         s.AddTransactionalIntegration("ti").From(TestConnectors.Pim).To(TestConnectors.Pim);
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor<DeployedTransportCapabilityRule>());
+        Assert.Empty(s.DiagnosticsFor<ConnectorTransportCapabilityRule>());
     }
 }
 
@@ -454,7 +383,7 @@ public class PubSubConnectorNameCollisionRuleTests
         // Arrange: the connector "shared" derives the Dapr component name "binding.shared"
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor")
-            .From(ConnectorRef.Define("shared", Transport.File("./test/shared")))
+            .From(ConnectorRef.Define("shared", Transport.Sftp()))
             .Publishes(TopicRef<RawEvent>.Define("binding.shared", "some-topic"));
 
         // Act

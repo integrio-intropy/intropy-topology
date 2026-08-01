@@ -68,7 +68,7 @@ public static class IntropyAspire
     /// </summary>
     internal static void Apply(
         IDistributedApplicationBuilder builder, SystemTopology topology, string generatedRoot) =>
-        Apply(builder, topology, generatedRoot, new DevelopmentManifest([]));
+        Apply(builder, topology, generatedRoot, new DevelopmentManifest([], []));
 
     internal static void Apply(
         IDistributedApplicationBuilder builder, SystemTopology topology, string generatedRoot, DevelopmentManifest development)

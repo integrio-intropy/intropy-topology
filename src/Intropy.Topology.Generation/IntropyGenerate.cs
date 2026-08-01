@@ -32,7 +32,7 @@ public static class IntropyGenerate
         return Task.FromResult(verb switch
         {
             "check" => Check(assembly),
-            "graph" => Graph(assembly),
+            "graph" => Graph(assembly, args),
             "generate" => Generate(assembly, args),
             _ => Unknown(verb),
         });
@@ -54,12 +54,15 @@ public static class IntropyGenerate
         }
     }
 
-    private static int Graph(Assembly assembly)
+    private static int Graph(Assembly assembly, string[] args)
     {
         try
         {
             var topology = SystemDiscovery.Discover(assembly).Topology;
-            Console.WriteLine(JsonSerializer.Serialize(GraphDocument.From(topology), s_json));
+            var development = args.Contains("--development", StringComparer.Ordinal)
+                ? DevelopmentDiscovery.Discover(assembly, topology, Directory.GetCurrentDirectory())
+                : null;
+            Console.WriteLine(JsonSerializer.Serialize(GraphDocument.From(topology, development), s_json));
             return 0;
         }
         catch (Exception ex)
@@ -77,16 +80,38 @@ public static class IntropyGenerate
         IReadOnlyList<GraphComponent>? Components,
         IReadOnlyList<GraphTopic>? Topics,
         IReadOnlyList<GraphConnector>? Connectors,
-        IReadOnlyList<GraphService>? Services)
+        IReadOnlyList<GraphService>? Services,
+        GraphDevelopment? Development)
     {
-        public static GraphDocument From(SystemTopology topology) => new(
+        public static GraphDocument From(SystemTopology topology, DevelopmentManifest? development) => new(
             "topology.intropy.io/v1",
             "SystemTopology",
             topology.SystemName,
             Optional(topology.Components.Select(GraphComponent.From)),
             Optional(topology.Topics.Select(GraphTopic.From)),
             Optional(topology.Connectors.Select(GraphConnector.From)),
-            Optional(topology.Services.Select(GraphService.From)));
+            Optional(topology.Services.Select(GraphService.From)),
+            development is null ? null : GraphDevelopment.From(development));
+    }
+
+    private sealed record GraphDevelopment(
+        IReadOnlyList<GraphMock>? Mocks,
+        IReadOnlyList<GraphFileConnector>? Files)
+    {
+        public static GraphDevelopment From(DevelopmentManifest development) => new(
+            Optional(development.Mocks.Select(GraphMock.From)),
+            Optional(development.Files.Select(GraphFileConnector.From)));
+    }
+
+    private sealed record GraphMock(string AppId, string Artifact, string Title, string Version, string BaseUri)
+    {
+        public static GraphMock From(OpenApiMock mock) => new(
+            mock.AppId, mock.ArtifactPath, mock.Title, mock.Version, mock.BaseUri.AbsoluteUri);
+    }
+
+    private sealed record GraphFileConnector(string Connector, string RootPath)
+    {
+        public static GraphFileConnector From(ConnectorFileResolution file) => new(file.ConnectorName, file.RootPath);
     }
 
     private sealed record GraphComponent(
@@ -137,14 +162,12 @@ public static class IntropyGenerate
     private sealed record GraphConnector(
         string Name,
         GraphTransport Transport,
-        GraphTransport? DeployedTransport,
         IReadOnlyList<string>? Directions,
         IReadOnlyList<string>? UsedBy)
     {
         public static GraphConnector From(ConnectorResource connector) => new(
             connector.Name,
             GraphTransport.From(connector.Transport),
-            connector.DeployedTransport is { } deployedTransport ? GraphTransport.From(deployedTransport) : null,
             Optional(connector.Directions.Select(Direction)),
             Optional(connector.UsedBy));
     }
@@ -158,7 +181,6 @@ public static class IntropyGenerate
     {
         public static GraphTransport From(Transport transport) => transport switch
         {
-            FileTransport => new("file", transport.SupportsInput, transport.SupportsOutput),
             SftpTransport => new("sftp", transport.SupportsInput, transport.SupportsOutput),
             _ => throw new InvalidOperationException($"Unsupported graph transport '{transport.GetType().Name}'."),
         };
