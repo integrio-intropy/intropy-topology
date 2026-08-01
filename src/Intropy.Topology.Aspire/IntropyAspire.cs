@@ -24,6 +24,9 @@ public static class IntropyAspire
     /// </summary>
     internal const int RedisPort = 6380;
 
+    /// <summary>Fixed host port for the local Microcks Uber backend.</summary>
+    internal const int MicrocksPort = 8585;
+
     /// <summary>
     /// Discovers the system in <paramref name="assembly"/>, generates its artifacts to a temp folder,
     /// builds the Aspire resource graph, and runs it. Requires Docker and the Dapr CLI to be present.
@@ -36,18 +39,27 @@ public static class IntropyAspire
         ArgumentNullException.ThrowIfNull(assembly);
         ArgumentNullException.ThrowIfNull(args);
 
-        var discovered = SystemDiscovery.Discover(assembly);
+        try
+        {
+            var discovered = SystemDiscovery.Discover(assembly);
+            var builder = DistributedApplication.CreateBuilder(args);
+            var development = DevelopmentDiscovery.Discover(assembly, discovered.Topology, builder.AppHostDirectory);
 
-        var generatedRoot = Path.Combine(
-            Path.GetTempPath(), "intropy-aspire", $"{discovered.Topology.SystemName}-{Guid.NewGuid():N}");
-        TopologyGenerator.Generate(discovered.Topology).WriteTo(generatedRoot);
+            var generatedRoot = Path.Combine(
+                Path.GetTempPath(), "intropy-aspire", $"{discovered.Topology.SystemName}-{Guid.NewGuid():N}");
+            TopologyGenerator.Generate(discovered.Topology, development).WriteTo(generatedRoot);
 
-        var builder = DistributedApplication.CreateBuilder(args);
-        Apply(builder, discovered.Topology, generatedRoot);
+            Apply(builder, discovered.Topology, generatedRoot, development);
 
-        var app = builder.Build();
-        await app.RunAsync().ConfigureAwait(false);
-        return 0;
+            var app = builder.Build();
+            await app.RunAsync().ConfigureAwait(false);
+            return 0;
+        }
+        catch (Exception ex) when (ex is TopologyValidationException or DevelopmentValidationException or InvalidOperationException)
+        {
+            await Console.Error.WriteLineAsync($"error: {ex.Message}").ConfigureAwait(false);
+            return 1;
+        }
     }
 
     /// <summary>
@@ -55,7 +67,11 @@ public static class IntropyAspire
     /// <see cref="RunAsync"/> so the built model can be inspected in tests without running DCP.
     /// </summary>
     internal static void Apply(
-        IDistributedApplicationBuilder builder, SystemTopology topology, string generatedRoot)
+        IDistributedApplicationBuilder builder, SystemTopology topology, string generatedRoot) =>
+        Apply(builder, topology, generatedRoot, new DevelopmentManifest([]));
+
+    internal static void Apply(
+        IDistributedApplicationBuilder builder, SystemTopology topology, string generatedRoot, DevelopmentManifest development)
     {
         var componentsPath = Path.Combine(generatedRoot, GeneratedArtifacts.ComponentsDir);
         var configDir = Path.Combine(generatedRoot, GeneratedArtifacts.ConfigDir);
@@ -74,6 +90,27 @@ public static class IntropyAspire
         var redisReadiness = new TcpReadyHealthCheck("localhost", RedisPort, TcpReadyHealthCheck.RedisHandshake);
         WithTcpReadiness(builder, redis, redisReadiness);
 
+        MockReadiness? mockReadiness = null;
+        IResourceBuilder<ContainerResource>? microcks = null;
+        if (development.Mocks.Count > 0)
+        {
+            EnsureHostPortAvailable(MicrocksPort, "Microcks");
+            microcks = builder
+                .AddContainer("microcks", "quay.io/microcks/microcks-uber", "1.13.0")
+                .WithEndpoint(name: "http", scheme: "http", port: MicrocksPort, targetPort: 8080)
+                .WithHttpHealthCheck("/api/health");
+            mockReadiness = new MockReadiness(development);
+            builder.Services.AddSingleton(development);
+            builder.Services.AddSingleton(mockReadiness);
+            builder.Services.AddHttpClient(nameof(MicrocksImporter));
+            builder.Services.AddSingleton<MicrocksImporter>();
+            microcks.OnResourceReady(async (_, evt, cancellationToken) =>
+            {
+                var importer = evt.Services.GetRequiredService<MicrocksImporter>();
+                await importer.ImportAsync(cancellationToken).ConfigureAwait(false);
+            });
+        }
+
         // Filled after the component loop; the hook closure only reads it at runtime.
         var sidecarWaits = new Dictionary<string, string[]>(StringComparer.Ordinal);
 
@@ -82,14 +119,29 @@ public static class IntropyAspire
         // every backend port answers and, for publishers, until every subscriber sidecar is running.
         builder.Eventing.Subscribe<BeforeResourceStartedEvent>(async (evt, cancellationToken) =>
         {
-            if (!DaprSidecarIdentity.IsCli(evt.Resource.Name))
+            var isSidecar = DaprSidecarIdentity.IsCli(evt.Resource.Name);
+            var componentName = isSidecar
+                ? evt.Resource.Name[..^"-dapr-cli".Length]
+                : evt.Resource.Name;
+            var component = topology.Components.SingleOrDefault(candidate => candidate.Name == componentName);
+            if (component is null)
+            {
+                return;
+            }
+
+            if (mockReadiness is not null)
+            {
+                await mockReadiness.WaitForAsync(component.Uses, TimeSpan.FromMinutes(3), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (!isSidecar)
             {
                 return;
             }
 
             await redisReadiness.WaitUntilReadyAsync(TimeSpan.FromMinutes(3), cancellationToken)
                 .ConfigureAwait(false);
-
             if (sidecarWaits.TryGetValue(evt.Resource.Name, out var subscriberSidecars))
             {
                 var notifications = evt.Services.GetRequiredService<ResourceNotificationService>();
@@ -132,13 +184,13 @@ public static class IntropyAspire
                 AddRunNowCommand(project, component.Name);
             }
 
-            Wire(project, component, stagedPath, configDir, redis);
+            Wire(project, component, stagedPath, configDir, redis, microcks);
             resources[component.Name] = project;
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
 
         RegisterDaprSidecarRecovery(builder, topology, redisReadiness);
-        RegisterScheduler(builder, topology);
+        RegisterScheduler(builder, topology, mockReadiness);
 
         if (unresolved.Count > 0)
         {
@@ -185,11 +237,11 @@ public static class IntropyAspire
     /// Registers the <see cref="ComponentScheduler"/> when any component declares a schedule.
     /// Keyed off <c>Schedule</c>, not the component kind — the scheduler is kind-blind.
     /// </summary>
-    private static void RegisterScheduler(IDistributedApplicationBuilder builder, SystemTopology topology)
+    private static void RegisterScheduler(IDistributedApplicationBuilder builder, SystemTopology topology, MockReadiness? mockReadiness)
     {
         var scheduled = topology.Components
             .Where(c => c.Schedule is not null)
-            .Select(c => new ScheduledComponent(c.Name, c.Schedule!))
+            .Select(c => new ScheduledComponent(c.Name, c.Schedule!, c.Uses.Count == 0 ? null : c.Uses))
             .ToArray();
         if (scheduled.Length == 0)
         {
@@ -198,6 +250,10 @@ public static class IntropyAspire
 
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IReadOnlyList<ScheduledComponent>>(scheduled);
+        if (mockReadiness is not null)
+        {
+            builder.Services.AddSingleton(mockReadiness);
+        }
         builder.Services.TryAddSingleton<IResourceLifecycle, AspireResourceLifecycle>();
         builder.Services.AddSingleton<ComponentScheduler>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<ComponentScheduler>());
@@ -299,7 +355,7 @@ public static class IntropyAspire
         return edges.Keys.Any(Visit);
     }
 
-    private static void EnsureHostPortAvailable(int port)
+    private static void EnsureHostPortAvailable(int port, string backend = "Redis")
     {
         try
         {
@@ -309,7 +365,7 @@ public static class IntropyAspire
         catch (SocketException ex)
         {
             throw new InvalidOperationException(
-                $"Redis requires host port {port}, but it is already in use. Stop the conflicting process and retry.", ex);
+                $"{backend} requires host port {port}, but it is already in use. Stop the conflicting process and retry.", ex);
         }
     }
 
@@ -328,7 +384,8 @@ public static class IntropyAspire
         ComponentModel component,
         string resourcesPath,
         string configDir,
-        IResourceBuilder<ContainerResource> redis)
+        IResourceBuilder<ContainerResource> redis,
+        IResourceBuilder<ContainerResource>? microcks)
     {
         project
             .WithDaprSidecar(sidecar =>
@@ -343,5 +400,9 @@ public static class IntropyAspire
             .WithEnvironment("INTROPY__COMPONENT", component.Name)
             .WithEnvironment("INTROPY__CONFIG", Path.Combine(configDir, $"{component.Name}.intropy.json"))
             .WaitFor(redis);
+        if (microcks is not null && component.Uses.Count > 0)
+        {
+            project.WaitFor(microcks);
+        }
     }
 }

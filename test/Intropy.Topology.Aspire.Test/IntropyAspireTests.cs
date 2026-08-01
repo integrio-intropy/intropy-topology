@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Text.Json;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using CommunityToolkit.Aspire.Hosting.Dapr;
@@ -79,6 +80,61 @@ public sealed class IntropyAspireTests : IDisposable
 
         // Assert
         Assert.Contains(builder.Resources, r => r.Name == "redis");
+    }
+
+    [Fact]
+    public void Apply_WithDevelopmentMocks_ShouldAddOneMicrocksResource()
+    {
+        // Arrange
+        var builder = CreateBuilder();
+        var development = new DevelopmentManifest([
+            new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency", "1")]);
+
+        // Act
+        IntropyAspire.Apply(builder, Topology(), GeneratedRoot, development);
+
+        // Assert
+        Assert.Contains(builder.Resources, resource => resource.Name == "microcks");
+    }
+
+    [Fact]
+    public void CountMatchingServices_WithTopLevelArray_ShouldFindService()
+    {
+        // Arrange
+        using var services = JsonDocument.Parse(
+            """
+            [
+              { "name": "Idempotency", "version": "1", "type": "REST" }
+            ]
+            """);
+        var mock = new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency", "1");
+
+        // Act
+        var matches = MicrocksImporter.CountMatchingServices(services.RootElement, mock);
+
+        // Assert
+        Assert.Equal(1, matches);
+    }
+
+    [Fact]
+    public void CountMatchingServices_WithPagedObject_ShouldFindService()
+    {
+        // Arrange
+        using var services = JsonDocument.Parse(
+            """
+            {
+              "content": [
+                { "name": "Idempotency", "version": "1", "type": "REST" }
+              ]
+            }
+            """);
+        var mock = new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency", "1");
+
+        // Act
+        var matches = MicrocksImporter.CountMatchingServices(services.RootElement, mock);
+
+        // Assert
+        Assert.Equal(1, matches);
     }
 
     [Fact]

@@ -114,6 +114,29 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
+    public void Generate_WithOpenApiMock_ShouldEmitScopedHttpEndpoint()
+    {
+        // Arrange
+        var topic = TopicRef<string>.Define("orders", "created");
+        var service = ServiceRef.Define("idempotency-service");
+        var builder = SystemBuilder.Create("orders");
+        builder.AddExtractor("extractor").Publishes(topic).Uses(service);
+        builder.AddLoader("loader").Subscribes(topic).Uses(service);
+        var manifest = new DevelopmentManifest([
+            new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency Service", "1.0/rc")]);
+
+        // Act
+        var yaml = TopologyGenerator.Generate(builder.Build(), manifest).Files
+            .Single(file => file.RelativePath == "components/idempotency-service.yaml").Content;
+
+        // Assert
+        Assert.Contains("kind: HTTPEndpoint", yaml, StringComparison.Ordinal);
+        Assert.Contains("baseUrl: \"http://localhost:8585/rest/Idempotency%20Service/1.0%2Frc\"", yaml, StringComparison.Ordinal);
+        Assert.Contains("- \"extractor\"", yaml, StringComparison.Ordinal);
+        Assert.Contains("- \"loader\"", yaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Generate_ShouldBeDeterministic()
     {
         // Act

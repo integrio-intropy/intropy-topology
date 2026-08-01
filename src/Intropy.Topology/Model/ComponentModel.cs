@@ -26,4 +26,7 @@ public sealed record ComponentModel
 
     /// <summary>Connectors the component uses (explicit From/To usage).</summary>
     public required IReadOnlyList<ConnectorEdge> Connectors { get; init; }
+
+    /// <summary>External platform-service app IDs the component invokes.</summary>
+    public required IReadOnlyList<string> Uses { get; init; }
 }

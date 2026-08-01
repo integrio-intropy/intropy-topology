@@ -12,9 +12,13 @@ public sealed class OrderFlowSystem : ISystemDefinition
         builder.AddExtractor("order-extractor")
             .From(Connectors.OrderExtractorSource)
             .Publishes(Topics.Orders)
+            .Uses(Services.Idempotency)
+            .Uses(Services.BusinessIncidents)
             .WithSchedule("* * * * *");
         builder.AddLoader("order-loader")
             .Subscribes(Topics.Orders)
-            .To(Connectors.OrderLoaderDestination);
+            .To(Connectors.OrderLoaderDestination)
+            .Uses(Services.Idempotency)
+            .Uses(Services.BusinessIncidents);
     }
 }

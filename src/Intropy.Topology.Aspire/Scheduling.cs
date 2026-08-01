@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace Intropy.Topology.Aspire;
 
 /// <summary>A component the scheduler re-runs: its resource name and cron expression.</summary>
-internal sealed record ScheduledComponent(string Name, string Cron);
+internal sealed record ScheduledComponent(string Name, string Cron, IReadOnlyList<string>? Uses = null);
 
 /// <summary>
 /// The scheduler's view of the Aspire resource model: last known states plus start/wait
@@ -99,7 +99,8 @@ internal sealed class ComponentScheduler(
     IReadOnlyList<ScheduledComponent> components,
     IResourceLifecycle lifecycle,
     TimeProvider timeProvider,
-    ILogger<ComponentScheduler> logger) : BackgroundService
+    ILogger<ComponentScheduler> logger,
+    MockReadiness? mockReadiness = null) : BackgroundService
 {
     private static readonly TimeSpan s_sidecarReadyTimeout = TimeSpan.FromMinutes(3);
 
@@ -130,6 +131,12 @@ internal sealed class ComponentScheduler(
 
         try
         {
+            if (mockReadiness is not null)
+            {
+                var uses = components.SingleOrDefault(candidate => candidate.Name == component)?.Uses ?? [];
+                await mockReadiness.WaitForAsync(uses, TimeSpan.FromMinutes(3), cancellationToken).ConfigureAwait(false);
+            }
+
             if (!lifecycle.IsStartable(component))
             {
                 logger.LogWarning(

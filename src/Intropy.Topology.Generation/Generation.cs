@@ -56,9 +56,15 @@ public static class TopologyGenerator
     /// <summary>Generates the artifacts for a topology.</summary>
     /// <param name="topology">The validated topology.</param>
     /// <returns>The generated artifacts.</returns>
-    public static GeneratedArtifacts Generate(SystemTopology topology)
+    public static GeneratedArtifacts Generate(SystemTopology topology) => Generate(topology, new DevelopmentManifest([]));
+
+    /// <summary>Generates local artifacts, including validated development mock endpoints when declared.</summary>
+    /// <param name="topology">The validated topology.</param>
+    /// <param name="development">The optional validated development substitutions.</param>
+    public static GeneratedArtifacts Generate(SystemTopology topology, DevelopmentManifest development)
     {
         ArgumentNullException.ThrowIfNull(topology);
+        ArgumentNullException.ThrowIfNull(development);
         var files = new List<GeneratedFile>();
 
         foreach (var topic in topology.Topics.Select(t => t.PubSubName).Distinct(StringComparer.Ordinal))
@@ -69,6 +75,12 @@ public static class TopologyGenerator
         foreach (var connector in topology.Connectors)
         {
             files.Add(BindingComponent(connector));
+        }
+
+        foreach (var mock in development.Mocks)
+        {
+            var service = topology.Services.Single(service => service.AppId == mock.AppId);
+            files.Add(HttpEndpoint(mock, service));
         }
 
         foreach (var component in topology.Components)
@@ -112,6 +124,12 @@ public static class TopologyGenerator
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{connector.DaprComponentName}.yaml", yaml);
     }
 
+    private static GeneratedFile HttpEndpoint(OpenApiMock mock, ServiceResource service)
+    {
+        var yaml = DaprYaml.HttpEndpoint(mock.AppId, mock.BaseUri.AbsoluteUri, service.Consumers);
+        return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{mock.AppId}.yaml", yaml);
+    }
+
     private static GeneratedFile ComponentConfig(string systemName, ComponentModel component)
     {
         var config = new
@@ -130,6 +148,7 @@ public static class TopologyGenerator
                     Direction = c.Direction.ToString(),
                     DaprComponent = $"binding.{c.ConnectorName}",
                 }),
+                Uses = component.Uses,
             },
         };
 
@@ -141,6 +160,24 @@ public static class TopologyGenerator
 /// <summary>Minimal, deterministic emitter for Dapr <c>Component</c> YAML.</summary>
 internal static class DaprYaml
 {
+    public static string HttpEndpoint(string name, string baseUrl, IEnumerable<string> scopes)
+    {
+        var sb = new StringBuilder();
+        sb.Append("apiVersion: dapr.io/v1alpha1\n");
+        sb.Append("kind: HTTPEndpoint\n");
+        sb.Append("metadata:\n");
+        sb.Append("  name: ").Append(Quote(name)).Append('\n');
+        sb.Append("spec:\n");
+        sb.Append("  baseUrl: ").Append(Quote(baseUrl)).Append('\n');
+        sb.Append("scopes:\n");
+        foreach (var scope in scopes.OrderBy(scope => scope, StringComparer.Ordinal))
+        {
+            sb.Append("- ").Append(Quote(scope)).Append('\n');
+        }
+
+        return sb.ToString();
+    }
+
     public static string Component(
         string name,
         string type,

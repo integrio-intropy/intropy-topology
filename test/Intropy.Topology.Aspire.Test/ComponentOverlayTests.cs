@@ -69,6 +69,31 @@ public sealed class ComponentOverlayTests : IDisposable
     }
 
     [Fact]
+    public void Stage_ShouldOnlyCopyGeneratedHttpEndpointToItsConsumers()
+    {
+        // Arrange
+        var dir = Directory.CreateDirectory(Path.Combine(_workspace, "generated", "components")).FullName;
+        File.WriteAllText(Path.Combine(dir, "idempotency-service.yaml"), """
+            apiVersion: dapr.io/v1alpha1
+            kind: HTTPEndpoint
+            metadata:
+              name: idempotency-service
+            spec:
+              baseUrl: http://localhost:8585/rest/Idempotency/1
+            scopes:
+            - order-extractor
+            """);
+
+        // Act
+        var consumer = ComponentOverlay.Stage(AppHostDir, "order-extractor", dir);
+        var nonConsumer = ComponentOverlay.Stage(AppHostDir, "order-loader", dir);
+
+        // Assert
+        Assert.Single(Directory.GetFiles(consumer));
+        Assert.Empty(Directory.GetFiles(nonConsumer));
+    }
+
+    [Fact]
     public void Stage_CalledAgain_ShouldDropFilesFromThePreviousRun()
     {
         // Arrange — a first staging leaves a file behind that the next topology no longer has.

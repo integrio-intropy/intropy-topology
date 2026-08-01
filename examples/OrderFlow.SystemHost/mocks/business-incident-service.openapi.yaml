@@ -1,0 +1,16 @@
+openapi: 3.0.3
+info:
+  title: Business Incident Service
+  version: 1.0.0
+paths:
+  /events:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/cloudevents+json:
+            schema:
+              type: object
+      responses:
+        '202':
+          description: Event accepted.

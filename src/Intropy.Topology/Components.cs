@@ -15,6 +15,7 @@ public abstract class Component
     private readonly List<TopicRef> _subscribes = [];
     private readonly List<(string Port, TopicRef Topic)> _publishes = [];
     private readonly List<(ConnectorRef Connector, ConnectorDirection Direction)> _connectors = [];
+    private readonly List<ServiceRef> _services = [];
 
     private protected Component(string name, ComponentKind kind)
     {
@@ -39,6 +40,8 @@ public abstract class Component
 
     internal IReadOnlyList<(ConnectorRef Connector, ConnectorDirection Direction)> ConnectorCalls => _connectors;
 
+    internal IReadOnlyList<ServiceRef> ServiceCalls => _services;
+
     internal void AddSubscribe(TopicRef topic)
     {
         ArgumentNullException.ThrowIfNull(topic);
@@ -55,6 +58,12 @@ public abstract class Component
     {
         ArgumentNullException.ThrowIfNull(connector);
         _connectors.Add((connector, direction));
+    }
+
+    internal void AddService(ServiceRef service)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        _services.Add(service);
     }
 
     internal void SetSchedule(string cron)

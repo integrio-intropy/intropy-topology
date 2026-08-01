@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Intropy.Topology\Intropy.Topology.csproj" />
+    <PackageReference Include="Microsoft.OpenApi" />
+    <PackageReference Include="Microsoft.OpenApi.YamlReader" />
   </ItemGroup>
 
 </Project>

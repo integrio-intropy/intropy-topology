@@ -24,6 +24,16 @@ public sealed record TopicResource
     public required IReadOnlyList<string> Subscribers { get; init; }
 }
 
+/// <summary>An external platform service materialized from component usage.</summary>
+public sealed record ServiceResource
+{
+    /// <summary>The Dapr app ID callers invoke.</summary>
+    public required string AppId { get; init; }
+
+    /// <summary>Names of components invoking this service, sorted ordinally.</summary>
+    public required IReadOnlyList<string> Consumers { get; init; }
+}
+
 /// <summary>A system-owned connector materialized from usage.</summary>
 public sealed record ConnectorResource
 {

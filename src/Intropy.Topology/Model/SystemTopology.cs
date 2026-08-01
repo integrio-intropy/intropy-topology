@@ -18,4 +18,7 @@ public sealed record SystemTopology
 
     /// <summary>Connectors materialized from connector usage.</summary>
     public required IReadOnlyList<ConnectorResource> Connectors { get; init; }
+
+    /// <summary>External platform services materialized from component usage.</summary>
+    public required IReadOnlyList<ServiceResource> Services { get; init; }
 }

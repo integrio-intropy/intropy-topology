@@ -43,6 +43,14 @@ public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, Extrac
         return this;
     }
 
+    /// <summary>Declares that the extractor invokes an external platform service.</summary>
+    /// <param name="service">The Dapr app identity invoked by the extractor.</param>
+    public ExtractorBuilder Uses(ServiceRef service)
+    {
+        Component.AddService(service);
+        return this;
+    }
+
     /// <summary>Declares that the extractor is activated on a cron schedule (standard
     /// five-field cron or a macro such as <c>@daily</c>). Without a schedule the
     /// extractor runs once at host start. Syntax is validated at
@@ -77,6 +85,14 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
         Component.AddConnector(connector, ConnectorDirection.Out);
         return this;
     }
+
+    /// <summary>Declares that the loader invokes an external platform service.</summary>
+    /// <param name="service">The Dapr app identity invoked by the loader.</param>
+    public LoaderBuilder Uses(ServiceRef service)
+    {
+        Component.AddService(service);
+        return this;
+    }
 }
 
 /// <summary>Fluent builder for a transactional integration: a synchronous block that
@@ -100,6 +116,14 @@ public sealed class TransactionalIntegrationBuilder
     public TransactionalIntegrationBuilder To(ConnectorRef connector)
     {
         Component.AddConnector(connector, ConnectorDirection.Out);
+        return this;
+    }
+
+    /// <summary>Declares that the integration invokes an external platform service.</summary>
+    /// <param name="service">The Dapr app identity invoked by the integration.</param>
+    public TransactionalIntegrationBuilder Uses(ServiceRef service)
+    {
+        Component.AddService(service);
         return this;
     }
 }
