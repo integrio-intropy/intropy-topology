@@ -1,0 +1,21 @@
+I like the definition of a gateway in this blog post: https://www.uber.com/us/en/blog/microservice-architecture/ their "domain" is quite close to our "system". We should not change any code but would you think it would be a good idea to change the meaning of an api in th DSL to something more similar? You could assign a contract to it in a similar way we do with idempotency-service and business-incident-service mock in cases where the api is either http or asyncapi
+
+---
+
+Yes draft a design doc and you can ignore all ADRs. We should have deleted them already so if ADR 009 blocks you, ignore it
+
+---
+
+retry
+
+---
+
+Can you print the plan here?
+
+---
+
+I agree on Open question #1, #2, and #3
+
+---
+
+Can you implement this on a new branch off main?
