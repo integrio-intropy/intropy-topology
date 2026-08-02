@@ -3,7 +3,7 @@
   "checkpoint_id": "85cc13fd9ca8",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 6,
+  "checkpoints_count": 7,
   "files_touched": [
     "src/Intropy.Topology.Generation/AssemblyInfo.cs"
   ],
@@ -14,13 +14,20 @@
       "compact_transcript": "/85/cc13fd9ca8/0/transcript.jsonl",
       "content_hash": "/85/cc13fd9ca8/0/content_hash.txt",
       "prompt": "/85/cc13fd9ca8/0/prompt.txt"
+    },
+    {
+      "metadata": "/85/cc13fd9ca8/1/metadata.json",
+      "transcript": "/85/cc13fd9ca8/1/full.jsonl",
+      "compact_transcript": "/85/cc13fd9ca8/1/transcript.jsonl",
+      "content_hash": "/85/cc13fd9ca8/1/content_hash.txt",
+      "prompt": "/85/cc13fd9ca8/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 205876,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 3426304,
-    "output_tokens": 17338,
-    "api_call_count": 52
+    "input_tokens": 205912,
+    "cache_creation_tokens": 41534,
+    "cache_read_tokens": 4355763,
+    "output_tokens": 29096,
+    "api_call_count": 71
   }
 }

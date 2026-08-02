@@ -1,0 +1,1 @@
+I dont like the use of InternalsVisibleTo. Isnt that a sign that you have bad abstractions?
