@@ -1,0 +1,5 @@
+Can you publish this to the local nuget feed?
+
+---
+
+can you package it as 0.3.0?
