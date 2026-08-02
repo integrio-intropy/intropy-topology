@@ -1,0 +1,14 @@
+I am struggling when using the berget provider. It works for a few minutes. Then I get throttled
+ Error: OAuth refresh failed for berget: Token refresh failed: 429
+ {"error":{"code":"RATE_LIMIT_EXCEEDED","message":"Too many authentication
+ attempts, please try again later","type":"rate_limit_exceeded"}}
+
+It seems to be the authentication and not the model usage. Is there something in my harness that doesnt cache the token or what can be done?
+
+---
+
+I got stuck in the retry loop on the berget provider again. Can you continue the work?
+
+---
+
+I dont want you to make any issues or prs or anything. Just answer my questions. What would be the suggested fix to berget if they should fix it on their side?
