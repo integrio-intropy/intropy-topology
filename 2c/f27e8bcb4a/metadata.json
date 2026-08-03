@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "2cf27e8bcb4a",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 79,
+  "files_touched": [
+    "src/Intropy.Topology.Generation/Generation.cs",
+    "src/Intropy.Topology/Refs.cs",
+    "src/Intropy.Topology/Validation/Rules/TopicAndConnectorRules.cs",
+    "src/Intropy.Topology/Validation/TopologyRules.cs",
+    "test/Intropy.Topology.Generation.Test/TopologyGeneratorTests.cs",
+    "test/Intropy.Topology.Test/RefTests.cs",
+    "test/Intropy.Topology.Test/Validation/RuleTests.cs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/2c/f27e8bcb4a/0/metadata.json",
+      "transcript": "/2c/f27e8bcb4a/0/full.jsonl",
+      "compact_transcript": "/2c/f27e8bcb4a/0/transcript.jsonl",
+      "content_hash": "/2c/f27e8bcb4a/0/content_hash.txt",
+      "prompt": "/2c/f27e8bcb4a/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 143946,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 7368832,
+    "output_tokens": 44322,
+    "api_call_count": 180
+  }
+}
