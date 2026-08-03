@@ -168,6 +168,24 @@ public class TopologyGeneratorTests
             second.Files.Select(f => (f.RelativePath, f.Content)));
     }
 
+    [Fact]
+    public void Generate_WithDefaultTransportConnector_ShouldThrow()
+    {
+        // Arrange — a connector using the placeholder default transport should not reach generation
+        var topic = TopicRef<string>.Define("orders", "created");
+#pragma warning disable CS0618
+        var connector = ConnectorRef.Define("placeholder", Transport.Default());
+#pragma warning restore CS0618
+        var builder = SystemBuilder.Create("orders");
+        builder.AddExtractor("extractor").From(connector).Publishes(topic);
+        builder.AddLoader("loader").Subscribes(topic);
+
+        // Act & Assert — TopologyRules should reject Default, but Generate guards as belt-and-suspenders
+        // The builder's Build() runs validation, so the default transport rule catches it first.
+        var exception = Assert.Throws<TopologyValidationException>(() => builder.Build());
+        Assert.Contains("placeholder default transport", exception.Message, StringComparison.Ordinal);
+    }
+
     private static string Content(string relativePath)
     {
         var artifacts = TopologyGenerator.Generate(s_topology, s_development);

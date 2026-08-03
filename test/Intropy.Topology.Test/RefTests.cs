@@ -73,6 +73,38 @@ public class TransportTests
         Assert.Equal(Transport.Sftp(), transport);
     }
 
+    [Fact]
+    public void Default_ShouldExposeEmptyDaprTypeBothCapabilities()
+    {
+        // Act
+        #pragma warning disable CS0618
+        var transport = Transport.Default();
+        #pragma warning restore CS0618
+
+        // Assert
+        Assert.IsType<DefaultTransport>(transport);
+        Assert.Equal("", transport.DaprType);
+        Assert.True(transport.SupportsInput);
+        Assert.True(transport.SupportsOutput);
+    }
+
+    [Fact]
+    public void Default_ShouldRoundTripThroughTransportPolymorphicSerialization()
+    {
+        // Arrange
+        #pragma warning disable CS0618
+        var expected = Transport.Default();
+        #pragma warning restore CS0618
+
+        // Act
+        var json = System.Text.Json.JsonSerializer.Serialize<Transport>(expected);
+        var transport = System.Text.Json.JsonSerializer.Deserialize<Transport>(json);
+
+        // Assert
+        Assert.Equal("{\"$transport\":\"default\",\"DaprType\":\"\"}", json);
+        Assert.Equal(expected, transport);
+    }
+
 }
 
 public class TopicRefTests

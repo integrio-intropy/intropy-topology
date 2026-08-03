@@ -111,6 +111,7 @@ public sealed record ConnectorRef
 /// </summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$transport")]
 [JsonDerivedType(typeof(SftpTransport), "sftp")]
+[JsonDerivedType(typeof(DefaultTransport), "default")]
 public abstract record Transport
 {
     private protected Transport()
@@ -133,6 +134,16 @@ public abstract record Transport
     /// credentials, and path are supplied by deployment configuration.
     /// </summary>
     public static Transport Sftp() => new SftpTransport();
+
+    /// <summary>
+    /// Placeholder transport for scaffolded connectors whose deployed shape is not yet
+    /// chosen. Compiles and passes capability checks so a freshly scaffolded system builds,
+    /// but <c>task check</c> rejects it and <c>task generate</c> refuses to emit a Dapr
+    /// component for it — replace with a concrete transport (e.g. <see cref="Sftp"/>)
+    /// before deployment.
+    /// </summary>
+    [Obsolete("Connector uses the placeholder default transport — replace with a concrete transport (e.g. Transport.Sftp()) before deployment.")]
+    public static Transport Default() => new DefaultTransport();
 }
 
 /// <summary>
@@ -143,6 +154,26 @@ public sealed record SftpTransport : Transport
 {
     /// <inheritdoc />
     public override string DaprType => "bindings.sftp";
+
+    /// <inheritdoc />
+    [JsonIgnore]
+    public override bool SupportsInput => true;
+
+    /// <inheritdoc />
+    [JsonIgnore]
+    public override bool SupportsOutput => true;
+}
+
+/// <summary>
+/// Placeholder transport: no real Dapr binding type. A scaffolded connector starts here
+/// so the system compiles immediately; <c>task check</c> rejects it and <c>task generate</c>
+/// refuses to emit a component for it. The developer replaces it with a concrete transport
+/// (e.g. <see cref="SftpTransport"/>) before deployment.
+/// </summary>
+public sealed record DefaultTransport : Transport
+{
+    /// <inheritdoc />
+    public override string DaprType => "";
 
     /// <inheritdoc />
     [JsonIgnore]

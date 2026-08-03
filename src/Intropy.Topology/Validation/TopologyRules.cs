@@ -14,6 +14,7 @@ internal static class TopologyRules
         new Rules.TopicContractConflictRule(),
         new Rules.ConnectorConflictRule(),
         new Rules.ConnectorTransportCapabilityRule(),
+        new Rules.ConnectorDefaultTransportRule(),
         new Rules.MissingRequiredOutputRule(),
         new Rules.MissingRequiredSubscriptionRule(),
         new Rules.ScheduleExpressionRule(),

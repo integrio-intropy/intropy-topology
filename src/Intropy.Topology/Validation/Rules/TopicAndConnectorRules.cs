@@ -147,3 +147,28 @@ internal sealed class ConnectorTransportCapabilityRule : ITopologyRule
     private static bool Supports(Intropy.Topology.Model.ConnectorDirection direction, Transport transport) =>
         direction == Intropy.Topology.Model.ConnectorDirection.In ? transport.SupportsInput : transport.SupportsOutput;
 }
+
+/// <summary>
+/// A connector must not keep the placeholder <see cref="Transport.Default"/> transport.
+/// The default compiles and passes capability checks so a freshly scaffolded system builds,
+/// but <c>task check</c> rejects it and <c>task generate</c> refuses to emit a Dapr component.
+/// </summary>
+internal sealed class ConnectorDefaultTransportRule : ITopologyRule
+{
+    public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
+    {
+        foreach (var component in context.Builder.Components)
+        {
+            foreach (var (connector, _) in component.ConnectorCalls)
+            {
+                if (connector.Transport is DefaultTransport)
+                {
+                    yield return new TopologyDiagnostic(
+                        DiagnosticSeverity.Error,
+                        $"The connector '{connector.Name}' still uses the placeholder default transport — replace it with a concrete transport (e.g. Transport.Sftp()) before deployment.",
+                        connector.Name);
+                }
+            }
+        }
+    }
+}

@@ -69,6 +69,11 @@ public static class TopologyGenerator
 
         foreach (var connector in topology.Connectors)
         {
+            if (string.IsNullOrEmpty(connector.Transport.DaprType))
+            {
+                throw new InvalidOperationException($"Connector '{connector.Name}' uses the placeholder default transport — replace it with a concrete transport before generating Dapr components.");
+            }
+
             var resolution = development.Files.SingleOrDefault(file => file.ConnectorName == connector.Name);
             if (resolution is null)
             {
