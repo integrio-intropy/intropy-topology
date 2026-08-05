@@ -211,12 +211,10 @@ public class ConnectorTransportCapabilityRuleTests
 public class ConnectorDefaultTransportRuleTests
 {
     [Fact]
-    public void Validate_WithDefaultTransport_ShouldReportError()
+    public void Validate_WithDefaultTransport_ShouldReportWarning()
     {
         // Arrange
-#pragma warning disable CS0618
         var connector = ConnectorRef.Define("placeholder", Transport.Default());
-#pragma warning restore CS0618
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor").From(connector).Publishes(TestTopics.Raw);
         s.AddLoader("sink").Subscribes(TestTopics.Raw);
@@ -225,10 +223,11 @@ public class ConnectorDefaultTransportRuleTests
         var diagnostic = Assert.Single(s.DiagnosticsFor<ConnectorDefaultTransportRule>());
 
         // Assert
-        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
         Assert.Equal("placeholder", diagnostic.Target);
         Assert.Contains("placeholder default transport", diagnostic.Message);
-        Assert.Throws<TopologyValidationException>(() => s.Build());
+        // Warning does not block the build — the system compiles and runs locally
+        Assert.NotNull(s.Build());
     }
 
     [Fact]

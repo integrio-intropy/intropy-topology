@@ -77,9 +77,7 @@ public class TransportTests
     public void Default_ShouldExposeEmptyDaprTypeBothCapabilities()
     {
         // Act
-        #pragma warning disable CS0618
         var transport = Transport.Default();
-        #pragma warning restore CS0618
 
         // Assert
         Assert.IsType<DefaultTransport>(transport);
@@ -92,9 +90,7 @@ public class TransportTests
     public void Default_ShouldRoundTripThroughTransportPolymorphicSerialization()
     {
         // Arrange
-        #pragma warning disable CS0618
         var expected = Transport.Default();
-        #pragma warning restore CS0618
 
         // Act
         var json = System.Text.Json.JsonSerializer.Serialize<Transport>(expected);

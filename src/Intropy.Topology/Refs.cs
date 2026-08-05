@@ -138,11 +138,11 @@ public abstract record Transport
     /// <summary>
     /// Placeholder transport for scaffolded connectors whose deployed shape is not yet
     /// chosen. Compiles and passes capability checks so a freshly scaffolded system builds,
-    /// but <c>task check</c> rejects it and <c>task generate</c> refuses to emit a Dapr
-    /// component for it — replace with a concrete transport (e.g. <see cref="Sftp"/>)
+    /// runs locally, and generates local artifacts (local runs resolve every connector to
+    /// localstorage regardless of transport); <c>task check</c> warns about it. Deployment
+    /// generation must refuse it — replace with a concrete transport (e.g. <see cref="Sftp"/>)
     /// before deployment.
     /// </summary>
-    [Obsolete("Connector uses the placeholder default transport — replace with a concrete transport (e.g. Transport.Sftp()) before deployment.")]
     public static Transport Default() => new DefaultTransport();
 }
 
@@ -166,9 +166,11 @@ public sealed record SftpTransport : Transport
 
 /// <summary>
 /// Placeholder transport: no real Dapr binding type. A scaffolded connector starts here
-/// so the system compiles immediately; <c>task check</c> rejects it and <c>task generate</c>
-/// refuses to emit a component for it. The developer replaces it with a concrete transport
-/// (e.g. <see cref="SftpTransport"/>) before deployment.
+/// so the system compiles and runs locally immediately — local runs resolve every
+/// connector to localstorage, so the declared transport is never consulted. <c>task
+/// check</c> warns about it, and deployment generation must refuse to emit a component
+/// for it. The developer replaces it with a concrete transport (e.g. <see cref="SftpTransport"/>)
+/// before deployment.
 /// </summary>
 public sealed record DefaultTransport : Transport
 {
