@@ -67,13 +67,11 @@ public static class TopologyGenerator
             files.Add(PubSubComponent(topic, topology));
         }
 
+        // Local runs resolve every connector to localstorage, so the declared transport is
+        // deliberately not consulted here: the placeholder default transport must not block
+        // F5. Deployment generation is where an unresolved transport must hard-fail.
         foreach (var connector in topology.Connectors)
         {
-            if (string.IsNullOrEmpty(connector.Transport.DaprType))
-            {
-                throw new InvalidOperationException($"Connector '{connector.Name}' uses the placeholder default transport — replace it with a concrete transport before generating Dapr components.");
-            }
-
             var resolution = development.Files.SingleOrDefault(file => file.ConnectorName == connector.Name);
             if (resolution is null)
             {

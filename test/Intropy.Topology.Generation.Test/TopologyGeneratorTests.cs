@@ -169,21 +169,26 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Generate_WithDefaultTransportConnector_ShouldThrow()
+    public void Generate_WithDefaultTransportConnector_ShouldEmitLocalstorageBinding()
     {
-        // Arrange — a connector using the placeholder default transport should not reach generation
+        // Arrange — the placeholder default transport warns at Build() but must not block
+        // local generation: dev resolves every connector to localstorage regardless of transport.
         var topic = TopicRef<string>.Define("orders", "created");
-#pragma warning disable CS0618
         var connector = ConnectorRef.Define("placeholder", Transport.Default());
-#pragma warning restore CS0618
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("extractor").From(connector).Publishes(topic);
         builder.AddLoader("loader").Subscribes(topic);
+        var topology = builder.Build();
+        var manifest = new DevelopmentManifest(
+            [],
+            [new ConnectorFileResolution("placeholder", "./test/placeholder")]);
 
-        // Act & Assert — TopologyRules should reject Default, but Generate guards as belt-and-suspenders
-        // The builder's Build() runs validation, so the default transport rule catches it first.
-        var exception = Assert.Throws<TopologyValidationException>(() => builder.Build());
-        Assert.Contains("placeholder default transport", exception.Message, StringComparison.Ordinal);
+        // Act
+        var artifacts = TopologyGenerator.Generate(topology, manifest);
+
+        // Assert
+        var yaml = artifacts.Files.Single(f => f.RelativePath == "components/binding.placeholder.yaml").Content;
+        Assert.Contains("type: \"bindings.localstorage\"", yaml, StringComparison.Ordinal);
     }
 
     private static string Content(string relativePath)
