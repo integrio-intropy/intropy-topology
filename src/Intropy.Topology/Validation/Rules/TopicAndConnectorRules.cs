@@ -149,9 +149,10 @@ internal sealed class ConnectorTransportCapabilityRule : ITopologyRule
 }
 
 /// <summary>
-/// A connector must not keep the placeholder <see cref="Transport.Default"/> transport.
-/// The default compiles and passes capability checks so a freshly scaffolded system builds,
-/// but <c>task check</c> rejects it and <c>task generate</c> refuses to emit a Dapr component.
+/// A connector should not keep the placeholder <see cref="Transport.Default"/> transport.
+/// The default compiles and passes capability checks so a freshly scaffolded system builds
+/// and runs locally — the placeholder must not block F5 — but it must be replaced before
+/// deployment, so the rule warns. Deployment generation is where it becomes an error.
 /// </summary>
 internal sealed class ConnectorDefaultTransportRule : ITopologyRule
 {
@@ -164,7 +165,7 @@ internal sealed class ConnectorDefaultTransportRule : ITopologyRule
                 if (connector.Transport is DefaultTransport)
                 {
                     yield return new TopologyDiagnostic(
-                        DiagnosticSeverity.Error,
+                        DiagnosticSeverity.Warning,
                         $"The connector '{connector.Name}' still uses the placeholder default transport — replace it with a concrete transport (e.g. Transport.Sftp()) before deployment.",
                         connector.Name);
                 }
