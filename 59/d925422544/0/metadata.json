@@ -1,0 +1,55 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "59d925422544",
+  "session_id": "019fd0eb-b836-7848-93cb-f3d49a585114",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-05T08:12:18.207785Z",
+  "branch": "fix/topic-completeness-warnings",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/Intropy.Topology/Validation/Rules/CompletenessRules.cs",
+    "test/Intropy.Topology.Test/Validation/RuleTests.cs",
+    "CLAUDE.md"
+  ],
+  "agent": "Pi",
+  "model": "moonshotai/Kimi-K3",
+  "turn_id": "5d99ea69d8cc",
+  "checkpoint_transcript_start": 75,
+  "transcript_lines_at_start": 75,
+  "compact_transcript_start": 32,
+  "token_usage": {
+    "input_tokens": 10460,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1231488,
+    "output_tokens": 5461,
+    "api_call_count": 29
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-05T08:12:18.188048Z",
+    "agent_lines": 19,
+    "agent_removed": 13,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 19,
+    "total_lines_changed": 32,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 754,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/designs/platform-service-development-mocks.md": 476,
+        "docs/designs/system-gateway-apis.md": 278
+      }
+    }
+  ]
+}

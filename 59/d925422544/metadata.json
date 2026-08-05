@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "59d925422544",
+  "strategy": "manual-commit",
+  "branch": "fix/topic-completeness-warnings",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "CLAUDE.md",
+    "src/Intropy.Topology/Validation/Rules/CompletenessRules.cs",
+    "test/Intropy.Topology.Test/Validation/RuleTests.cs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/59/d925422544/0/metadata.json",
+      "transcript": "/59/d925422544/0/full.jsonl",
+      "compact_transcript": "/59/d925422544/0/transcript.jsonl",
+      "content_hash": "/59/d925422544/0/content_hash.txt",
+      "prompt": "/59/d925422544/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 10460,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1231488,
+    "output_tokens": 5461,
+    "api_call_count": 29
+  }
+}

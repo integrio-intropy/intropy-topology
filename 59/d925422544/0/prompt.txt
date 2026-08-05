@@ -1,0 +1,9 @@
+yes
+
+---
+
+this is pushed to a local nuget feed. Can you push a new version of it?
+
+---
+
+I realised another thing. We have a validation rule that prevents you from publishing to a topic which is never consumed. For the same reason as the default transports I dont think that will hold. You want it to be true when you deploy but you also want to be able to run just an extractor if you havent created the loader yet
