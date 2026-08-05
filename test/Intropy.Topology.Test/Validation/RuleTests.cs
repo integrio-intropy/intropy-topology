@@ -317,9 +317,9 @@ public class MissingRequiredSubscriptionRuleTests
 public class UnconsumedTopicRuleTests
 {
     [Fact]
-    public void Validate_WithPublishedButUnsubscribedTopic_ShouldReportError()
+    public void Validate_WithPublishedButUnsubscribedTopic_ShouldReportWarning()
     {
-        // Arrange
+        // Arrange — the consumer may not exist yet; the system must still build and run locally
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor").Publishes(TestTopics.Raw);
 
@@ -327,9 +327,10 @@ public class UnconsumedTopicRuleTests
         var diagnostic = Assert.Single(s.DiagnosticsFor<UnconsumedTopicRule>());
 
         // Assert
+        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
         Assert.Equal("raw-events", diagnostic.Target);
         Assert.Contains("no component subscribes", diagnostic.Message);
-        Assert.Throws<TopologyValidationException>(() => s.Build());
+        Assert.NotNull(s.Build());
     }
 
     [Fact]
@@ -346,9 +347,9 @@ public class UnconsumedTopicRuleTests
 public class UnproducedTopicRuleTests
 {
     [Fact]
-    public void Validate_WithSubscribedButUnpublishedTopic_ShouldReportError()
+    public void Validate_WithSubscribedButUnpublishedTopic_ShouldReportWarning()
     {
-        // Arrange
+        // Arrange — the publisher may not exist yet; the system must still build and run locally
         var s = SystemBuilder.Create("test-system");
         s.AddLoader("loader").Subscribes(TestTopics.Raw);
 
@@ -356,9 +357,10 @@ public class UnproducedTopicRuleTests
         var diagnostic = Assert.Single(s.DiagnosticsFor<UnproducedTopicRule>());
 
         // Assert
+        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
         Assert.Equal("raw-events", diagnostic.Target);
         Assert.Contains("no component publishes", diagnostic.Message);
-        Assert.Throws<TopologyValidationException>(() => s.Build());
+        Assert.NotNull(s.Build());
     }
 
     [Fact]

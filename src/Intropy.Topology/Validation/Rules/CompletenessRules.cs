@@ -57,8 +57,10 @@ internal sealed class MissingRequiredSubscriptionRule : ITopologyRule
 }
 
 /// <summary>
-/// Every published topic must have a subscriber. A message published into the
-/// system with no consumer is a broken contract, not a fan-out reserve.
+/// Every published topic should have a subscriber. A message published into the
+/// system with no consumer is a broken contract, not a fan-out reserve — but the
+/// consumer may simply not exist yet, so the rule warns and local runs proceed.
+/// Deployment validation is where an unconsumed topic becomes an error.
 /// </summary>
 internal sealed class UnconsumedTopicRule : ITopologyRule
 {
@@ -67,7 +69,7 @@ internal sealed class UnconsumedTopicRule : ITopologyRule
         foreach (var topic in context.Topology.Topics.Where(t => t.Subscribers.Count == 0))
         {
             yield return new TopologyDiagnostic(
-                DiagnosticSeverity.Error,
+                DiagnosticSeverity.Warning,
                 $"The topic '{topic.TopicName}' on pubsub '{topic.PubSubName}' is published but no component subscribes to it.",
                 topic.TopicName);
         }
@@ -75,8 +77,10 @@ internal sealed class UnconsumedTopicRule : ITopologyRule
 }
 
 /// <summary>
-/// Every subscribed topic must have a publisher. A subscription nothing publishes
-/// to will never receive a message.
+/// Every subscribed topic should have a publisher. A subscription nothing publishes
+/// to will never receive a message — but the publisher may simply not exist yet,
+/// so the rule warns and local runs proceed. Deployment validation is where an
+/// unproduced topic becomes an error.
 /// </summary>
 internal sealed class UnproducedTopicRule : ITopologyRule
 {
@@ -85,7 +89,7 @@ internal sealed class UnproducedTopicRule : ITopologyRule
         foreach (var topic in context.Topology.Topics.Where(t => t.Publishers.Count == 0))
         {
             yield return new TopologyDiagnostic(
-                DiagnosticSeverity.Error,
+                DiagnosticSeverity.Warning,
                 $"The topic '{topic.TopicName}' on pubsub '{topic.PubSubName}' is subscribed to but no component publishes it.",
                 topic.TopicName);
         }
