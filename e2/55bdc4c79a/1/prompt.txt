@@ -1,0 +1,14 @@
+I realised another thing. We have a validation rule that prevents you from publishing to a topic which is never consumed. For the same reason as the default transports I dont think that will hold. You want it to be true when you deploy but you also want to be able to run just an extractor if you havent created the loader yet
+
+---
+
+yes
+
+---
+
+I actually think you should be able to print the graph even with the default transport
+
+---
+
+1. Try again and I will unlock
+2. I have stopped it
