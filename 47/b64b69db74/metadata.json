@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "47b64b69db74",
+  "strategy": "manual-commit",
+  "branch": "fix/default-transport-local-run",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "test/Intropy.Topology.Generation.Test/TopologyGeneratorTests.cs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/47/b64b69db74/0/metadata.json",
+      "transcript": "/47/b64b69db74/0/full.jsonl",
+      "compact_transcript": "/47/b64b69db74/0/transcript.jsonl",
+      "content_hash": "/47/b64b69db74/0/content_hash.txt",
+      "prompt": "/47/b64b69db74/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 38832,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 570816,
+    "output_tokens": 6516,
+    "api_call_count": 25
+  }
+}
