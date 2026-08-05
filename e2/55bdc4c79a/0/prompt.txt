@@ -1,0 +1,212 @@
+Do not implement anything yet. Is it possible to add a flag to the graph subcommand? I would like it to be possible to include dev settings in the serialized output
+
+---
+
+1. Yes flag definitely. 
+2. I want it to include where test files are read and written aswell. But perhaps that mandates that the local test paths move to dev settings aswell?
+
+We havent launched this so backwards compatibility is of no concern
+
+---
+
+GO ahead and make a plan. I think Transport.File() should be removed. I am not sure about the other open questions. Perhaps you can make a suggestion?
+
+---
+
+Start implementing on main, no PR
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+try again

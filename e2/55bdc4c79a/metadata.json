@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "e255bdc4c79a",
+  "strategy": "manual-commit",
+  "branch": "fix/graph-tolerates-wip-systems",
+  "checkpoints_count": 79,
+  "files_touched": [
+    "src/Intropy.Topology.Generation/IntropyGenerate.cs",
+    "test/Intropy.Topology.Generation.Test/IntropyGenerateTests.cs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/e2/55bdc4c79a/0/metadata.json",
+      "transcript": "/e2/55bdc4c79a/0/full.jsonl",
+      "compact_transcript": "/e2/55bdc4c79a/0/transcript.jsonl",
+      "content_hash": "/e2/55bdc4c79a/0/content_hash.txt",
+      "prompt": "/e2/55bdc4c79a/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 143946,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 7368832,
+    "output_tokens": 44322,
+    "api_call_count": 180
+  }
+}
