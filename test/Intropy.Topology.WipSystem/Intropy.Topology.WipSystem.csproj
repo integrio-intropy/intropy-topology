@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- Test fixture, not built by the solution: Intropy.Topology.Generation.Test compiles it
+         on demand to load a second ISystemDefinition assembly for the graph verb. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\src\Intropy.Topology.Generation\Intropy.Topology.Generation.csproj" />
+    </ItemGroup>
+
+</Project>

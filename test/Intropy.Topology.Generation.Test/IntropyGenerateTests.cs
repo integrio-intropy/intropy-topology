@@ -136,6 +136,39 @@ public class IntropyGenerateTests
     }
 
     [Fact]
+    public async Task RunAsync_Graph_WithDefaultTransport_ShouldEmitGraphAndWarn()
+    {
+        // Act
+        var (code, output, error) = await Capture(() => IntropyGenerate.RunAsync(WipSystemFixture.Assembly, ["graph"]));
+        using var json = JsonDocument.Parse(output);
+        var root = json.RootElement;
+        var connector = root.GetProperty("connectors").EnumerateArray()
+            .Single(c => c.GetProperty("name").GetString() == "placeholder");
+
+        // Assert — stdout stays pure JSON; the placeholder and the one-sided topic warn on stderr
+        Assert.Equal(0, code);
+        Assert.Equal("wip-system", root.GetProperty("system").GetString());
+        Assert.Equal("default", connector.GetProperty("transport").GetProperty("type").GetString());
+        Assert.Contains("warning: ", error, StringComparison.Ordinal);
+        Assert.Contains("placeholder default transport", error, StringComparison.Ordinal);
+        Assert.Contains("no component subscribes", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunAsync_Graph_WithDefaultTransportAndDevelopmentFlag_ShouldEmitDevelopmentSection()
+    {
+        // Act
+        var (code, output, _) = await Capture(() => IntropyGenerate.RunAsync(WipSystemFixture.Assembly, ["graph", "--development"]));
+        using var json = JsonDocument.Parse(output);
+        var files = json.RootElement.GetProperty("development").GetProperty("files").EnumerateArray().ToArray();
+
+        // Assert
+        Assert.Equal(0, code);
+        var placeholder = Assert.Single(files);
+        Assert.Equal("placeholder", placeholder.GetProperty("connector").GetString());
+    }
+
+    [Fact]
     public async Task RunAsync_UnknownVerb_ShouldReturnNonZero()
     {
         // Act

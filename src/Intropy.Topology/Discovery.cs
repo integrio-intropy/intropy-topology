@@ -42,6 +42,43 @@ public static class SystemDiscovery
 
     internal static DiscoveredSystem DiscoverFrom(string source, IReadOnlyList<Type> types)
     {
+        var (definition, builder) = Declare(source, types);
+        return new DiscoveredSystem(builder.Build(), definition);
+    }
+
+    /// <summary>
+    /// Discovery for read-only inspection (the <c>graph</c> verb): like <see cref="Discover"/>,
+    /// but warning-severity diagnostics do not fail — the materialized topology is returned
+    /// alongside them so a partially built system can still be inspected. Error-severity
+    /// violations still throw.
+    /// </summary>
+    /// <param name="assembly">The assembly to scan.</param>
+    /// <param name="diagnostics">All diagnostics found, including the tolerated warnings.</param>
+    /// <returns>The materialized topology and the definition instance.</returns>
+    /// <exception cref="InvalidOperationException">No definition, or more than one, was found.</exception>
+    /// <exception cref="TopologyValidationException">The declared topology has error-severity violations.</exception>
+    public static DiscoveredSystem DiscoverTolerant(Assembly assembly, out IReadOnlyList<TopologyDiagnostic> diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(assembly);
+        var (definition, builder) = Declare(assembly.GetName().Name ?? assembly.ToString(), assembly.GetTypes());
+        if (!builder.TryBuild(out var topology, out diagnostics))
+        {
+            throw new TopologyValidationException(diagnostics);
+        }
+
+        return new DiscoveredSystem(topology!, definition);
+    }
+
+    private static (ISystemDefinition Definition, SystemBuilder Builder) Declare(string source, IReadOnlyList<Type> types)
+    {
+        var definition = FindSingleDefinition(source, types);
+        var builder = SystemBuilder.Create(definition.SystemName);
+        definition.Define(builder);
+        return (definition, builder);
+    }
+
+    private static ISystemDefinition FindSingleDefinition(string source, IReadOnlyList<Type> types)
+    {
         var candidates = types
             .Where(t => t is { IsAbstract: false, IsInterface: false } && typeof(ISystemDefinition).IsAssignableFrom(t))
             .ToList();
@@ -59,9 +96,6 @@ public static class SystemDiscovery
                 $"{string.Join(", ", candidates.Select(t => t.FullName))}. Exactly one is required.");
         }
 
-        var definition = (ISystemDefinition)Activator.CreateInstance(candidates[0])!;
-        var builder = SystemBuilder.Create(definition.SystemName);
-        definition.Define(builder);
-        return new DiscoveredSystem(builder.Build(), definition);
+        return (ISystemDefinition)Activator.CreateInstance(candidates[0])!;
     }
 }
