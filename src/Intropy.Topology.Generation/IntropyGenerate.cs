@@ -58,7 +58,15 @@ public static class IntropyGenerate
     {
         try
         {
-            var topology = SystemDiscovery.Discover(assembly).Topology;
+            // Tolerant discovery: a partially built system (placeholder transports, one-sided
+            // topics) must still be inspectable. Warnings go to stderr so stdout stays pure JSON.
+            var topology = SystemDiscovery.DiscoverTolerant(assembly, out var diagnostics).Topology;
+            foreach (var diagnostic in diagnostics)
+            {
+                var severity = diagnostic.Severity == DiagnosticSeverity.Warning ? "warning" : "error";
+                Console.Error.WriteLine($"{severity}: {diagnostic.Message}");
+            }
+
             var development = args.Contains("--development", StringComparer.Ordinal)
                 ? DevelopmentDiscovery.Discover(assembly, topology, Directory.GetCurrentDirectory())
                 : null;
@@ -182,6 +190,7 @@ public static class IntropyGenerate
         public static GraphTransport From(Transport transport) => transport switch
         {
             SftpTransport => new("sftp", transport.SupportsInput, transport.SupportsOutput),
+            DefaultTransport => new("default", transport.SupportsInput, transport.SupportsOutput),
             _ => throw new InvalidOperationException($"Unsupported graph transport '{transport.GetType().Name}'."),
         };
     }
