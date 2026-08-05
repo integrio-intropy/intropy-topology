@@ -1,10 +1,1 @@
-As it is implement now we fail if the developers try to run a host if the real transport is not specified. See;
-Robins-MacBook-Pro orders/orderf/system-host on  main [$✘!?] ➜  task run                                                                                                                                                                                                                                                                                                                  09:53
-task: [run] dotnet run
-Using launch settings from /Users/robinhultman/dev/intropy/customers/entrovia/integrations/domains/orders/orderf/system-host/Properties/launchSettings.json...
-Building...
-error: Connector 'order-extractor-source' uses the placeholder default transport — replace it with a concrete transport before generating Dapr components.
-task: Failed to run task "run": exit status 1
-
-But running the host is part of testing the integration before release so that is not correct.
-Could you analyze what must be done and what the possible unintended consequences might be of not failing when the default transport is used?
+yes
