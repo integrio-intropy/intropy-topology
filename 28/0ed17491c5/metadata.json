@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "280ed17491c5",
+  "strategy": "manual-commit",
+  "branch": "chore/trust-only-minted-facts",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "docs/concepts/components.md",
+    "docs/concepts/topics.md",
+    "src/Intropy.Topology/Refs.cs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/28/0ed17491c5/0/metadata.json",
+      "transcript": "/28/0ed17491c5/0/full.jsonl",
+      "compact_transcript": "/28/0ed17491c5/0/transcript.jsonl",
+      "content_hash": "/28/0ed17491c5/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 2837,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 706304,
+    "output_tokens": 1424,
+    "api_call_count": 6
+  }
+}
