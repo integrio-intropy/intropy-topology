@@ -26,7 +26,7 @@ public static class Topics
 }
 ```
 
-Both the pubsub name and the topic name are DNS-1123 names, validated at `Define`.
+Both the pubsub name and the topic name are DNS-1123 names, validated at `Define`. The pubsub name is minted here: local runs materialize a pubsub component with exactly this name, and deployment configuration consumes it rather than maintaining its own copy.
 
 ## The contract type
 

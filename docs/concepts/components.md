@@ -47,6 +47,12 @@ s.AddExtractor("order-extractor")
 
 Component names are DNS-1123 labels, validated at the call site with an `ArgumentException` — they become Kubernetes resource names and Dapr app-ids.
 
+## Minted identities
+
+The names in the topology — component names, service app-ids, pubsub names, the derived binding names — are facts the topology *mints*: the local run backend materializes them, generated artifacts carry them, and deployment honors them. They are not copies of deployment configuration, so they cannot drift from it; breaking one (renaming a deployed app-id without updating the topology) fails loudly at runtime. Deployment treats these names as owned by the topology, never as values to maintain a second copy of.
+
+One qualification: a `ServiceRef` app-id is unqualified, while Dapr service resolution in a cluster is namespace-scoped. The minted identity holds within the system's own namespace; invoking a service across namespaces would need qualified app-ids, which the model does not express today.
+
 ## What the compiler rejects
 
 ```csharp

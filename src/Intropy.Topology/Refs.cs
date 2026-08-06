@@ -51,8 +51,11 @@ public sealed record TopicRef<T> : TopicRef
 }
 
 /// <summary>
-/// Identifies a platform service by the Dapr app ID callers use. The service materializes
-/// from component usage; this reference neither owns nor deploys its provider.
+/// Identifies a platform service by the Dapr app ID callers use. The app ID is a minted
+/// identity: deployment honors it rather than maintaining its own copy. It is unqualified —
+/// Dapr service resolution in a cluster is namespace-scoped, so the identity holds within
+/// the system's own namespace. The service materializes from component usage; this reference
+/// neither owns nor deploys its provider.
 /// </summary>
 public sealed record ServiceRef
 {
