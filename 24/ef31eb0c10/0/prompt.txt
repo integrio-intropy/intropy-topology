@@ -1,0 +1,25 @@
+This is only an analysis task. Do not make any changes. 
+I wonder if we got carried away with everything we could capture in the topology. The schedule for example. There is a high chance that the developers over time change this in the gitops repo and the topology would have the wrong information. In that case no one will trust the topology. The whole point is that you should be able to trust it. 
+Can you look for more examples of this?
+
+---
+
+There is a point to some of the references when it comes to running the topology with aspire. I guess the app-ids are used there?
+
+---
+
+With this as the background make a plan of the changes you would do to this repo
+
+---
+
+launch a review agent for the plan with pi --print
+
+---
+
+I agree with Option A. This library isnt released yet so do not do PRs. Just make separate commits on a new branch.
+
+Will you update the plan?
+
+---
+
+ok implement the plan
