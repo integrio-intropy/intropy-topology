@@ -12,9 +12,9 @@ dotnet add package Intropy.Topology
 
 ## Concepts
 
-- **Components** — extractors, aggregators, loaders, and transactional integrations, each declared through a builder that exposes only its legal edges. Illegal topology is a compile error, not a validation diagnostic.
-- **Edges** — the topology is the wiring *between* components: async topics (`Publishes`/`Subscribes`), sync APIs (`Provides`/`Consumes`), external connectors (`From`/`To`), and service uses — plus one activation attribute: an optional cron schedule (`WithSchedule`, extractors only). The rest of the workload shape lives in the component's scaffold.
-- **Refs** — `TopicRef<T>`, `ApiRef<T>`, `ConnectorRef`, `ServiceRef`, and `ExternalSystem` name the things components connect to. Resources materialize from usage — there is no `AddTopic`.
+- **Components** — extractors, loaders, and transactional integrations, each declared through a builder that exposes only its legal edges. Illegal topology is a compile error, not a validation diagnostic.
+- **Edges** — the topology is the wiring *between* components: async topics (`Publishes`/`Subscribes`), external connectors (`From`/`To`), and service uses. The rest of the workload shape, including activation, lives in the component's scaffold.
+- **Refs** — `TopicRef<T>`, `ConnectorRef`, and `ServiceRef` name the things components connect to. Resources materialize from usage — there is no `AddTopic`.
 - **Model** — `SystemTopology` is the immutable, deterministic output; `TopologyValidationException` carries every diagnostic when validation fails.
 
 ## Companion packages

@@ -1,8 +1,8 @@
 // A deliberately minimal run-to-completion extractor, mirroring the real scaffold's shape:
 // one sweep of work per run, then exit — and, like the scaffold's ExtractorRunner, it shuts
-// its Dapr sidecar down in a finally so the whole pair reaches a terminal state. The Aspire
-// run-backend's scheduler re-starts sidecar + app on every cron tick. The 15-second "work"
-// window is long enough to demo the skip-on-overlap warning via the "Run now" command.
+// its Dapr sidecar down in a finally so the whole pair reaches a terminal state. Activation
+// cadence (a deployed CronJob schedule, a local re-run loop) lives in the scaffold and
+// deployment configuration, not in the topology.
 
 var component = Environment.GetEnvironmentVariable("INTROPY__COMPONENT") ?? "unknown";
 var config = Environment.GetEnvironmentVariable("INTROPY__CONFIG");

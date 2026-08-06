@@ -114,7 +114,6 @@ internal static class TopologyMaterializer
         {
             Name = component.Name,
             Kind = component.Kind,
-            Schedule = component.ScheduleCall,
             Subscribes = subscribes,
             Publishes = publishes,
             Connectors = connectorEdges,

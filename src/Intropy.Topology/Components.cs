@@ -29,11 +29,6 @@ public abstract class Component
     /// <summary>The component's block kind.</summary>
     public ComponentKind Kind { get; }
 
-    /// <summary>The cron schedule recorded by <c>WithSchedule</c>; null when the component
-    /// runs once at host start. A later call replaces the value. Syntax is validated at
-    /// <see cref="SystemBuilder.Build"/>.</summary>
-    internal string? ScheduleCall { get; private set; }
-
     internal IReadOnlyList<TopicRef> SubscribeCalls => _subscribes;
 
     internal IReadOnlyList<(string Port, TopicRef Topic)> PublishCalls => _publishes;
@@ -64,12 +59,6 @@ public abstract class Component
     {
         ArgumentNullException.ThrowIfNull(service);
         _services.Add(service);
-    }
-
-    internal void SetSchedule(string cron)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(cron);
-        ScheduleCall = cron;
     }
 }
 

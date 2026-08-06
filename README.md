@@ -23,9 +23,8 @@ a validation diagnostic*; only what types cannot check (completeness and cross-c
 is validated at `Build()`.
 
 The topology records the edges **between** components — subscriptions, publishes, and connectors
-out to the outside world — plus one activation attribute: an optional cron schedule
-(`WithSchedule`, extractors only). Everything else about the workload shape lives in the
-component's own scaffold.
+out to the outside world. Everything about the workload shape, including activation (a cron
+schedule is deployment-owned configuration), lives in the component's own scaffold.
 
 ## Packages
 

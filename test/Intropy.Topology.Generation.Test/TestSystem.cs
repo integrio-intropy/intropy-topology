@@ -19,7 +19,7 @@ public sealed class OrderSystem : ISystemDefinition
 
     public void Define(SystemBuilder builder)
     {
-        builder.AddExtractor("order-extractor").From(Erp).Publishes(Raw).WithSchedule("*/5 * * * *");
+        builder.AddExtractor("order-extractor").From(Erp).Publishes(Raw);
         builder.AddLoader("order-loader").Subscribes(Raw).To(Webshop);
         builder.AddExtractor("fulfillment-extractor").Publishes(Fulfillment);
         builder.AddLoader("fulfillment-loader").Subscribes(Fulfillment);

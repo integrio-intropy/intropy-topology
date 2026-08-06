@@ -14,7 +14,6 @@ internal static class TopologyRules
         new Rules.TopicContractConflictRule(),
         new Rules.MissingRequiredOutputRule(),
         new Rules.MissingRequiredSubscriptionRule(),
-        new Rules.ScheduleExpressionRule(),
         new Rules.UnconsumedTopicRule(),
         new Rules.UnproducedTopicRule(),
         new Rules.NoEdgesRule(),

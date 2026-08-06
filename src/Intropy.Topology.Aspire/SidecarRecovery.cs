@@ -14,6 +14,83 @@ internal interface IResourceStateMonitor
     IAsyncEnumerable<ResourceStateUpdate> WatchAsync(CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// The recovery service's view of the Aspire resource model: last known states plus start/wait
+/// commands. A seam so behavior is unit-testable without DCP.
+/// </summary>
+internal interface IResourceLifecycle
+{
+    /// <summary>Maintains the last-known-state map; runs for the host's lifetime.</summary>
+    Task WatchAsync(CancellationToken cancellationToken);
+
+    /// <summary>Whether the resource can be started: never seen, or in a terminal state.
+    /// A non-terminal state means a run is still in progress.</summary>
+    bool IsStartable(string resourceName);
+
+    /// <summary>Executes a resource command; false when the command fails or is unavailable.</summary>
+    Task<bool> ExecuteAsync(string resourceName, string commandName, CancellationToken cancellationToken);
+
+    /// <summary>Waits for the resource to reach Running; false on timeout.</summary>
+    Task<bool> WaitUntilRunningAsync(string resourceName, TimeSpan timeout, CancellationToken cancellationToken);
+}
+
+/// <summary>Production <see cref="IResourceLifecycle"/> over the Aspire services.</summary>
+internal sealed class AspireResourceLifecycle(
+    ResourceCommandService commands,
+    ResourceNotificationService notifications) : IResourceLifecycle
+{
+    private readonly ConcurrentDictionary<string, string?> _states = new(StringComparer.Ordinal);
+
+    public async Task WatchAsync(CancellationToken cancellationToken)
+    {
+        await foreach (var evt in notifications.WatchAsync(cancellationToken).ConfigureAwait(false))
+        {
+            _states[evt.Resource.Name] = evt.Snapshot.State?.Text;
+        }
+    }
+
+    public bool IsStartable(string resourceName)
+    {
+        var state = _states.GetValueOrDefault(resourceName);
+        return state is null || KnownResourceStates.TerminalStates.Contains(state, StringComparer.Ordinal);
+    }
+
+    public async Task<bool> ExecuteAsync(string resourceName, string commandName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await commands
+                .ExecuteCommandAsync(resourceName, commandName, cancellationToken)
+                .ConfigureAwait(false);
+            return result.Success;
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Command unavailable in the resource's current state, or the resource is
+            // unknown — the caller decides whether to fall back or give up.
+            return false;
+        }
+    }
+
+    public async Task<bool> WaitUntilRunningAsync(
+        string resourceName, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(timeout);
+        try
+        {
+            await notifications
+                .WaitForResourceAsync(resourceName, KnownResourceStates.Running, deadline.Token)
+                .ConfigureAwait(false);
+            return true;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+    }
+}
+
 /// <summary>Production resource-state monitor over Aspire notifications.</summary>
 internal sealed class AspireResourceStateMonitor(ResourceNotificationService notifications) : IResourceStateMonitor
 {
@@ -41,14 +118,10 @@ internal static class DaprSidecarIdentity
     public static bool IsCli(string resourceName) => resourceName.EndsWith(CliSuffix, StringComparison.Ordinal);
 }
 
-/// <summary>Recovery configuration: which sidecars the scheduler owns and recovery must skip.</summary>
-internal sealed record DaprSidecarRecoveryOptions(IReadOnlySet<string> SchedulerOwnedSidecars);
-
 internal sealed class DaprSidecarRecovery(
     IResourceStateMonitor states,
     IResourceLifecycle lifecycle,
     IBackendReadiness backendReadiness,
-    DaprSidecarRecoveryOptions options,
     TimeProvider time,
     ILogger<DaprSidecarRecovery> logger) : BackgroundService
 {
@@ -57,8 +130,8 @@ internal sealed class DaprSidecarRecovery(
 
     // DCP reports an executable as Running the moment its process launches, not when it is
     // healthy — daprd lives ~1s before a fatal component-init exit. Only a stay in Running at
-    // least this long counts as having actually run; a scheduled sidecar that legitimately
-    // completes faster costs at most MaxAttemptsPerSidecar spurious restarts.
+    // least this long counts as having actually run; a sidecar that legitimately completes
+    // faster costs at most MaxAttemptsPerSidecar spurious restarts.
     private static readonly TimeSpan s_minHealthyRunningDuration = TimeSpan.FromSeconds(10);
 
     private readonly ConcurrentDictionary<string, int> _attempts = new(StringComparer.Ordinal);
@@ -87,14 +160,6 @@ internal sealed class DaprSidecarRecovery(
             return;
         }
 
-        // A scheduled component's sidecar is scheduler-owned: the run-to-completion block shuts
-        // its sidecar down after every run and the scheduler restarts it on the next tick,
-        // so its exits are lifecycle, not failure — however quick the run.
-        if (options.SchedulerOwnedSidecars.Contains(update.ResourceName))
-        {
-            return;
-        }
-
         if (string.Equals(update.State, KnownResourceStates.Running, StringComparison.Ordinal))
         {
             // Overwrite (not TryAdd): after a recovery restart the fresh instance's clock must
@@ -103,8 +168,8 @@ internal sealed class DaprSidecarRecovery(
             return;
         }
 
-        // A normal scheduled sidecar exits after its app completes — but only a sustained stay
-        // in Running proves that, so a component-init crash a moment after launch still recovers.
+        // Only a sustained stay in Running proves the sidecar initialized; a component-init
+        // crash a moment after launch must still recover.
         var ranHealthily = _runningSince.TryGetValue(update.ResourceName, out var since)
             && time.GetElapsedTime(since) >= s_minHealthyRunningDuration;
         var failedBeforeRunning = string.Equals(update.State, KnownResourceStates.Finished, StringComparison.Ordinal)

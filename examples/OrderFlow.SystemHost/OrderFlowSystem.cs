@@ -13,8 +13,7 @@ public sealed class OrderFlowSystem : ISystemDefinition
             .From(Connectors.OrderExtractorSource)
             .Publishes(Topics.Orders)
             .Uses(Services.Idempotency)
-            .Uses(Services.BusinessIncidents)
-            .WithSchedule("* * * * *");
+            .Uses(Services.BusinessIncidents);
         builder.AddLoader("order-loader")
             .Subscribes(Topics.Orders)
             .To(Connectors.OrderLoaderDestination)

@@ -39,7 +39,6 @@ A component's standalone Dapr resources live at `../<component>/local/dapr-compo
 - Redis backs development pub/sub. It is published at host port `6380` because generated Dapr resources target `localhost:6380`; `dapr init` commonly reserves Redis's default `6379`.
 - Components receive `INTROPY__COMPONENT` and `INTROPY__CONFIG` environment variables. The latter points to that component's generated `.intropy.json` file.
 - A publisher waits for its subscribers during startup when the topic graph is acyclic. Dapr sidecars also wait for Redis readiness before they start.
-- An extractor declared with `WithSchedule` runs once at AppHost startup and is re-run on its cron ticks. The dashboard provides a **Run now** command; overlapping runs are skipped.
 
 ## Prerequisites
 
