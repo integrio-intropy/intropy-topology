@@ -1,0 +1,45 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "7114bbd360f7",
+  "session_id": "019fbda8-6c96-7db4-8609-a41542de9d01",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-06T10:14:14.722141Z",
+  "branch": "chore/trust-only-minted-facts",
+  "checkpoints_count": 79,
+  "save_step_count": 1,
+  "files_touched": [
+    "Directory.Packages.props",
+    "examples/OrderFlow.SystemHost/OrderFlowSystem.cs",
+    "src/Intropy.Topology.Aspire/IntropyAspire.cs",
+    "src/Intropy.Topology.Aspire/Scheduling.cs",
+    "src/Intropy.Topology/Building/ComponentBuilders.cs",
+    "src/Intropy.Topology/Components.cs",
+    "src/Intropy.Topology/Model/ComponentModel.cs"
+  ],
+  "agent": "Pi",
+  "model": "moonshotai/Kimi-K3",
+  "turn_id": "27982e7ab3de",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 143946,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 7368832,
+    "output_tokens": 44322,
+    "api_call_count": 180
+  },
+  "session_metrics": {
+    "turn_count": 79
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-06T10:14:14.692162Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 112,
+    "human_removed": 234,
+    "total_committed": 0,
+    "total_lines_changed": 897,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}
