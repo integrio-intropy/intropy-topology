@@ -1,0 +1,61 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "7cc5b29d6703",
+  "session_id": "019fd658-0b19-7076-9a55-6180737d3e2b",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-06T10:02:37.0765Z",
+  "branch": "chore/trust-only-minted-facts",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "src/Intropy.Topology/Refs.cs",
+    "src/Intropy.Topology/Model/Resources.cs",
+    "src/Intropy.Topology/Building/TopologyMaterializer.cs",
+    "src/Intropy.Topology/Validation/Rules/TopicAndConnectorRules.cs",
+    "src/Intropy.Topology/Validation/TopologyRules.cs",
+    "src/Intropy.Topology.Generation/IntropyGenerate.cs",
+    "examples/OrderFlow.SystemHost/Connectors.cs",
+    "test/Intropy.Topology.Test/RefTests.cs",
+    "test/Intropy.Topology.Test/TestContracts.cs",
+    "test/Intropy.Topology.Test/Building/MaterializationTests.cs",
+    "test/Intropy.Topology.Test/Building/EndToEndTests.cs",
+    "test/Intropy.Topology.WipSystem/WipSystem.cs",
+    "test/Intropy.Topology.Generation.Test/IntropyGenerateTests.cs",
+    "test/Intropy.Topology.Test/Validation/RuleTests.cs",
+    "test/Intropy.Topology.Generation.Test/TopologyGeneratorTests.cs",
+    "docs/concepts/connectors.md",
+    "README.md",
+    "docs/getting-started.md",
+    "docs/concepts/materialization.md",
+    "docs/concepts/validation.md",
+    "docs/index.md",
+    "src/Intropy.Topology.Generation/README.md"
+  ],
+  "agent": "Pi",
+  "model": "moonshotai/Kimi-K3",
+  "turn_id": "8ec61018eba3",
+  "checkpoint_transcript_start": 75,
+  "transcript_lines_at_start": 75,
+  "compact_transcript_start": 34,
+  "token_usage": {
+    "input_tokens": 24739,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2634048,
+    "output_tokens": 15052,
+    "api_call_count": 39
+  },
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-06T10:02:37.034845Z",
+    "agent_lines": 86,
+    "agent_removed": 615,
+    "human_added": 6,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 92,
+    "total_lines_changed": 713,
+    "agent_percentage": 98.31697054698458,
+    "metric_version": 2
+  }
+}

@@ -3,17 +3,33 @@
   "checkpoint_id": "7cc5b29d6703",
   "strategy": "manual-commit",
   "branch": "chore/trust-only-minted-facts",
-  "checkpoints_count": 79,
+  "checkpoints_count": 84,
   "files_touched": [
+    "README.md",
+    "docs/concepts/connectors.md",
+    "docs/concepts/materialization.md",
+    "docs/concepts/validation.md",
+    "docs/getting-started.md",
+    "docs/index.md",
     "examples/OrderFlow.SystemHost/Connectors.cs",
+    "src/Intropy.Topology.Generation/IntropyGenerate.cs",
+    "src/Intropy.Topology.Generation/README.md",
     "src/Intropy.Topology/Building/TopologyMaterializer.cs",
     "src/Intropy.Topology/Model/Resources.cs",
+    "src/Intropy.Topology/Refs.cs",
+    "src/Intropy.Topology/Validation/Rules/TopicAndConnectorRules.cs",
+    "src/Intropy.Topology/Validation/TopologyRules.cs",
     "test/Intropy.Topology.Aspire.Test/IntropyAspireTests.cs",
     "test/Intropy.Topology.Generation.Test/DevelopmentTests.cs",
+    "test/Intropy.Topology.Generation.Test/IntropyGenerateTests.cs",
     "test/Intropy.Topology.Generation.Test/TestSystem.cs",
+    "test/Intropy.Topology.Generation.Test/TopologyGeneratorTests.cs",
     "test/Intropy.Topology.Test/Building/EndToEndTests.cs",
     "test/Intropy.Topology.Test/Building/MaterializationTests.cs",
-    "test/Intropy.Topology.Test/TestContracts.cs"
+    "test/Intropy.Topology.Test/RefTests.cs",
+    "test/Intropy.Topology.Test/TestContracts.cs",
+    "test/Intropy.Topology.Test/Validation/RuleTests.cs",
+    "test/Intropy.Topology.WipSystem/WipSystem.cs"
   ],
   "sessions": [
     {
@@ -22,13 +38,20 @@
       "compact_transcript": "/7c/c5b29d6703/0/transcript.jsonl",
       "content_hash": "/7c/c5b29d6703/0/content_hash.txt",
       "prompt": "/7c/c5b29d6703/0/prompt.txt"
+    },
+    {
+      "metadata": "/7c/c5b29d6703/1/metadata.json",
+      "transcript": "/7c/c5b29d6703/1/full.jsonl",
+      "compact_transcript": "/7c/c5b29d6703/1/transcript.jsonl",
+      "content_hash": "/7c/c5b29d6703/1/content_hash.txt",
+      "prompt": "/7c/c5b29d6703/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 143946,
+    "input_tokens": 168685,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 7368832,
-    "output_tokens": 44322,
-    "api_call_count": 180
+    "cache_read_tokens": 10002880,
+    "output_tokens": 59374,
+    "api_call_count": 219
   }
 }
