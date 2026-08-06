@@ -1,9 +1,11 @@
 {
   "cli_version": "0.8.42",
   "checkpoint_id": "7114bbd360f7",
+  "session_id": "019fd658-0b19-7076-9a55-6180737d3e2b",
   "strategy": "manual-commit",
+  "created_at": "2026-08-06T10:14:15.27874Z",
   "branch": "chore/trust-only-minted-facts",
-  "checkpoints_count": 84,
+  "checkpoints_count": 5,
   "files_touched": [
     "CLAUDE.md",
     "Directory.Packages.props",
@@ -36,27 +38,32 @@
     "test/Intropy.Topology.Test/Validation/CronValidatorTests.cs",
     "test/Intropy.Topology.Test/Validation/RuleTests.cs"
   ],
-  "sessions": [
-    {
-      "metadata": "/71/14bbd360f7/0/metadata.json",
-      "transcript": "/71/14bbd360f7/0/full.jsonl",
-      "compact_transcript": "/71/14bbd360f7/0/transcript.jsonl",
-      "content_hash": "/71/14bbd360f7/0/content_hash.txt",
-      "prompt": "/71/14bbd360f7/0/prompt.txt"
-    },
-    {
-      "metadata": "/71/14bbd360f7/1/metadata.json",
-      "transcript": "/71/14bbd360f7/1/full.jsonl",
-      "compact_transcript": "/71/14bbd360f7/1/transcript.jsonl",
-      "content_hash": "/71/14bbd360f7/1/content_hash.txt",
-      "prompt": ""
-    }
-  ],
+  "agent": "Pi",
+  "model": "moonshotai/Kimi-K3",
+  "turn_id": "8ec61018eba3",
+  "checkpoint_transcript_start": 165,
+  "transcript_lines_at_start": 165,
+  "compact_transcript_start": 73,
   "token_usage": {
-    "input_tokens": 165503,
+    "input_tokens": 21557,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 11117952,
-    "output_tokens": 58153,
-    "api_call_count": 217
+    "cache_read_tokens": 3749120,
+    "output_tokens": 13831,
+    "api_call_count": 37
+  },
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-06T10:14:15.230744Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 112,
+    "human_removed": 785,
+    "total_committed": 0,
+    "total_lines_changed": 897,
+    "agent_percentage": 0,
+    "metric_version": 2
   }
 }
