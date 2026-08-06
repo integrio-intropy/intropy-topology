@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Text.Json.Serialization;
 using Intropy.Topology.Validation;
 
 namespace Intropy.Topology;
@@ -52,8 +51,11 @@ public sealed record TopicRef<T> : TopicRef
 }
 
 /// <summary>
-/// Identifies a platform service by the Dapr app ID callers use. The service materializes
-/// from component usage; this reference neither owns nor deploys its provider.
+/// Identifies a platform service by the Dapr app ID callers use. The app ID is a minted
+/// identity: deployment honors it rather than maintaining its own copy. It is unqualified —
+/// Dapr service resolution in a cluster is namespace-scoped, so the identity holds within
+/// the system's own namespace. The service materializes from component usage; this reference
+/// neither owns nor deploys its provider.
 /// </summary>
 public sealed record ServiceRef
 {
@@ -70,13 +72,14 @@ public sealed record ServiceRef
 
 /// <summary>
 /// A connector — the named connection point between the system and the outside world.
-/// Every edge block reaches the outside world through a connector. Its declared transport is
-/// the deployed shape (value-free; connection values are environment-owned deployment
-/// configuration); local F5 runs substitute their own resolution via the development
-/// definition. The Dapr binding component's name is always derived
-/// (<c>binding.&lt;connector-name&gt;</c>), never declared. Connectors are declared in the
-/// SystemHost (typically a scaffolded <c>Connectors.cs</c>); they are system-owned and never
-/// shared across systems. Direction is not part of the identity — it follows from usage
+/// Every edge block reaches the outside world through a connector. The name is the whole
+/// identity: the Dapr binding component's name is always derived
+/// (<c>binding.&lt;connector-name&gt;</c>), never declared, and the binding's deployed
+/// <c>spec.type</c> (with its address and credentials) is environment-owned deployment
+/// configuration the topology deliberately does not repeat. Local F5 runs substitute their
+/// own resolution via the development definition. Connectors are declared in the SystemHost
+/// (typically a scaffolded <c>Connectors.cs</c>); they are system-owned and never shared
+/// across systems. Direction is not part of the identity — it follows from usage
 /// (<c>From</c> / <c>To</c>).
 /// </summary>
 public sealed record ConnectorRef
@@ -84,104 +87,12 @@ public sealed record ConnectorRef
     /// <summary>The connector's name (DNS-1123 label, e.g. <c>pim</c>).</summary>
     public string Name { get; }
 
-    /// <summary>The deployed transport shape — the kind of Dapr binding the connector materializes as after deployment.</summary>
-    public Transport Transport { get; }
+    private ConnectorRef(string name) => Name = name;
 
-    private ConnectorRef(string name, Transport transport)
-    {
-        Name = name;
-        Transport = transport;
-    }
-
-    /// <summary>Declares a connector with its deployed transport shape.</summary>
+    /// <summary>Declares a connector.</summary>
     /// <param name="name">The connector's name (DNS-1123 label).</param>
-    /// <param name="transport">The value-free deployed Dapr binding transport shape.</param>
     /// <exception cref="ArgumentException">The name is not a valid DNS-1123 label.</exception>
-    public static ConnectorRef Define([ConstantExpected] string name, Transport transport)
-    {
-        ArgumentNullException.ThrowIfNull(transport);
-        return new ConnectorRef(NameRules.RequireLabel(name, nameof(name)), transport);
-    }
+    public static ConnectorRef Define([ConstantExpected] string name) =>
+        new(NameRules.RequireLabel(name, nameof(name)));
 }
 
-/// <summary>
-/// The kind of Dapr binding a connector materializes as. All connectivity goes through
-/// Dapr — the transport selects the Dapr binding component's <c>spec.type</c>; it never
-/// bypasses Dapr. The component name is always derived: <c>binding.&lt;connector-name&gt;</c>.
-/// </summary>
-[JsonPolymorphic(TypeDiscriminatorPropertyName = "$transport")]
-[JsonDerivedType(typeof(SftpTransport), "sftp")]
-[JsonDerivedType(typeof(DefaultTransport), "default")]
-public abstract record Transport
-{
-    private protected Transport()
-    {
-    }
-
-    /// <summary>The Dapr binding component's <c>spec.type</c> (e.g. <c>bindings.localstorage</c>).</summary>
-    public abstract string DaprType { get; }
-
-    /// <summary>Whether the transport can provide input to a component through <c>From</c>.</summary>
-    [JsonIgnore]
-    public abstract bool SupportsInput { get; }
-
-    /// <summary>Whether the transport can accept component output through <c>To</c>.</summary>
-    [JsonIgnore]
-    public abstract bool SupportsOutput { get; }
-
-    /// <summary>
-    /// SFTP transport (<c>bindings.sftp</c>) for deployed environments. Its address,
-    /// credentials, and path are supplied by deployment configuration.
-    /// </summary>
-    public static Transport Sftp() => new SftpTransport();
-
-    /// <summary>
-    /// Placeholder transport for scaffolded connectors whose deployed shape is not yet
-    /// chosen. Compiles and passes capability checks so a freshly scaffolded system builds,
-    /// runs locally, and generates local artifacts (local runs resolve every connector to
-    /// localstorage regardless of transport); <c>task check</c> warns about it. Deployment
-    /// generation must refuse it — replace with a concrete transport (e.g. <see cref="Sftp"/>)
-    /// before deployment.
-    /// </summary>
-    public static Transport Default() => new DefaultTransport();
-}
-
-/// <summary>
-/// Value-free SFTP transport: a Dapr binding component of type <c>bindings.sftp</c>.
-/// Deployment configuration supplies its address, credentials, and path.
-/// </summary>
-public sealed record SftpTransport : Transport
-{
-    /// <inheritdoc />
-    public override string DaprType => "bindings.sftp";
-
-    /// <inheritdoc />
-    [JsonIgnore]
-    public override bool SupportsInput => true;
-
-    /// <inheritdoc />
-    [JsonIgnore]
-    public override bool SupportsOutput => true;
-}
-
-/// <summary>
-/// Placeholder transport: no real Dapr binding type. A scaffolded connector starts here
-/// so the system compiles and runs locally immediately — local runs resolve every
-/// connector to localstorage, so the declared transport is never consulted. <c>task
-/// check</c> warns about it, and deployment generation must refuse to emit a component
-/// for it. The developer replaces it with a concrete transport (e.g. <see cref="SftpTransport"/>)
-/// before deployment.
-/// </summary>
-public sealed record DefaultTransport : Transport
-{
-    /// <inheritdoc />
-    public override string DaprType => "";
-
-    /// <inheritdoc />
-    [JsonIgnore]
-    public override bool SupportsInput => true;
-
-    /// <inheritdoc />
-    [JsonIgnore]
-    public override bool SupportsOutput => true;
-}

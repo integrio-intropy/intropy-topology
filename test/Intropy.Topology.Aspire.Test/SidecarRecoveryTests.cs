@@ -59,10 +59,8 @@ public sealed class DaprSidecarRecoveryTests
     }
 
     private static DaprSidecarRecovery NewRecovery(
-        FakeLifecycle lifecycle, FakeBackendReadiness backendReadiness, TimeProvider? time = null,
-        params string[] schedulerOwnedSidecars) =>
+        FakeLifecycle lifecycle, FakeBackendReadiness backendReadiness, TimeProvider? time = null) =>
         new(new FakeStateMonitor(), lifecycle, backendReadiness,
-            new DaprSidecarRecoveryOptions(schedulerOwnedSidecars.ToHashSet(StringComparer.Ordinal)),
             time ?? TimeProvider.System, NullLogger<DaprSidecarRecovery>.Instance);
 
     [Fact]
@@ -128,30 +126,6 @@ public sealed class DaprSidecarRecoveryTests
     }
 
     [Fact]
-    public async Task HandleStateUpdateAsync_WhenSchedulerOwnedSidecarExitsQuickly_ShouldIgnoreIt()
-    {
-        // Arrange — a run-to-completion block shuts its sidecar down after every run, often
-        // well inside any healthy-duration window; the scheduler restarts it on the next tick.
-        var lifecycle = new FakeLifecycle();
-        var backendReadiness = new FakeBackendReadiness();
-        var time = new FakeTimeProvider();
-        var recovery = NewRecovery(lifecycle, backendReadiness, time, "order-extractor-dapr-cli");
-
-        // Act
-        await recovery.HandleStateUpdateAsync(
-            new ResourceStateUpdate("order-extractor-dapr-cli", KnownResourceStates.Running),
-            CancellationToken.None);
-        time.Advance(TimeSpan.FromSeconds(1));
-        await recovery.HandleStateUpdateAsync(
-            new ResourceStateUpdate("order-extractor-dapr-cli", KnownResourceStates.Finished),
-            CancellationToken.None);
-
-        // Assert
-        Assert.Equal(0, backendReadiness.WaitCalls);
-        Assert.Empty(lifecycle.Commands);
-    }
-
-    [Fact]
     public async Task HandleStateUpdateAsync_WhenNonSidecarFails_ShouldIgnoreIt()
     {
         // Arrange
@@ -192,7 +166,7 @@ public sealed class DaprSidecarRecoveryTests
     [Fact]
     public async Task HandleStateUpdateAsync_WhenSidecarRanThenFinished_ShouldNotRestartIt()
     {
-        // Arrange — scheduled sidecars finish normally after their run-to-completion app exits.
+        // Arrange — a sidecar that ran healthily and then finished needs no recovery.
         var lifecycle = new FakeLifecycle();
         var backendReadiness = new FakeBackendReadiness();
         var time = new FakeTimeProvider();

@@ -5,7 +5,7 @@ namespace Intropy.Topology.Generation.Test;
 
 public class DevelopmentBuilderTests
 {
-    private static readonly ConnectorRef s_connector = ConnectorRef.Define("erp", Transport.Sftp());
+    private static readonly ConnectorRef s_connector = ConnectorRef.Define("erp");
 
     private static SystemTopology TopologyWithConnector()
     {
@@ -38,7 +38,7 @@ public class DevelopmentBuilderTests
     {
         // Arrange
         var builder = new DevelopmentBuilder(TopologyWithConnector(), Directory.GetCurrentDirectory());
-        var unknown = ConnectorRef.Define("unknown", Transport.Sftp());
+        var unknown = ConnectorRef.Define("unknown");
 
         // Act & Assert
         var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Files(unknown));

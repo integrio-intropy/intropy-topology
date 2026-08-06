@@ -41,19 +41,16 @@ The system topology is invalid (2 error(s)):
 | Error | A component publishes at most one topic — more than one `Publishes` call is an error |
 | Error | A component must not subscribe to the same topic more than once |
 | Error | One topic must not be used with two different event contract types |
-| Error | One connector name must not be declared with two different transports |
-| Error | A declared deployed transport must support every direction the connector is used in |
 | Error | Extractors must publish (a loader's destination may stay a private local component) |
 | Error | Loaders subscribe to exactly one topic |
 | Error | A published topic must have a subscriber |
 | Error | A subscribed topic must have a publisher |
-| Error | A declared schedule must be valid five-field cron or a macro such as `@daily` |
 | Warning | A component with no edges (no subscriptions, publishes, or connectors) is likely unfinished |
 | Error | A pubsub name must not equal a connector's derived Dapr component name |
 
 ## Argument validation
 
-Name and argument invariants are enforced eagerly at the call site, not collected: component, topic, and connector names are DNS-1123 labels/subdomains and throw `ArgumentException` immediately when invalid, and `WithSchedule` throws for a null/whitespace expression. Only *semantic* topology validation is deferred to `Build()` — including cron syntax, so all diagnostics report at once.
+Name and argument invariants are enforced eagerly at the call site, not collected: component, topic, and connector names are DNS-1123 labels/subdomains and throw `ArgumentException` immediately when invalid. Only *semantic* topology validation is deferred to `Build()` so all diagnostics report at once.
 
 ## Related
 

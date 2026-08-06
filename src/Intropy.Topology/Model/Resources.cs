@@ -37,11 +37,8 @@ public sealed record ServiceResource
 /// <summary>A system-owned connector materialized from usage.</summary>
 public sealed record ConnectorResource
 {
-    /// <summary>The connector's name (DNS-1123 label).</summary>
+    /// <summary>The connector's name (DNS-1123 label) — its whole identity.</summary>
     public required string Name { get; init; }
-
-    /// <summary>The deployed transport shape — the kind of Dapr binding the connector materializes as after deployment.</summary>
-    public required Transport Transport { get; init; }
 
     /// <summary>The derived Dapr binding component name: <c>binding.&lt;connector-name&gt;</c>.</summary>
     public string DaprComponentName => $"binding.{Name}";

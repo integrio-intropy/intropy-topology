@@ -13,8 +13,7 @@ namespace Intropy.Topology.Aspire;
 
 /// <summary>
 /// Runs a discovered topology as a local Aspire application with Dapr sidecars. Components
-/// start subscribers before publishers when the topic graph is acyclic, and scheduled
-/// components run on their cron ticks.
+/// start subscribers before publishers when the topic graph is acyclic.
 /// </summary>
 public static class IntropyAspire
 {
@@ -171,26 +170,16 @@ public static class IntropyAspire
             }
 
             var project = builder.AddProject(component.Name, projectPath);
-            if (component.Schedule is null)
-            {
-                // The endpoint makes Aspire allocate a port and inject ASPNETCORE_URLS (without it
-                // every Kestrel binds the 5000 default) and gives the Dapr sidecar its app-port.
-                // A scheduled component is a run-to-completion job that receives no inbound
-                // delivery, so it gets neither.
-                project = project.WithHttpEndpoint();
-            }
-            else
-            {
-                AddRunNowCommand(project, component.Name);
-            }
+            // The endpoint makes Aspire allocate a port and inject ASPNETCORE_URLS (without it
+            // every Kestrel binds the 5000 default) and gives the Dapr sidecar its app-port.
+            project = project.WithHttpEndpoint();
 
             Wire(project, component, stagedPath, configDir, redis, microcks);
             resources[component.Name] = project;
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
 
-        RegisterDaprSidecarRecovery(builder, topology, redisReadiness);
-        RegisterScheduler(builder, topology, mockReadiness);
+        RegisterDaprSidecarRecovery(builder, redisReadiness);
 
         if (unresolved.Count > 0)
         {
@@ -234,70 +223,19 @@ public static class IntropyAspire
     }
 
     /// <summary>
-    /// Registers the <see cref="ComponentScheduler"/> when any component declares a schedule.
-    /// Keyed off <c>Schedule</c>, not the component kind — the scheduler is kind-blind.
-    /// </summary>
-    private static void RegisterScheduler(IDistributedApplicationBuilder builder, SystemTopology topology, MockReadiness? mockReadiness)
-    {
-        var scheduled = topology.Components
-            .Where(c => c.Schedule is not null)
-            .Select(c => new ScheduledComponent(c.Name, c.Schedule!, c.Uses.Count == 0 ? null : c.Uses))
-            .ToArray();
-        if (scheduled.Length == 0)
-        {
-            return;
-        }
-
-        builder.Services.TryAddSingleton(TimeProvider.System);
-        builder.Services.AddSingleton<IReadOnlyList<ScheduledComponent>>(scheduled);
-        if (mockReadiness is not null)
-        {
-            builder.Services.AddSingleton(mockReadiness);
-        }
-        builder.Services.TryAddSingleton<IResourceLifecycle, AspireResourceLifecycle>();
-        builder.Services.AddSingleton<ComponentScheduler>();
-        builder.Services.AddHostedService(sp => sp.GetRequiredService<ComponentScheduler>());
-    }
-
-    /// <summary>
-    /// Registers recovery for long-running components' Dapr sidecars. The normal pre-start gate
+    /// Registers recovery for components' Dapr sidecars. The normal pre-start gate
     /// prevents the common race; recovery covers the remaining interval where a backend passes
-    /// TCP readiness but daprd's component initialization still fails. Scheduled components'
-    /// sidecars are excluded: the scheduler owns their stop/start lifecycle.
+    /// TCP readiness but daprd's component initialization still fails.
     /// </summary>
     private static void RegisterDaprSidecarRecovery(
-        IDistributedApplicationBuilder builder, SystemTopology topology, IBackendReadiness backendReadiness)
+        IDistributedApplicationBuilder builder, IBackendReadiness backendReadiness)
     {
-        var schedulerOwned = topology.Components
-            .Where(c => c.Schedule is not null)
-            .Select(c => DaprSidecarIdentity.CliName(c.Name))
-            .ToHashSet(StringComparer.Ordinal);
-        builder.Services.AddSingleton(new DaprSidecarRecoveryOptions(schedulerOwned));
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<IResourceLifecycle, AspireResourceLifecycle>();
         builder.Services.AddSingleton<IResourceStateMonitor, AspireResourceStateMonitor>();
         builder.Services.AddSingleton<IBackendReadiness>(backendReadiness);
         builder.Services.AddSingleton<DaprSidecarRecovery>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<DaprSidecarRecovery>());
-    }
-
-    /// <summary>
-    /// A dashboard command that triggers a scheduled component immediately, through the same
-    /// path as a cron tick — including the skip when the previous run is still in progress.
-    /// </summary>
-    private static void AddRunNowCommand(IResourceBuilder<ProjectResource> project, string componentName)
-    {
-        project.WithCommand(
-            name: "intropy-run-now",
-            displayName: "Run now",
-            executeCommand: async context =>
-            {
-                var scheduler = context.ServiceProvider.GetRequiredService<ComponentScheduler>();
-                await scheduler.TriggerAsync(componentName, "manual run", context.CancellationToken)
-                    .ConfigureAwait(false);
-                return CommandResults.Success();
-            },
-            commandOptions: new CommandOptions { IconName = "Play", IconVariant = IconVariant.Filled });
     }
 
     /// <summary>

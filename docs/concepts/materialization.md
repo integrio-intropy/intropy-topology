@@ -34,7 +34,7 @@ public sealed record SystemTopology
 | `TopicResource` | Every topic published to or subscribed from, with `Publishers`/`Subscribers` precomputed |
 | `ConnectorResource` | Every connector used, with the union of directions and `UsedBy` |
 
-A `ConnectorResource` is `{ Name, Transport, DaprComponentName, Directions, UsedBy }` — the transport is always present (a `ConnectorRef` cannot be declared without one), and `DaprComponentName` is derived (`binding.<name>`), never stored.
+A `ConnectorResource` is `{ Name, DaprComponentName, Directions, UsedBy }` — the name is the whole identity, and `DaprComponentName` is derived (`binding.<name>`), never stored.
 
 ## Determinism
 
@@ -48,12 +48,11 @@ A byte-exact JSON snapshot test guards this — the same declaration always seri
 
 ## Serialization
 
-The model round-trips through `System.Text.Json`. `Transport` uses polymorphic serialization with a `$transport` discriminator:
+The model round-trips through `System.Text.Json`:
 
 ```json
 {
   "Name": "order-loader-destination",
-  "Transport": { "$transport": "file", "DaprType": "bindings.localstorage", "RootPath": "./test/order-loader-destination" },
   "DaprComponentName": "binding.order-loader-destination",
   "Directions": [1],
   "UsedBy": ["order-loader"]

@@ -6,11 +6,10 @@ public class ConnectorRefTests
     public void Define_WithValidName_ShouldExposeProperties()
     {
         // Act
-        var connector = ConnectorRef.Define("pim", Transport.Sftp());
+        var connector = ConnectorRef.Define("pim");
 
         // Assert
         Assert.Equal("pim", connector.Name);
-        Assert.Equal(Transport.Sftp(), connector.Transport);
     }
 
     [Theory]
@@ -23,84 +22,20 @@ public class ConnectorRefTests
         // Act & Assert: Define carries [ConstantExpected] (CA1857 fires on this non-constant
         // argument, proving the attribute works); suppressed here to test the runtime guard.
 #pragma warning disable CA1857
-        Assert.Throws<ArgumentException>(() => ConnectorRef.Define(name, Transport.Sftp()));
+        Assert.Throws<ArgumentException>(() => ConnectorRef.Define(name));
 #pragma warning restore CA1857
     }
 
     [Fact]
-    public void Define_WithNullTransport_ShouldThrowArgumentNullException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => ConnectorRef.Define("pim", null!));
-    }
-
-    [Fact]
-    public void Equals_WithSameNameAndTransport_ShouldBeEqual()
+    public void Equals_WithSameName_ShouldBeEqual()
     {
         // Arrange
-        var first = ConnectorRef.Define("pim", Transport.Sftp());
-        var second = ConnectorRef.Define("pim", Transport.Sftp());
+        var first = ConnectorRef.Define("pim");
+        var second = ConnectorRef.Define("pim");
 
         // Assert
         Assert.Equal(first, second);
     }
-}
-
-public class TransportTests
-{
-    [Fact]
-    public void Sftp_ShouldExposeDaprTypeAndCapabilities()
-    {
-        // Act
-        var transport = Transport.Sftp();
-
-        // Assert
-        Assert.IsType<SftpTransport>(transport);
-        Assert.Equal("bindings.sftp", transport.DaprType);
-        Assert.True(transport.SupportsInput);
-        Assert.True(transport.SupportsOutput);
-    }
-
-    [Fact]
-    public void Sftp_ShouldRoundTripThroughTransportPolymorphicSerialization()
-    {
-        // Act
-        var json = System.Text.Json.JsonSerializer.Serialize<Transport>(Transport.Sftp());
-        var transport = System.Text.Json.JsonSerializer.Deserialize<Transport>(json);
-
-        // Assert
-        Assert.Equal("{\"$transport\":\"sftp\",\"DaprType\":\"bindings.sftp\"}", json);
-        Assert.Equal(Transport.Sftp(), transport);
-    }
-
-    [Fact]
-    public void Default_ShouldExposeEmptyDaprTypeBothCapabilities()
-    {
-        // Act
-        var transport = Transport.Default();
-
-        // Assert
-        Assert.IsType<DefaultTransport>(transport);
-        Assert.Equal("", transport.DaprType);
-        Assert.True(transport.SupportsInput);
-        Assert.True(transport.SupportsOutput);
-    }
-
-    [Fact]
-    public void Default_ShouldRoundTripThroughTransportPolymorphicSerialization()
-    {
-        // Arrange
-        var expected = Transport.Default();
-
-        // Act
-        var json = System.Text.Json.JsonSerializer.Serialize<Transport>(expected);
-        var transport = System.Text.Json.JsonSerializer.Deserialize<Transport>(json);
-
-        // Assert
-        Assert.Equal("{\"$transport\":\"default\",\"DaprType\":\"\"}", json);
-        Assert.Equal(expected, transport);
-    }
-
 }
 
 public class TopicRefTests

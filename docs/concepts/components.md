@@ -10,7 +10,7 @@ graph LR
     C -->|"From / Publishes"| C
 ```
 
-Each `Add*` call on `SystemBuilder` returns the block's builder directly, whose members are exactly that block's legal edges. A method that would be illegal for the block type does not exist on its builder type, so the compiler rejects it before validation ever runs. The topology records the edges *between* components plus one activation attribute: an optional cron schedule (`WithSchedule`, extractors only). Everything else about the workload shape (hosting model, ports, process lifetime) lives in the component's own scaffold.
+Each `Add*` call on `SystemBuilder` returns the block's builder directly, whose members are exactly that block's legal edges. A method that would be illegal for the block type does not exist on its builder type, so the compiler rejects it before validation ever runs. The topology records the edges *between* components. Everything about the workload shape (hosting model, activation, ports, process lifetime) lives in the component's own scaffold — a cron schedule is deployment-owned configuration the topology deliberately does not repeat.
 
 Underneath, every declaration is a **`Component`** — the shared substance each builder records into, mirroring `Pipeline`'s role in `intropy-framework`. Each block kind is a sealed subclass (`ExtractorComponent`, `LoaderComponent`, `TransactionalIntegrationComponent`), and the builder exposes it via its `Component` property:
 
@@ -35,8 +35,6 @@ Each kind exposes only its own legal edges:
 
 `Subscribes`/`Publishes` are the asynchronous (topic) edges; `From`/`To` are the edges out through connectors. A component publishes at most one topic — a second `Publishes` call is rejected at `Build()`. See [Topics](topics.md) and [Connectors](connectors.md).
 
-Only extractors additionally take `WithSchedule("<cron>")` — a run-to-completion extractor activated on a cron tick (five-field cron or a macro such as `@daily`; syntax is validated at `Build()`). Without a schedule a component runs once at host start.
-
 ## Declaring components
 
 ```csharp
@@ -44,11 +42,16 @@ var s = SystemBuilder.Create("order-flow");
 
 s.AddExtractor("order-extractor")
     .From(Connectors.OrderExtractorSource)
-    .Publishes(Topics.Orders)
-    .WithSchedule("*/5 * * * *");   // optional: activate on a cron tick
+    .Publishes(Topics.Orders);
 ```
 
 Component names are DNS-1123 labels, validated at the call site with an `ArgumentException` — they become Kubernetes resource names and Dapr app-ids.
+
+## Minted identities
+
+The names in the topology — component names, service app-ids, pubsub names, the derived binding names — are facts the topology *mints*: the local run backend materializes them, generated artifacts carry them, and deployment honors them. They are not copies of deployment configuration, so they cannot drift from it; breaking one (renaming a deployed app-id without updating the topology) fails loudly at runtime. Deployment treats these names as owned by the topology, never as values to maintain a second copy of.
+
+One qualification: a `ServiceRef` app-id is unqualified, while Dapr service resolution in a cluster is namespace-scoped. The minted identity holds within the system's own namespace; invoking a service across namespaces would need qualified app-ids, which the model does not express today.
 
 ## What the compiler rejects
 

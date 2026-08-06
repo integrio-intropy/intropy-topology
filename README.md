@@ -10,8 +10,8 @@ the backends generate Dapr components / runtime config, or translate it into a l
 application for local F5.
 
 > This is the **minimal model**: exactly the surface the system tutorial and `intropy sys create`
-> use. The full model (aggregators, APIs, named publish ports, sftp/blob/http/custom transports,
-> dev mocking) is preserved on the `full-topology` branch.
+> use. The full model (aggregators, APIs, named publish ports) is preserved on the
+> `full-topology` branch.
 
 ## Why?
 
@@ -23,9 +23,8 @@ a validation diagnostic*; only what types cannot check (completeness and cross-c
 is validated at `Build()`.
 
 The topology records the edges **between** components — subscriptions, publishes, and connectors
-out to the outside world — plus one activation attribute: an optional cron schedule
-(`WithSchedule`, extractors only). Everything else about the workload shape lives in the
-component's own scaffold.
+out to the outside world. Everything about the workload shape, including activation (a cron
+schedule is deployment-owned configuration), lives in the component's own scaffold.
 
 ## Packages
 
@@ -70,16 +69,17 @@ public static class Topics
 public static class Connectors
 {
     public static readonly ConnectorRef OrderExtractorSource =
-        ConnectorRef.Define("order-extractor-source", Transport.File("./test/order-extractor-source"));
+        ConnectorRef.Define("order-extractor-source");
     public static readonly ConnectorRef OrderLoaderDestination =
-        ConnectorRef.Define("order-loader-destination", Transport.File("./test/order-loader-destination"));
+        ConnectorRef.Define("order-loader-destination");
 }
 ```
 
-All connectivity runs through Dapr — a transport selects the Dapr binding component's `spec.type`.
-The minimal model ships one transport: `Transport.File(rootPath)` (`bindings.localstorage`), the
-default resolution `intropy sys create` applies. The folder is the endpoint, so a file connector
-needs no external-system concept — the system runs with zero external configuration.
+All connectivity runs through Dapr — a connector never bypasses it. The connector's name is its
+whole identity; the deployed binding's `spec.type`, address, and credentials are environment-owned
+deployment configuration the topology deliberately does not repeat. Local runs resolve every
+connector to a folder on the host through the development definition, so the system runs with zero
+external configuration.
 
 ## One model, two backends
 
@@ -140,7 +140,7 @@ Full documentation lives in [`docs/`](docs/index.md):
 
 - [Getting Started](docs/getting-started.md) — declare a complete order-flow topology
 - [Components](docs/concepts/components.md) — component kinds and block builders
-- [Topics](docs/concepts/topics.md) and [Connectors](docs/concepts/connectors.md) — refs, transports, materialize-from-usage
+- [Topics](docs/concepts/topics.md) and [Connectors](docs/concepts/connectors.md) — refs, materialize-from-usage
 - [Validation](docs/concepts/validation.md) — the validation rules and Build/TryBuild/Validate
 - [Materialization](docs/concepts/materialization.md) — the immutable, deterministic output model
 

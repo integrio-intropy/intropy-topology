@@ -45,8 +45,6 @@ public sealed class GeneratedArtifacts
 /// </summary>
 public static class TopologyGenerator
 {
-    // Schedule is the only emitted property that is ever null; omitting it keeps
-    // unscheduled components' config free of a redundant attribute.
     private static readonly JsonSerializerOptions s_json = new()
     {
         WriteIndented = true,
@@ -139,7 +137,6 @@ public static class TopologyGenerator
                 System = systemName,
                 Component = component.Name,
                 Kind = component.Kind.ToString(),
-                component.Schedule,
                 Subscribes = component.Subscribes.Select(s => new { s.PubSubName, s.TopicName }),
                 Publishes = component.Publishes.Select(p => new { p.Port, p.PubSubName, p.TopicName }),
                 Connectors = component.Connectors.Select(c => new

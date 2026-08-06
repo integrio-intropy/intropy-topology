@@ -10,11 +10,13 @@ graph LR
         E["order-extractor"]
         L["order-loader"]
     end
-    C1["order-extractor-source (binding.order-extractor-source, file)"] -->|"From"| E
-    L -->|"To"| C2["order-loader-destination (binding.order-loader-destination, file)"]
+    C1["order-extractor-source (binding.order-extractor-source)"] -->|"From"| E
+    L -->|"To"| C2["order-loader-destination (binding.order-loader-destination)"]
 ```
 
-Every edge block reaches the outside world through a connector. All connectivity runs through Dapr — the transport selects the Dapr binding component's `spec.type`, it never bypasses Dapr. Each connector becomes exactly one Dapr binding component whose name is derived from the connector's name (`binding.<connector-name>`), never declared.
+Every edge block reaches the outside world through a connector. All connectivity runs through Dapr — a connector never bypasses it. Each connector becomes exactly one Dapr binding component whose name is derived from the connector's name (`binding.<connector-name>`), never declared.
+
+The name is the connector's **whole identity**. The binding's deployed `spec.type` — sftp, blob, http — together with its address and credentials, is environment-owned deployment configuration. The topology deliberately does not repeat it: a fact deployment owns and can edit would drift from a second copy declared here, and a drifting topology is an untrusted one. Locally, F5 runs substitute their own resolution through the development definition (every connector resolves to a localstorage folder), so the system runs with zero external configuration.
 
 ## Declaring connectors
 
@@ -24,34 +26,23 @@ Connectors are declared as static fields in a scaffolded `Connectors.cs`. They a
 public static class Connectors
 {
     public static readonly ConnectorRef OrderExtractorSource =
-        ConnectorRef.Define("order-extractor-source", Transport.File("./test/order-extractor-source"));
+        ConnectorRef.Define("order-extractor-source");
 
     public static readonly ConnectorRef OrderLoaderDestination =
-        ConnectorRef.Define("order-loader-destination", Transport.File("./test/order-loader-destination"));
+        ConnectorRef.Define("order-loader-destination");
 }
 ```
 
-Direction is not part of a connector's identity — it follows from usage: `From(connector)` reads, `To(connector)` writes. One connector name declared with two different transports is rejected at `Build()`.
-
-## The file transport
-
-The minimal model ships one transport:
-
-| Transport | Dapr type |
-|-----------|-----------|
-| `Transport.File(rootPath)` | `bindings.localstorage` |
-
-`Transport.File(rootPath)` reads and writes files in a folder on the host — the folder *is* the endpoint, so a file connector needs no external-system concept and the system runs with zero external configuration. It is the default resolution `intropy sys create` applies; generation absolutizes the root path relative to the SystemHost directory. Other transports (sftp/blob/http/custom) live on the `full-topology` branch.
+Direction is not part of a connector's identity — it follows from usage: `From(connector)` reads, `To(connector)` writes. Because the name is the identity, two declarations with the same name are the same connector by construction; there is nothing left to conflict.
 
 ## Materialized connectors
 
-Each used connector folds into a `ConnectorResource` carrying the transport, the derived Dapr component name, the union of used directions, and the components using it:
+Each used connector folds into a `ConnectorResource` carrying the derived Dapr component name, the union of used directions, and the components using it:
 
 ```csharp
 public sealed record ConnectorResource
 {
     public required string Name { get; init; }
-    public required Transport Transport { get; init; }
     public string DaprComponentName => $"binding.{Name}";
     public required IReadOnlyList<ConnectorDirection> Directions { get; init; }
     public required IReadOnlyList<string> UsedBy { get; init; }
@@ -60,4 +51,4 @@ public sealed record ConnectorResource
 
 ## Related
 
-- [Validation](validation.md) — conflicting transports and name collisions
+- [Validation](validation.md) — name collisions and usage rules

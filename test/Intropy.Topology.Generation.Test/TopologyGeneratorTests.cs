@@ -33,7 +33,7 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Generate_ShouldEmit_OneBindingComponentPerConnector_TypedFromTransport()
+    public void Generate_ShouldEmit_OneBindingComponentPerConnector_ResolvedToLocalstorage()
     {
         // Act
         var webshop = Content("components/binding.webshop.yaml");
@@ -74,7 +74,7 @@ public class TopologyGeneratorTests
     {
         // Arrange — a connector used by the topology but absent from the development manifest
         var topic = TopicRef<string>.Define("orders", "created");
-        var connector = ConnectorRef.Define("erp", Transport.Sftp());
+        var connector = ConnectorRef.Define("erp");
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("extractor").From(connector).Publishes(topic);
         builder.AddLoader("loader").Subscribes(topic);
@@ -112,19 +112,9 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Generate_WithSchedule_ShouldEmitScheduleInRuntimeConfig()
+    public void Generate_ShouldEmitRuntimeConfigWithoutActivationAttributes()
     {
-        // Act
-        var json = Content("config/order-extractor.intropy.json");
-
-        // Assert
-        Assert.Contains("\"Schedule\": \"*/5 * * * *\"", json, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Generate_WithoutSchedule_ShouldOmitScheduleFromRuntimeConfig()
-    {
-        // Act — unscheduled components' config stays byte-identical to the pre-schedule shape.
+        // Act — activation (cron) lives in the component scaffold, not in the emitted config.
         var json = Content("config/order-loader.intropy.json");
 
         // Assert
@@ -169,12 +159,12 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Generate_WithDefaultTransportConnector_ShouldEmitLocalstorageBinding()
+    public void Generate_WithStandaloneConnector_ShouldEmitLocalstorageBinding()
     {
-        // Arrange — the placeholder default transport warns at Build() but must not block
-        // local generation: dev resolves every connector to localstorage regardless of transport.
+        // Arrange — local generation resolves every connector to localstorage; the deployed
+        // binding type is deployment-owned and never declared in the topology.
         var topic = TopicRef<string>.Define("orders", "created");
-        var connector = ConnectorRef.Define("placeholder", Transport.Default());
+        var connector = ConnectorRef.Define("placeholder");
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("extractor").From(connector).Publishes(topic);
         builder.AddLoader("loader").Subscribes(topic);

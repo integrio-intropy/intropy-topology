@@ -21,8 +21,8 @@ public class EndToEndTests
             TopicRef<RawEvent>.Define("product-distribution-pubsub", "price-raw");
     }
 
-    private static readonly ConnectorRef s_pim = ConnectorRef.Define("pim", Transport.Sftp());
-    private static readonly ConnectorRef s_erp = ConnectorRef.Define("erp", Transport.Sftp());
+    private static readonly ConnectorRef s_pim = ConnectorRef.Define("pim");
+    private static readonly ConnectorRef s_erp = ConnectorRef.Define("erp");
 
     private static SystemBuilder DeclareSystem()
     {
@@ -30,8 +30,7 @@ public class EndToEndTests
 
         s.AddExtractor("pim-extractor")
             .From(s_pim)
-            .Publishes(ProductFlow.Raw)
-            .WithSchedule("*/5 * * * *");
+            .Publishes(ProductFlow.Raw);
 
         s.AddTransactionalIntegration("pricing-service")
             .From(s_pim)
@@ -66,10 +65,8 @@ public class EndToEndTests
         var extractor = topology.Components[0];
         Assert.Equal(ConnectorDirection.In, Assert.Single(extractor.Connectors).Direction);
         Assert.Equal("default", Assert.Single(extractor.Publishes).Port);
-        Assert.Equal("*/5 * * * *", extractor.Schedule);
 
         var pricing = topology.Components[1];
-        Assert.Null(pricing.Schedule);
         Assert.Equal(
             [("pim", ConnectorDirection.In), ("erp", ConnectorDirection.Out)],
             pricing.Connectors.Select(c => (c.ConnectorName, c.Direction)));
@@ -90,11 +87,9 @@ public class EndToEndTests
 
         Assert.Equal(["erp", "pim"], topology.Connectors.Select(c => c.Name));
         var erp = topology.Connectors[0];
-        Assert.Equal(Transport.Sftp(), erp.Transport);
         Assert.Equal("binding.erp", erp.DaprComponentName);
         Assert.Equal(["pricing-service", "product-loader"], erp.UsedBy);
         var pim = topology.Connectors[1];
-        Assert.Equal(Transport.Sftp(), pim.Transport);
         Assert.Equal("binding.pim", pim.DaprComponentName);
         Assert.Equal(["pim-extractor", "pricing-service"], pim.UsedBy);
     }
@@ -112,7 +107,7 @@ public class EndToEndTests
         // Byte-exact snapshot of the sample system's serialized model: guards materializer
         // output against unintentional change. Regenerate only on intentional model changes.
         const string expected =
-            """{"SystemName":"product-distribution","Components":[{"Name":"pim-extractor","Kind":0,"Schedule":"*/5 * * * *","Subscribes":[],"Publishes":[{"Port":"default","PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Connectors":[{"ConnectorName":"pim","Direction":0}],"Uses":[]},{"Name":"pricing-service","Kind":2,"Schedule":null,"Subscribes":[],"Publishes":[],"Connectors":[{"ConnectorName":"pim","Direction":0},{"ConnectorName":"erp","Direction":1}],"Uses":[]},{"Name":"product-loader","Kind":1,"Schedule":null,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Publishes":[],"Connectors":[{"ConnectorName":"erp","Direction":1}],"Uses":[]},{"Name":"price-extractor","Kind":0,"Schedule":null,"Subscribes":[],"Publishes":[{"Port":"default","PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Connectors":[],"Uses":[]},{"Name":"price-loader","Kind":1,"Schedule":null,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Publishes":[],"Connectors":[],"Uses":[]}],"Topics":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["price-extractor"],"Subscribers":["price-loader"]},{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["pim-extractor"],"Subscribers":["product-loader"]}],"Connectors":[{"Name":"erp","Transport":{"$transport":"sftp","DaprType":"bindings.sftp"},"DaprComponentName":"binding.erp","Directions":[1],"UsedBy":["pricing-service","product-loader"]},{"Name":"pim","Transport":{"$transport":"sftp","DaprType":"bindings.sftp"},"DaprComponentName":"binding.pim","Directions":[0],"UsedBy":["pim-extractor","pricing-service"]}],"Services":[]}""";
+            """{"SystemName":"product-distribution","Components":[{"Name":"pim-extractor","Kind":0,"Subscribes":[],"Publishes":[{"Port":"default","PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Connectors":[{"ConnectorName":"pim","Direction":0}],"Uses":[]},{"Name":"pricing-service","Kind":2,"Subscribes":[],"Publishes":[],"Connectors":[{"ConnectorName":"pim","Direction":0},{"ConnectorName":"erp","Direction":1}],"Uses":[]},{"Name":"product-loader","Kind":1,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Publishes":[],"Connectors":[{"ConnectorName":"erp","Direction":1}],"Uses":[]},{"Name":"price-extractor","Kind":0,"Subscribes":[],"Publishes":[{"Port":"default","PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Connectors":[],"Uses":[]},{"Name":"price-loader","Kind":1,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Publishes":[],"Connectors":[],"Uses":[]}],"Topics":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["price-extractor"],"Subscribers":["price-loader"]},{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["pim-extractor"],"Subscribers":["product-loader"]}],"Connectors":[{"Name":"erp","DaprComponentName":"binding.erp","Directions":[1],"UsedBy":["pricing-service","product-loader"]},{"Name":"pim","DaprComponentName":"binding.pim","Directions":[0],"UsedBy":["pim-extractor","pricing-service"]}],"Services":[]}""";
 
         // Act
         var json = JsonSerializer.Serialize(DeclareSystem().Build());
@@ -135,8 +130,7 @@ public class EndToEndTests
         Assert.NotNull(deserialized);
         Assert.Equal(topology.SystemName, deserialized.SystemName);
         Assert.Equal(topology.Components.Count, deserialized.Components.Count);
-        Assert.Equal("*/5 * * * *", deserialized.Components[0].Schedule);
         Assert.Equal(["product-raw"], deserialized.Components[2].Subscribes.Select(t => t.TopicName));
-        Assert.IsType<SftpTransport>(deserialized.Connectors.Single(c => c.Name == "erp").Transport);
+        Assert.Equal("binding.erp", deserialized.Connectors.Single(c => c.Name == "erp").DaprComponentName);
     }
 }
