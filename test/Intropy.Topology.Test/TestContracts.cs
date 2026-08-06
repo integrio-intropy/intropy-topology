@@ -16,8 +16,8 @@ public static class TestTopics
 public static class TestConnectors
 {
     public static readonly ConnectorRef Pim =
-        ConnectorRef.Define("pim", Transport.Sftp());
+        ConnectorRef.Define("pim");
 
     public static readonly ConnectorRef Erp =
-        ConnectorRef.Define("erp", Transport.Sftp());
+        ConnectorRef.Define("erp");
 }

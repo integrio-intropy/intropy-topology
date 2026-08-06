@@ -1,23 +1,22 @@
 # Intropy.Topology.Generation
 
 Generation for [`Intropy.Topology`](https://www.nuget.org/packages/Intropy.Topology): turns a
-validated `SystemTopology` into Dapr components and per-component runtime config, for a `Dev` or
-`Prod` profile. Backend-agnostic and dependency-free (YAML is emitted by a small internal writer).
+validated `SystemTopology` into Dapr components and per-component runtime config for the local run
+profile. Backend-agnostic and dependency-free (YAML is emitted by a small internal writer).
 
 It produces, deterministically:
 
-- one Dapr **pub/sub** component per distinct `PubSubName` (dev: Redis-backed),
-- one Dapr **binding** per connector (`type` from `Transport.DaprType`, `scopes` from `UsedBy`);
-  in dev, `bindings.http` connectors with a declared `MockHttpExternalSystem` point at the
-  contract-backed mock server (fixed port 8585),
-- one Dapr **HTTPEndpoint** per dev-mocked internal API (`MockApi`), named after the provider's
-  app-id so service invocation resolves to the mock (dev profile only),
+- one Dapr **pub/sub** component per distinct `PubSubName` (Redis Streams backed),
+- one Dapr **binding** per connector (`bindings.localstorage` rooted at the connector's
+  development-manifest folder, `scopes` from `UsedBy`),
+- one Dapr **HTTPEndpoint** per development-mocked platform service, named after the service's
+  app-id so service invocation resolves to the mock,
 - a per-component `*.intropy.json` describing that component's identity and edges.
 
 ```csharp
 var discovered = SystemDiscovery.Discover(assembly);
-var dev = DevManifest.From(discovered.Definition);
-var artifacts = TopologyGenerator.Generate(discovered.Topology, GenerationProfile.Dev, dev);
+var development = DevelopmentDiscovery.Discover(assembly, discovered.Topology, root);
+var artifacts = TopologyGenerator.Generate(discovered.Topology, development);
 artifacts.WriteTo("./out");
 ```
 

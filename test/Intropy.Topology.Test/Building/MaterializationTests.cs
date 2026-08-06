@@ -54,7 +54,6 @@ public class MaterializationTests
 
         // Assert
         Assert.Equal("pim", connector.Name);
-        Assert.Equal(Transport.Sftp(), connector.Transport);
         Assert.Equal("binding.pim", connector.DaprComponentName);
         Assert.Equal([ConnectorDirection.In, ConnectorDirection.Out], connector.Directions);
         Assert.Equal(["ti"], connector.UsedBy);
@@ -82,7 +81,7 @@ public class MaterializationTests
     public void Build_ShouldSortResourcesDeterministically()
     {
         // Arrange: declare in non-alphabetical order
-        var erp = ConnectorRef.Define("erp", Transport.Sftp());
+        var erp = ConnectorRef.Define("erp");
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("zeta")
             .Publishes(TopicRef<RawEvent>.Define("test-pubsub", "zzz-topic"))

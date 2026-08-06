@@ -28,20 +28,20 @@ There is no `AddTopic` on the builder — publishing to or subscribing to a topi
 
 ## Declare your connectors
 
-A connector is the named port an edge block reaches the outside world through. Its transport selects the Dapr binding type it materializes as; the Dapr component name is always derived from the connector's name (`binding.order-extractor-source`), never declared:
+A connector is the named port an edge block reaches the outside world through. The Dapr component name is always derived from the connector's name (`binding.order-extractor-source`), never declared:
 
 ```csharp
 public static class Connectors
 {
     public static readonly ConnectorRef OrderExtractorSource =
-        ConnectorRef.Define("order-extractor-source", Transport.File("./test/order-extractor-source"));
+        ConnectorRef.Define("order-extractor-source");
 
     public static readonly ConnectorRef OrderLoaderDestination =
-        ConnectorRef.Define("order-loader-destination", Transport.File("./test/order-loader-destination"));
+        ConnectorRef.Define("order-loader-destination");
 }
 ```
 
-`Transport.File(rootPath)` (`bindings.localstorage`) makes the folder the endpoint, so the system runs with zero external configuration. Connectors are system-owned and never shared across systems. Direction is not part of the identity — it follows from usage (`From` reads, `To` writes).
+The name is the connector's whole identity; the deployed binding's type and credentials are environment-owned deployment configuration. Locally, the development definition resolves every connector to a folder on the host, so the system runs with zero external configuration. Connectors are system-owned and never shared across systems. Direction is not part of the identity — it follows from usage (`From` reads, `To` writes).
 
 ## Declare the system
 
@@ -113,5 +113,5 @@ dotnet run -- generate ./out     # write Dapr YAML + per-component config
 
 - [Components](concepts/components.md) — the component kinds and their block builders
 - [Topics](concepts/topics.md) — the asynchronous edge between components
-- [Connectors](concepts/connectors.md) — the file transport and derived binding names
+- [Connectors](concepts/connectors.md) — derived binding names and environment-owned deployment
 - [Validation](concepts/validation.md) — the validation rules

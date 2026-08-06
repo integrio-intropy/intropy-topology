@@ -41,8 +41,6 @@ The system topology is invalid (2 error(s)):
 | Error | A component publishes at most one topic — more than one `Publishes` call is an error |
 | Error | A component must not subscribe to the same topic more than once |
 | Error | One topic must not be used with two different event contract types |
-| Error | One connector name must not be declared with two different transports |
-| Error | A declared deployed transport must support every direction the connector is used in |
 | Error | Extractors must publish (a loader's destination may stay a private local component) |
 | Error | Loaders subscribe to exactly one topic |
 | Error | A published topic must have a subscriber |

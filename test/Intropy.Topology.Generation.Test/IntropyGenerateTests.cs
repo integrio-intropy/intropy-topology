@@ -60,10 +60,7 @@ public class IntropyGenerateTests
         Assert.Equal("Intropy.Topology.Generation.Test.RawOrder", rawTopic.GetProperty("contract").GetString());
         Assert.Equal(["order-extractor"], rawTopic.GetProperty("publishers").EnumerateArray().Select(value => value.GetString()));
         Assert.Equal(["order-loader", "raw-audit"], rawTopic.GetProperty("subscribers").EnumerateArray().Select(value => value.GetString()));
-        Assert.Equal("sftp", webshop.GetProperty("transport").GetProperty("type").GetString());
-        Assert.True(webshop.GetProperty("transport").GetProperty("supportsInput").GetBoolean());
-        Assert.True(webshop.GetProperty("transport").GetProperty("supportsOutput").GetBoolean());
-        Assert.False(webshop.TryGetProperty("deployedTransport", out _));
+        Assert.False(webshop.TryGetProperty("transport", out _));
         Assert.Equal(["out"], webshop.GetProperty("directions").EnumerateArray().Select(value => value.GetString()));
         Assert.Equal(["order-loader"], webshop.GetProperty("usedBy").EnumerateArray().Select(value => value.GetString()));
     }
@@ -136,26 +133,22 @@ public class IntropyGenerateTests
     }
 
     [Fact]
-    public async Task RunAsync_Graph_WithDefaultTransport_ShouldEmitGraphAndWarn()
+    public async Task RunAsync_Graph_WithOneSidedTopic_ShouldEmitGraphAndWarn()
     {
         // Act
         var (code, output, error) = await Capture(() => IntropyGenerate.RunAsync(WipSystemFixture.Assembly, ["graph"]));
         using var json = JsonDocument.Parse(output);
         var root = json.RootElement;
-        var connector = root.GetProperty("connectors").EnumerateArray()
-            .Single(c => c.GetProperty("name").GetString() == "placeholder");
 
-        // Assert — stdout stays pure JSON; the placeholder and the one-sided topic warn on stderr
+        // Assert — stdout stays pure JSON; the one-sided topic warns on stderr
         Assert.Equal(0, code);
         Assert.Equal("wip-system", root.GetProperty("system").GetString());
-        Assert.Equal("default", connector.GetProperty("transport").GetProperty("type").GetString());
         Assert.Contains("warning: ", error, StringComparison.Ordinal);
-        Assert.Contains("placeholder default transport", error, StringComparison.Ordinal);
         Assert.Contains("no component subscribes", error, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task RunAsync_Graph_WithDefaultTransportAndDevelopmentFlag_ShouldEmitDevelopmentSection()
+    public async Task RunAsync_Graph_WipSystemWithDevelopmentFlag_ShouldEmitDevelopmentSection()
     {
         // Act
         var (code, output, _) = await Capture(() => IntropyGenerate.RunAsync(WipSystemFixture.Assembly, ["graph", "--development"]));
