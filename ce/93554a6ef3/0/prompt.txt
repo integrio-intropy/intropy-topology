@@ -7,3 +7,7 @@ can you make a plan for fixing all issues?
 ---
 
 can you launch a review agent with pi --print?
+
+---
+
+start implementing the plan on a  new branch off main. Do not push anything
