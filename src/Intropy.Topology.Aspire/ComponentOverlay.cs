@@ -64,6 +64,18 @@ internal static class ComponentOverlay
         }
     }
 
+    /// <summary>
+    /// Line-oriented reader for the Dapr resource YAML this overlay accepts. Supported
+    /// subset, deliberately narrow because both writers (the generator and scaffolded
+    /// local components) produce it: block style only; one document per file;
+    /// <c>apiVersion</c>, <c>kind</c>, and <c>metadata:</c>/<c>scopes:</c> as top-level keys at
+    /// column 0; scalar values optionally single- or double-quoted; <c>scopes</c> entries as
+    /// <c>- value</c> list items. Anchors, aliases, flow collections, multi-line values, and
+    /// comments are NOT part of the contract — a <c>name:</c> nested under another top-level
+    /// mapping is not recognized as <c>metadata.name</c> (only lines while inside the
+    /// <c>metadata:</c> block count). Reject or extend consciously: staging behavior depends
+    /// on the identity extracted here.
+    /// </summary>
     private static Resource? Parse(string yaml, string source)
     {
         if (yaml.Split("---", StringSplitOptions.None).Length > 1)
