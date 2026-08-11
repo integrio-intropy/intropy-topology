@@ -194,6 +194,24 @@ public sealed class IntropyAspireTests : IDisposable
     }
 
     [Fact]
+    public void CountMatchingServices_WithEntryMissingAField_ShouldThrowAFocusedError()
+    {
+        // Arrange — a malformed Microcks response must not surface as KeyNotFoundException
+        using var services = JsonDocument.Parse(
+            """
+            [
+              { "name": "Idempotency", "version": "1" }
+            ]
+            """);
+        var mock = new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency", "1");
+
+        // Act & Assert
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => MicrocksImporter.CountMatchingServices(services.RootElement, mock));
+        Assert.Contains("/api/services", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Apply_ShouldAddProjectPerComponent_WithSidecarAppId()
     {
         // Arrange

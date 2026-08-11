@@ -128,8 +128,18 @@ internal sealed class MicrocksImporter(
         }
 
         return entries.EnumerateArray().Count(service =>
-            service.GetProperty("name").GetString() == mock.Title
-            && service.GetProperty("version").GetString() == mock.Version
-            && service.GetProperty("type").GetString() == "REST");
+        {
+            if (!service.TryGetProperty("name", out var name)
+                || !service.TryGetProperty("version", out var version)
+                || !service.TryGetProperty("type", out var type))
+            {
+                throw new InvalidOperationException(
+                    "Microcks /api/services returned an entry missing 'name', 'version', or 'type'.");
+            }
+
+            return name.GetString() == mock.Title
+                && version.GetString() == mock.Version
+                && type.GetString() == "REST";
+        });
     }
 }

@@ -172,6 +172,17 @@ public class IntropyGenerateTests
     }
 
     [Fact]
+    public void Run_GenerateWithExtraPositionalArguments_ShouldReturnTwo()
+    {
+        // Act
+        var (code, _, error) = Capture(() => IntropyGenerate.Run(s_assembly, ["generate", "./out", "extra-arg"]));
+
+        // Assert
+        Assert.Equal(2, code);
+        Assert.Contains("unrecognized arguments", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Generate_WithInvariantViolation_ShouldThrowRatherThanExit()
     {
         // Arrange: a manifest mock no topology service matches — a programming error,

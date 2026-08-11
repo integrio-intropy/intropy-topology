@@ -210,9 +210,16 @@ public static class IntropyGenerate
 
     private static int Generate(Assembly assembly, string[] args)
     {
+        var positional = args.Skip(1).Where(a => !a.StartsWith('-')).ToArray();
+        if (positional.Length > 1)
+        {
+            Console.Error.WriteLine($"unrecognized arguments: {string.Join(' ', positional.Skip(1))}. Expected: generate [directory].");
+            return 2;
+        }
+
         try
         {
-            var directory = args.Skip(1).FirstOrDefault(a => !a.StartsWith('-')) ?? "./out";
+            var directory = positional.FirstOrDefault() ?? "./out";
             var discovered = SystemDiscovery.Discover(assembly);
             var development = DevelopmentDiscovery.Discover(assembly, discovered.Topology, Directory.GetCurrentDirectory());
             var artifacts = TopologyGenerator.Generate(discovered.Topology, development);

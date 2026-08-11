@@ -106,7 +106,7 @@ public sealed class DevelopmentBuilder
 
         /// <summary>Uses a self-contained OpenAPI 3.0.x document relative to the SystemHost directory.</summary>
         /// <param name="path">The relative contract path.</param>
-        public void FromOpenApi(string path)
+        public MockBuilder FromOpenApi(string path)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(path);
             if (_declaration.Path is not null)
@@ -115,6 +115,7 @@ public sealed class DevelopmentBuilder
             }
 
             _declaration.Path = path;
+            return this;
         }
     }
 
@@ -126,7 +127,7 @@ public sealed class DevelopmentBuilder
 
         /// <summary>Reads and writes files in a folder relative to the SystemHost directory.</summary>
         /// <param name="path">The relative folder path.</param>
-        public void RootPath(string path)
+        public FileBuilder RootPath(string path)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(path);
             if (_declaration.Path is not null)
@@ -135,6 +136,7 @@ public sealed class DevelopmentBuilder
             }
 
             _declaration.Path = path;
+            return this;
         }
     }
 
