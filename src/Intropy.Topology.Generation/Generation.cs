@@ -10,6 +10,24 @@ namespace Intropy.Topology.Generation;
 /// <param name="Content">The file's text content.</param>
 public sealed record GeneratedFile(string RelativePath, string Content);
 
+/// <summary>
+/// The single composition point for local mock endpoint URLs. The origin is a
+/// local-runtime convention this dependency-free package would rather not know —
+/// but the <c>topology.intropy.io/v1</c> graph contract includes <c>baseUri</c>,
+/// which forces the knowledge here. The Aspire backend owns the matching port
+/// constant (<c>IntropyAspire.MicrocksPort</c>) and must agree with
+/// <see cref="Origin"/>; do not introduce a second composition site.
+/// </summary>
+internal static class LocalMockEndpoints
+{
+    public const string Origin = "http://localhost:8585";
+
+    /// <summary>The mock's local Microcks REST base URI, with title and version escaped
+    /// as individual path segments.</summary>
+    public static string BaseUri(OpenApiMock mock) =>
+        $"{Origin}/rest/{Uri.EscapeDataString(mock.Title)}/{Uri.EscapeDataString(mock.Version)}";
+}
+
 /// <summary>The artifacts generated for a system: Dapr component YAML and per-component runtime config.</summary>
 public sealed class GeneratedArtifacts
 {
@@ -68,15 +86,12 @@ public static class TopologyGenerator
         // Local runs resolve every connector to localstorage, so the declared transport is
         // deliberately not consulted here: the placeholder default transport must not block
         // F5. Deployment generation is where an unresolved transport must hard-fail.
+        // The manifest is the single validation boundary: it already rejects unresolved
+        // connectors, so a miss here is an invariant violation, not user input.
+        var resolutions = development.Files.ToDictionary(file => file.ConnectorName, StringComparer.Ordinal);
         foreach (var connector in topology.Connectors)
         {
-            var resolution = development.Files.SingleOrDefault(file => file.ConnectorName == connector.Name);
-            if (resolution is null)
-            {
-                throw new InvalidOperationException($"Connector '{connector.Name}' has no local file resolution in the development manifest.");
-            }
-
-            files.Add(BindingComponent(connector, resolution));
+            files.Add(BindingComponent(connector, resolutions[connector.Name]));
         }
 
         foreach (var mock in development.Mocks)
@@ -124,7 +139,7 @@ public static class TopologyGenerator
 
     private static GeneratedFile HttpEndpoint(OpenApiMock mock, ServiceResource service)
     {
-        var yaml = DaprYaml.HttpEndpoint(mock.AppId, mock.BaseUri.AbsoluteUri, service.Consumers);
+        var yaml = DaprYaml.HttpEndpoint(mock.AppId, LocalMockEndpoints.BaseUri(mock), service.Consumers);
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{mock.AppId}.yaml", yaml);
     }
 
@@ -143,7 +158,7 @@ public static class TopologyGenerator
                 {
                     c.ConnectorName,
                     Direction = c.Direction.ToString(),
-                    DaprComponent = $"binding.{c.ConnectorName}",
+                    DaprComponent = ConnectorResource.DaprComponentNameFor(c.ConnectorName),
                 }),
                 Uses = component.Uses,
             },

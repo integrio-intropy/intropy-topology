@@ -37,11 +37,16 @@ public sealed record ServiceResource
 /// <summary>A system-owned connector materialized from usage.</summary>
 public sealed record ConnectorResource
 {
+    /// <summary>Derives a connector's Dapr binding component name:
+    /// <c>binding.&lt;connector-name&gt;</c>. The single derivation site — every consumer
+    /// of the name goes through here.</summary>
+    public static string DaprComponentNameFor(string connectorName) => $"binding.{connectorName}";
+
     /// <summary>The connector's name (DNS-1123 label) — its whole identity.</summary>
     public required string Name { get; init; }
 
     /// <summary>The derived Dapr binding component name: <c>binding.&lt;connector-name&gt;</c>.</summary>
-    public string DaprComponentName => $"binding.{Name}";
+    public string DaprComponentName => DaprComponentNameFor(Name);
 
     /// <summary>The union of directions the connector is used in.</summary>
     public required IReadOnlyList<ConnectorDirection> Directions { get; init; }

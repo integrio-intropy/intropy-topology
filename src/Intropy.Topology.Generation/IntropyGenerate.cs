@@ -23,19 +23,19 @@ public static class IntropyGenerate
     /// <param name="assembly">The assembly declaring the <see cref="ISystemDefinition"/>.</param>
     /// <param name="args">Command-line arguments; <c>args[0]</c> is the verb (check | graph | generate).</param>
     /// <returns>A process exit code.</returns>
-    public static Task<int> RunAsync(Assembly assembly, string[] args)
+    public static int Run(Assembly assembly, string[] args)
     {
         ArgumentNullException.ThrowIfNull(assembly);
         ArgumentNullException.ThrowIfNull(args);
 
         var verb = args.Length > 0 ? args[0] : "check";
-        return Task.FromResult(verb switch
+        return verb switch
         {
             "check" => Check(assembly),
             "graph" => Graph(assembly, args),
             "generate" => Generate(assembly, args),
             _ => Unknown(verb),
-        });
+        };
     }
 
     private static int Check(Assembly assembly)
@@ -47,7 +47,7 @@ public static class IntropyGenerate
             Console.WriteLine($"ok: '{discovered.Topology.SystemName}' is valid ({discovered.Topology.Components.Count} components).");
             return 0;
         }
-        catch (Exception ex) when (ex is TopologyValidationException or DevelopmentValidationException or InvalidOperationException)
+        catch (Exception ex) when (ex is IntropyException or InvalidOperationException)
         {
             Console.Error.WriteLine($"error: {ex.Message}");
             return 1;
@@ -73,7 +73,7 @@ public static class IntropyGenerate
             Console.WriteLine(JsonSerializer.Serialize(GraphDocument.From(topology, development), s_json));
             return 0;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IntropyException or InvalidOperationException)
         {
             Console.Error.WriteLine($"error: {ex.Message}");
             return 1;
@@ -114,7 +114,7 @@ public static class IntropyGenerate
     private sealed record GraphMock(string AppId, string Artifact, string Title, string Version, string BaseUri)
     {
         public static GraphMock From(OpenApiMock mock) => new(
-            mock.AppId, mock.ArtifactPath, mock.Title, mock.Version, mock.BaseUri.AbsoluteUri);
+            mock.AppId, mock.ArtifactPath, mock.Title, mock.Version, LocalMockEndpoints.BaseUri(mock));
     }
 
     private sealed record GraphFileConnector(string Connector, string RootPath)
@@ -135,7 +135,7 @@ public static class IntropyGenerate
             KebabCase(component.Kind.ToString()),
             Optional(component.Subscribes.Select(t => new GraphTopicReference(t.PubSubName, t.TopicName))),
             Optional(component.Publishes.Select(p => new GraphPublication(
-                p.Port == "default" ? null : p.Port, p.PubSubName, p.TopicName))),
+                p.Port == Component.DefaultPort ? null : p.Port, p.PubSubName, p.TopicName))),
             Optional(component.Connectors.Select(c => new GraphConnectorUse(
                 c.ConnectorName, Direction(c.Direction)))),
             Optional(component.Uses));
@@ -210,9 +210,16 @@ public static class IntropyGenerate
 
     private static int Generate(Assembly assembly, string[] args)
     {
+        var positional = args.Skip(1).Where(a => !a.StartsWith('-')).ToArray();
+        if (positional.Length > 1)
+        {
+            Console.Error.WriteLine($"unrecognized arguments: {string.Join(' ', positional.Skip(1))}. Expected: generate [directory].");
+            return 2;
+        }
+
         try
         {
-            var directory = args.Skip(1).FirstOrDefault(a => !a.StartsWith('-')) ?? "./out";
+            var directory = positional.FirstOrDefault() ?? "./out";
             var discovered = SystemDiscovery.Discover(assembly);
             var development = DevelopmentDiscovery.Discover(assembly, discovered.Topology, Directory.GetCurrentDirectory());
             var artifacts = TopologyGenerator.Generate(discovered.Topology, development);
@@ -226,7 +233,7 @@ public static class IntropyGenerate
 
             return 0;
         }
-        catch (Exception ex) when (ex is TopologyValidationException or DevelopmentValidationException or InvalidOperationException)
+        catch (Exception ex) when (ex is IntropyException or InvalidOperationException)
         {
             Console.Error.WriteLine($"error: {ex.Message}");
             return 1;

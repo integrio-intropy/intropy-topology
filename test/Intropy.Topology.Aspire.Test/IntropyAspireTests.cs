@@ -70,6 +70,53 @@ public sealed class IntropyAspireTests : IDisposable
     }
 
     [Fact]
+    public void Apply_WithCyclicTopics_ShouldWarnAndSkipOrdering()
+    {
+        // Arrange: order-extractor and order-loader publish and subscribe each other's
+        // topics. The block builders make a cycle undeclarable, so the model is built
+        // directly. The cycle cannot be ordered; Apply must warn and skip ordering.
+        var topology = Topology() with
+        {
+            Topics =
+            [
+                new TopicResource
+                {
+                    PubSubName = "pubsub-a",
+                    TopicName = "order-raw",
+                    ContractTypeName = "Test.RawOrder",
+                    Publishers = ["order-extractor"],
+                    Subscribers = ["order-loader"],
+                },
+                new TopicResource
+                {
+                    PubSubName = "pubsub-b",
+                    TopicName = "order-processed",
+                    ContractTypeName = "Test.RawOrder",
+                    Publishers = ["order-loader"],
+                    Subscribers = ["order-extractor"],
+                },
+            ],
+        };
+        var builder = CreateBuilder();
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        Console.SetError(error);
+
+        try
+        {
+            // Act
+            IntropyAspire.Apply(builder, topology, GeneratedRoot);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+
+        // Assert
+        Assert.Contains("publish/subscribe cycle", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Apply_ShouldAddRedisBackend()
     {
         // Arrange
@@ -80,6 +127,14 @@ public sealed class IntropyAspireTests : IDisposable
 
         // Assert
         Assert.Contains(builder.Resources, r => r.Name == "redis");
+    }
+
+    [Fact]
+    public void MicrocksOrigin_ShouldAgreeWithTheGenerationCompositionPoint()
+    {
+        // The graph contract forces the dependency-free Generation package to know the
+        // local Microcks origin too; this is the guard against the two drifting.
+        Assert.Equal(IntropyAspire.MicrocksOrigin, LocalMockEndpoints.Origin);
     }
 
     [Fact]
@@ -136,6 +191,24 @@ public sealed class IntropyAspireTests : IDisposable
 
         // Assert
         Assert.Equal(1, matches);
+    }
+
+    [Fact]
+    public void CountMatchingServices_WithEntryMissingAField_ShouldThrowAFocusedError()
+    {
+        // Arrange — a malformed Microcks response must not surface as KeyNotFoundException
+        using var services = JsonDocument.Parse(
+            """
+            [
+              { "name": "Idempotency", "version": "1" }
+            ]
+            """);
+        var mock = new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency", "1");
+
+        // Act & Assert
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => MicrocksImporter.CountMatchingServices(services.RootElement, mock));
+        Assert.Contains("/api/services", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

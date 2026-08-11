@@ -1,3 +1,4 @@
+using Intropy.Topology.Building;
 using Intropy.Topology.Model;
 
 namespace Intropy.Topology.Test.Building;
@@ -106,6 +107,26 @@ public class BuilderMappingTests
         // Assert
         Assert.Same(builder, builder.Publishes(TestTopics.Raw));
         Assert.Same(builder, builder.From(TestConnectors.Pim));
+    }
+
+    [Fact]
+    public void Uses_ShouldChainWithKindSpecificEdgesOnEveryBuilderKind()
+    {
+        // Arrange: Uses lives on the shared base and must chain with each kind's own edges
+        var service = ServiceRef.Define("idempotency-service");
+        var s = SystemBuilder.Create("test-system");
+
+        // Act
+        var extractor = s.AddExtractor("extractor").Uses(service).Publishes(TestTopics.Raw);
+        var loader = s.AddLoader("loader").Subscribes(TestTopics.Raw).Uses(service).To(TestConnectors.Erp);
+        var integration = s.AddTransactionalIntegration("ti").From(TestConnectors.Pim).Uses(service).To(TestConnectors.Erp);
+        var topology = s.Build();
+
+        // Assert
+        Assert.IsType<ExtractorBuilder>(extractor);
+        Assert.IsType<LoaderBuilder>(loader);
+        Assert.IsType<TransactionalIntegrationBuilder>(integration);
+        Assert.All(topology.Components, component => Assert.Equal(["idempotency-service"], component.Uses));
     }
 
     [Fact]

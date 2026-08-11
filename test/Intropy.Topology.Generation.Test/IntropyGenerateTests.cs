@@ -7,20 +7,20 @@ public class IntropyGenerateTests
     private static readonly System.Reflection.Assembly s_assembly = typeof(OrderSystem).Assembly;
 
     [Fact]
-    public async Task RunAsync_Check_ShouldReturnZeroForValidSystem()
+    public void Run_Check_ShouldReturnZeroForValidSystem()
     {
         // Act
-        var (code, _, _) = await Capture(() => IntropyGenerate.RunAsync(s_assembly, ["check"]));
+        var (code, _, _) = Capture(() => IntropyGenerate.Run(s_assembly, ["check"]));
 
         // Assert
         Assert.Equal(0, code);
     }
 
     [Fact]
-    public async Task RunAsync_Graph_ShouldEmitTopologyV1Document()
+    public void Run_Graph_ShouldEmitTopologyV1Document()
     {
         // Act
-        var (code, output, error) = await Capture(() => IntropyGenerate.RunAsync(s_assembly, ["graph"]));
+        var (code, output, error) = Capture(() => IntropyGenerate.Run(s_assembly, ["graph"]));
         using var json = JsonDocument.Parse(output);
         var root = json.RootElement;
 
@@ -34,10 +34,10 @@ public class IntropyGenerateTests
     }
 
     [Fact]
-    public async Task RunAsync_Graph_ShouldEmitTheV1WiringAndLookupTables()
+    public void Run_Graph_ShouldEmitTheV1WiringAndLookupTables()
     {
         // Act
-        var (_, output, _) = await Capture(() => IntropyGenerate.RunAsync(s_assembly, ["graph"]));
+        var (_, output, _) = Capture(() => IntropyGenerate.Run(s_assembly, ["graph"]));
         using var json = JsonDocument.Parse(output);
         var root = json.RootElement;
         var extractor = root.GetProperty("components").EnumerateArray()
@@ -66,10 +66,10 @@ public class IntropyGenerateTests
     }
 
     [Fact]
-    public async Task RunAsync_Graph_WithoutDevelopmentFlag_ShouldOmitDevelopmentSection()
+    public void Run_Graph_WithoutDevelopmentFlag_ShouldOmitDevelopmentSection()
     {
         // Act
-        var (code, output, _) = await Capture(() => IntropyGenerate.RunAsync(s_assembly, ["graph"]));
+        var (code, output, _) = Capture(() => IntropyGenerate.Run(s_assembly, ["graph"]));
         using var json = JsonDocument.Parse(output);
 
         // Assert
@@ -78,10 +78,10 @@ public class IntropyGenerateTests
     }
 
     [Fact]
-    public async Task RunAsync_Graph_WithDevelopmentFlag_ShouldEmitDevelopmentSection()
+    public void Run_Graph_WithDevelopmentFlag_ShouldEmitDevelopmentSection()
     {
         // Act
-        var (code, output, _) = await Capture(() => IntropyGenerate.RunAsync(s_assembly, ["graph", "--development"]));
+        var (code, output, _) = Capture(() => IntropyGenerate.Run(s_assembly, ["graph", "--development"]));
         using var json = JsonDocument.Parse(output);
         var development = json.RootElement.GetProperty("development");
 
@@ -97,10 +97,10 @@ public class IntropyGenerateTests
     }
 
     [Fact]
-    public async Task RunAsync_Graph_WhenSystemDiscoveryFails_ShouldWriteOnlyToStandardError()
+    public void Run_Graph_WhenSystemDiscoveryFails_ShouldWriteOnlyToStandardError()
     {
         // Act
-        var (code, output, error) = await Capture(() => IntropyGenerate.RunAsync(typeof(IntropyGenerate).Assembly, ["graph"]));
+        var (code, output, error) = Capture(() => IntropyGenerate.Run(typeof(IntropyGenerate).Assembly, ["graph"]));
 
         // Assert
         Assert.Equal(1, code);
@@ -109,14 +109,14 @@ public class IntropyGenerateTests
     }
 
     [Fact]
-    public async Task RunAsync_Generate_ShouldWriteArtifactsToDirectory()
+    public void Run_Generate_ShouldWriteArtifactsToDirectory()
     {
         // Arrange
         var dir = Path.Combine(Path.GetTempPath(), "intropy-gen-test-" + Guid.NewGuid().ToString("N"));
         try
         {
             // Act
-            var (code, _, _) = await Capture(() => IntropyGenerate.RunAsync(s_assembly, ["generate", dir]));
+            var (code, _, _) = Capture(() => IntropyGenerate.Run(s_assembly, ["generate", dir]));
 
             // Assert
             Assert.Equal(0, code);
@@ -133,10 +133,10 @@ public class IntropyGenerateTests
     }
 
     [Fact]
-    public async Task RunAsync_Graph_WithOneSidedTopic_ShouldEmitGraphAndWarn()
+    public void Run_Graph_WithOneSidedTopic_ShouldEmitGraphAndWarn()
     {
         // Act
-        var (code, output, error) = await Capture(() => IntropyGenerate.RunAsync(WipSystemFixture.Assembly, ["graph"]));
+        var (code, output, error) = Capture(() => IntropyGenerate.Run(WipSystemFixture.Assembly, ["graph"]));
         using var json = JsonDocument.Parse(output);
         var root = json.RootElement;
 
@@ -148,10 +148,10 @@ public class IntropyGenerateTests
     }
 
     [Fact]
-    public async Task RunAsync_Graph_WipSystemWithDevelopmentFlag_ShouldEmitDevelopmentSection()
+    public void Run_Graph_WipSystemWithDevelopmentFlag_ShouldEmitDevelopmentSection()
     {
         // Act
-        var (code, output, _) = await Capture(() => IntropyGenerate.RunAsync(WipSystemFixture.Assembly, ["graph", "--development"]));
+        var (code, output, _) = Capture(() => IntropyGenerate.Run(WipSystemFixture.Assembly, ["graph", "--development"]));
         using var json = JsonDocument.Parse(output);
         var files = json.RootElement.GetProperty("development").GetProperty("files").EnumerateArray().ToArray();
 
@@ -162,16 +162,45 @@ public class IntropyGenerateTests
     }
 
     [Fact]
-    public async Task RunAsync_UnknownVerb_ShouldReturnNonZero()
+    public void Run_UnknownVerb_ShouldReturnNonZero()
     {
         // Act
-        var (code, _, _) = await Capture(() => IntropyGenerate.RunAsync(s_assembly, ["wat"]));
+        var (code, _, _) = Capture(() => IntropyGenerate.Run(s_assembly, ["wat"]));
 
         // Assert
         Assert.Equal(2, code);
     }
 
-    private static async Task<(int Code, string Output, string Error)> Capture(Func<Task<int>> run)
+    [Fact]
+    public void Run_GenerateWithExtraPositionalArguments_ShouldReturnTwo()
+    {
+        // Act
+        var (code, _, error) = Capture(() => IntropyGenerate.Run(s_assembly, ["generate", "./out", "extra-arg"]));
+
+        // Assert
+        Assert.Equal(2, code);
+        Assert.Contains("unrecognized arguments", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generate_WithInvariantViolation_ShouldThrowRatherThanExit()
+    {
+        // Arrange: a manifest mock no topology service matches — a programming error,
+        // not user input, so it must crash rather than surface as exit code 1.
+        var topic = TopicRef<string>.Define("orders", "created");
+        var builder = SystemBuilder.Create("orders");
+        builder.AddExtractor("extractor").Publishes(topic);
+        builder.AddLoader("loader").Subscribes(topic);
+        var manifest = new DevelopmentManifest(
+            [new OpenApiMock("ghost-service", "/tmp/ghost.yaml", "Ghost", "1")],
+            []);
+
+        // Act & Assert
+        Assert.Throws<InvalidOperationException>(() =>
+            TopologyGenerator.Generate(builder.Build(), manifest));
+    }
+
+    private static (int Code, string Output, string Error) Capture(Func<int> run)
     {
         var originalOut = Console.Out;
         var originalError = Console.Error;
@@ -181,7 +210,7 @@ public class IntropyGenerateTests
         Console.SetError(error);
         try
         {
-            var code = await run();
+            var code = run();
             return (code, output.ToString(), error.ToString());
         }
         finally

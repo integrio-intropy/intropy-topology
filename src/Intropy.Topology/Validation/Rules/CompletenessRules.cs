@@ -8,15 +8,15 @@ namespace Intropy.Topology.Validation.Rules;
 /// destination may stay a private local component, so a loader without a <c>To</c> call
 /// is legal.
 /// </summary>
-internal sealed class MissingRequiredOutputRule : ITopologyRule
+internal sealed class MissingRequiredOutputRule : IModelRule
 {
-    public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
     {
-        foreach (var component in context.Builder.Components)
+        foreach (var component in topology.Components)
         {
             var missing = component.Kind switch
             {
-                ComponentKind.Extractor when component.PublishCalls.Count == 0 =>
+                ComponentKind.Extractor when component.Publishes.Count == 0 =>
                     "Extractor components must publish to at least one topic; add a Publishes call.",
                 _ => null,
             };
@@ -34,13 +34,13 @@ internal sealed class MissingRequiredOutputRule : ITopologyRule
 /// one topic. The block builders prevent illegal calls but cannot force a required
 /// subscription.
 /// </summary>
-internal sealed class MissingRequiredSubscriptionRule : ITopologyRule
+internal sealed class MissingRequiredSubscriptionRule : IModelRule
 {
-    public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
     {
-        foreach (var component in context.Builder.Components)
+        foreach (var component in topology.Components)
         {
-            var count = component.SubscribeCalls.Count;
+            var count = component.Subscribes.Count;
             var message = component.Kind switch
             {
                 ComponentKind.Loader when count != 1 =>
@@ -62,11 +62,11 @@ internal sealed class MissingRequiredSubscriptionRule : ITopologyRule
 /// consumer may simply not exist yet, so the rule warns and local runs proceed.
 /// Deployment validation is where an unconsumed topic becomes an error.
 /// </summary>
-internal sealed class UnconsumedTopicRule : ITopologyRule
+internal sealed class UnconsumedTopicRule : IModelRule
 {
-    public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
     {
-        foreach (var topic in context.Topology.Topics.Where(t => t.Subscribers.Count == 0))
+        foreach (var topic in topology.Topics.Where(t => t.Subscribers.Count == 0))
         {
             yield return new TopologyDiagnostic(
                 DiagnosticSeverity.Warning,
@@ -82,11 +82,11 @@ internal sealed class UnconsumedTopicRule : ITopologyRule
 /// so the rule warns and local runs proceed. Deployment validation is where an
 /// unproduced topic becomes an error.
 /// </summary>
-internal sealed class UnproducedTopicRule : ITopologyRule
+internal sealed class UnproducedTopicRule : IModelRule
 {
-    public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
     {
-        foreach (var topic in context.Topology.Topics.Where(t => t.Publishers.Count == 0))
+        foreach (var topic in topology.Topics.Where(t => t.Publishers.Count == 0))
         {
             yield return new TopologyDiagnostic(
                 DiagnosticSeverity.Warning,

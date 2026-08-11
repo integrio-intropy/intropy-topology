@@ -107,4 +107,42 @@ public class DevelopmentBuilderTests
         var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Build());
         Assert.Contains("does not declare a root path", exception.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Build_WithRootPathEqualToSystemHost_ShouldResolve()
+    {
+        // Arrange
+        var builder = new DevelopmentBuilder(TopologyWithConnector(), Directory.GetCurrentDirectory());
+        builder.Files(s_connector).RootPath(".");
+
+        // Act
+        var manifest = builder.Build();
+
+        // Assert
+        Assert.Equal(Path.GetFullPath("."), Assert.Single(manifest.Files).RootPath);
+    }
+
+    [Fact]
+    public void Build_WithSymlinkedRootPathEscapingSystemHost_ShouldThrow()
+    {
+        // Arrange: a symlink inside the SystemHost pointing outside it
+        var workspace = Directory.CreateTempSubdirectory("intropy-devtest-");
+        try
+        {
+            var outside = Directory.CreateDirectory(Path.Combine(workspace.FullName, "outside"));
+            var host = Directory.CreateDirectory(Path.Combine(workspace.FullName, "host"));
+            Directory.CreateSymbolicLink(Path.Combine(host.FullName, "link"), outside.FullName);
+
+            var builder = new DevelopmentBuilder(TopologyWithConnector(), host.FullName);
+            builder.Files(s_connector).RootPath("./link");
+
+            // Act & Assert
+            var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Build());
+            Assert.Contains("escapes the SystemHost directory", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            workspace.Delete(recursive: true);
+        }
+    }
 }

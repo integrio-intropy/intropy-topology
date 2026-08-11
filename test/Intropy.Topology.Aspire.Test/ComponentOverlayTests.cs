@@ -140,4 +140,54 @@ public sealed class ComponentOverlayTests : IDisposable
         // Act & Assert
         Assert.Equal("pubsub", ComponentOverlay.MetadataName(yaml));
     }
+
+    [Fact]
+    public void MetadataName_WithQuotedValues_ShouldStripTheQuotes()
+    {
+        // Arrange — single- and double-quoted scalars are part of the accepted subset.
+        const string yaml = """
+            apiVersion: dapr.io/v1alpha1
+            kind: Component
+            metadata:
+              name: 'quoted-name'
+            spec:
+              type: "pubsub.redis"
+              version: v1
+            """;
+
+        // Act & Assert
+        Assert.Equal("quoted-name", ComponentOverlay.MetadataName(yaml));
+    }
+
+    [Fact]
+    public void Stage_WithMultipleYamlDocuments_ShouldThrow()
+    {
+        // Arrange — one document per file; multi-doc YAML is rejected outright.
+        var dir = Directory.CreateDirectory(Path.Combine(_workspace, "generated", "components")).FullName;
+        File.WriteAllText(Path.Combine(dir, "two.yaml"), """
+            apiVersion: dapr.io/v1alpha1
+            kind: Component
+            metadata:
+              name: one
+            ---
+            apiVersion: dapr.io/v1alpha1
+            kind: Component
+            metadata:
+              name: two
+            """);
+
+        // Act & Assert
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => ComponentOverlay.Stage(AppHostDir, "order-extractor", dir));
+        Assert.Contains("multiple YAML documents", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MetadataName_WithCrLfLineEndings_ShouldParseIdenticallyToLf()
+    {
+        const string yaml = "apiVersion: dapr.io/v1alpha1\r\nkind: Component\r\nmetadata:\r\n  name: pubsub\r\nspec:\r\n  type: pubsub.redis\r\n";
+
+        // Act & Assert
+        Assert.Equal("pubsub", ComponentOverlay.MetadataName(yaml));
+    }
 }

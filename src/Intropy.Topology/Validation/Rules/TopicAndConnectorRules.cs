@@ -1,3 +1,5 @@
+using Intropy.Topology.Model;
+
 namespace Intropy.Topology.Validation.Rules;
 
 /// <summary>
@@ -5,17 +7,17 @@ namespace Intropy.Topology.Validation.Rules;
 /// records the single <c>default</c> output port; multi-output components (named ports)
 /// are not part of the minimal model.
 /// </summary>
-internal sealed class DuplicatePortRule : ITopologyRule
+internal sealed class DuplicatePortRule : IModelRule
 {
-    public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
     {
-        foreach (var component in context.Builder.Components)
+        foreach (var component in topology.Components)
         {
-            if (component.PublishCalls.Count > 1)
+            if (component.Publishes.Count > 1)
             {
                 yield return new TopologyDiagnostic(
                     DiagnosticSeverity.Error,
-                    $"The component declares {component.PublishCalls.Count} Publishes calls; a component publishes exactly one topic.",
+                    $"The component declares {component.Publishes.Count} Publishes calls; a component publishes exactly one topic.",
                     component.Name);
             }
         }
@@ -23,13 +25,13 @@ internal sealed class DuplicatePortRule : ITopologyRule
 }
 
 /// <summary>A component must not subscribe to the same topic more than once.</summary>
-internal sealed class DuplicateSubscriptionRule : ITopologyRule
+internal sealed class DuplicateSubscriptionRule : IModelRule
 {
-    public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
     {
-        foreach (var component in context.Builder.Components)
+        foreach (var component in topology.Components)
         {
-            var duplicates = component.SubscribeCalls
+            var duplicates = component.Subscribes
                 .GroupBy(t => (t.PubSubName, t.TopicName))
                 .Where(g => g.Count() > 1);
 
@@ -44,12 +46,16 @@ internal sealed class DuplicateSubscriptionRule : ITopologyRule
     }
 }
 
-/// <summary>One topic must not be used with two different event contract types.</summary>
-internal sealed class TopicContractConflictRule : ITopologyRule
+/// <summary>
+/// One topic must not be used with two different event contract types. The model carries
+/// only the contract's name and materialization is first-seen-wins, so the conflict is
+/// visible only in the raw <see cref="TopicRef"/> declarations.
+/// </summary>
+internal sealed class TopicContractConflictRule : IDeclarationRule
 {
-    public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemBuilder builder)
     {
-        var usages = context.Builder.Components.SelectMany(TopicUsages);
+        var usages = builder.Components.SelectMany(TopicUsages);
 
         var conflicts = usages
             .GroupBy(t => (t.PubSubName, t.TopicName))
@@ -80,4 +86,3 @@ internal sealed class TopicContractConflictRule : ITopologyRule
         }
     }
 }
-

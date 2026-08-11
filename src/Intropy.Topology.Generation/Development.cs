@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Intropy.Topology;
 using Intropy.Topology.Model;
 using Microsoft.OpenApi;
 using Microsoft.OpenApi.Reader;
@@ -105,7 +106,7 @@ public sealed class DevelopmentBuilder
 
         /// <summary>Uses a self-contained OpenAPI 3.0.x document relative to the SystemHost directory.</summary>
         /// <param name="path">The relative contract path.</param>
-        public void FromOpenApi(string path)
+        public MockBuilder FromOpenApi(string path)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(path);
             if (_declaration.Path is not null)
@@ -114,6 +115,7 @@ public sealed class DevelopmentBuilder
             }
 
             _declaration.Path = path;
+            return this;
         }
     }
 
@@ -125,7 +127,7 @@ public sealed class DevelopmentBuilder
 
         /// <summary>Reads and writes files in a folder relative to the SystemHost directory.</summary>
         /// <param name="path">The relative folder path.</param>
-        public void RootPath(string path)
+        public FileBuilder RootPath(string path)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(path);
             if (_declaration.Path is not null)
@@ -134,6 +136,7 @@ public sealed class DevelopmentBuilder
             }
 
             _declaration.Path = path;
+            return this;
         }
     }
 
@@ -157,14 +160,10 @@ public sealed record DevelopmentManifest(IReadOnlyList<OpenApiMock> Mocks, IRead
 public sealed record ConnectorFileResolution(string ConnectorName, string RootPath);
 
 /// <summary>One OpenAPI-backed platform-service mock with a verified Microcks identity.</summary>
-public sealed record OpenApiMock(string AppId, string ArtifactPath, string Title, string Version)
-{
-    /// <summary>The local Microcks REST base URI, with title and version escaped as individual path segments.</summary>
-    public Uri BaseUri => new($"http://localhost:8585/rest/{Uri.EscapeDataString(Title)}/{Uri.EscapeDataString(Version)}", UriKind.Absolute);
-}
+public sealed record OpenApiMock(string AppId, string ArtifactPath, string Title, string Version);
 
 /// <summary>Thrown when a development definition or its artifacts are invalid.</summary>
-public sealed class DevelopmentValidationException : InvalidOperationException
+public sealed class DevelopmentValidationException : IntropyException
 {
     /// <summary>Creates an empty validation exception.</summary>
     public DevelopmentValidationException() { }
@@ -183,22 +182,19 @@ public static class DevelopmentDiscovery
     public static DevelopmentManifest Discover(Assembly assembly, SystemTopology topology, string root)
     {
         ArgumentNullException.ThrowIfNull(assembly);
-        var candidates = assembly.GetTypes()
-            .Where(type => type is { IsAbstract: false, IsInterface: false } && typeof(IDevelopmentDefinition).IsAssignableFrom(type))
-            .ToArray();
-        if (candidates.Length > 1)
+        var result = SingleImplementation.Find<IDevelopmentDefinition>(assembly.GetTypes(), requireOne: false);
+        if (result.Error is not null)
         {
-            throw new DevelopmentValidationException(
-                $"Multiple {nameof(IDevelopmentDefinition)} types were found: {string.Join(", ", candidates.Select(type => type.FullName))}. Exactly zero or one is required.");
+            throw new DevelopmentValidationException(result.Error + ".");
         }
 
-        if (candidates.Length == 0)
+        if (result.Instance is null)
         {
             return new DevelopmentManifest([], []);
         }
 
         var builder = new DevelopmentBuilder(topology, root);
-        ((IDevelopmentDefinition)Activator.CreateInstance(candidates[0])!).Define(builder);
+        result.Instance.Define(builder);
         return builder.Build();
     }
 }
@@ -214,22 +210,39 @@ internal static class FileRootPath
             throw new DevelopmentValidationException($"File resolution for connector '{connectorName}' does not declare a root path.");
         }
 
-        var rootPath = ResolveDirectory(root, $"SystemHost directory '{root}' cannot be resolved");
-        var folderPath = Path.GetFullPath(Path.Combine(rootPath, relativePath));
+        var rootPath = PathContainment.ResolveRoot(root);
+        var folderPath = PathContainment.Resolve(rootPath, relativePath, out var escaped);
+        var error = $"File resolution '{relativePath}' for connector '{connectorName}'";
         if (Directory.Exists(folderPath))
         {
-            folderPath = ResolveDirectory(folderPath, $"File resolution '{relativePath}' for connector '{connectorName}' cannot be resolved");
+            folderPath = PathContainment.ResolveDirectory(folderPath, $"{error} cannot be resolved");
         }
 
-        if (!folderPath.StartsWith(rootPath + Path.DirectorySeparatorChar, StringComparison.Ordinal) && !string.Equals(folderPath, rootPath, StringComparison.Ordinal))
+        if (escaped || !PathContainment.IsWithin(rootPath, folderPath))
         {
-            throw new DevelopmentValidationException($"File resolution '{relativePath}' for connector '{connectorName}' escapes the SystemHost directory.");
+            throw new DevelopmentValidationException($"{error} escapes the SystemHost directory.");
         }
 
         return new ConnectorFileResolution(connectorName, folderPath);
     }
+}
 
-    private static string ResolveDirectory(string path, string error)
+/// <summary>
+/// Canonicalizes paths against the SystemHost directory and rejects escapes. Both
+/// development artifact kinds (connector file roots, OpenAPI mock documents) resolve
+/// the same way: the root is canonicalized through its symlink target, the relative
+/// path is combined and canonicalized, and any path landing outside the root is a
+/// validation error.
+/// </summary>
+internal static class PathContainment
+{
+    /// <summary>The canonical SystemHost root; symlink targets are resolved.</summary>
+    public static string ResolveRoot(string root) =>
+        ResolveDirectory(Path.GetFullPath(root), $"SystemHost directory '{root}' cannot be resolved");
+
+    /// <summary>Canonicalizes a directory through its symlink target.</summary>
+    /// <exception cref="DevelopmentValidationException">The path cannot be resolved.</exception>
+    public static string ResolveDirectory(string path, string error)
     {
         try
         {
@@ -240,6 +253,20 @@ internal static class FileRootPath
             throw new DevelopmentValidationException($"{error}: {ex.Message}", ex);
         }
     }
+
+    /// <summary>Combines and canonicalizes <paramref name="relativePath"/> against
+    /// <paramref name="rootPath"/>; <paramref name="escaped"/> reports a lexical escape.</summary>
+    public static string Resolve(string rootPath, string relativePath, out bool escaped)
+    {
+        var combined = Path.GetFullPath(Path.Combine(rootPath, relativePath));
+        escaped = !IsWithin(rootPath, combined);
+        return combined;
+    }
+
+    /// <summary>Whether <paramref name="path"/> is <paramref name="rootPath"/> or inside it.</summary>
+    public static bool IsWithin(string rootPath, string path) =>
+        path.StartsWith(rootPath + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+        || string.Equals(path, rootPath, StringComparison.Ordinal);
 }
 
 internal static class OpenApiArtifact
@@ -256,18 +283,9 @@ internal static class OpenApiArtifact
             throw new DevelopmentValidationException($"Mock for service '{appId}' does not declare an OpenAPI artifact.");
         }
 
-        var rootPath = Path.GetFullPath(root);
-        try
-        {
-            rootPath = Path.GetFullPath(new DirectoryInfo(rootPath).ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? rootPath);
-        }
-        catch (IOException ex)
-        {
-            throw new DevelopmentValidationException($"SystemHost directory '{root}' cannot be resolved: {ex.Message}", ex);
-        }
-
-        var artifactPath = Path.GetFullPath(Path.Combine(rootPath, relativePath));
-        if (!artifactPath.StartsWith(rootPath + Path.DirectorySeparatorChar, StringComparison.Ordinal) && !string.Equals(artifactPath, rootPath, StringComparison.Ordinal))
+        var rootPath = PathContainment.ResolveRoot(root);
+        var artifactPath = PathContainment.Resolve(rootPath, relativePath, out var escaped);
+        if (escaped)
         {
             throw new DevelopmentValidationException($"Mock artifact '{relativePath}' for service '{appId}' escapes the SystemHost directory.");
         }
@@ -281,7 +299,7 @@ internal static class OpenApiArtifact
             throw new DevelopmentValidationException($"Mock artifact '{relativePath}' for service '{appId}' cannot be resolved: {ex.Message}");
         }
 
-        if (!artifactPath.StartsWith(rootPath + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        if (!PathContainment.IsWithin(rootPath, artifactPath))
         {
             throw new DevelopmentValidationException($"Mock artifact '{relativePath}' for service '{appId}' escapes the SystemHost directory through a symlink.");
         }

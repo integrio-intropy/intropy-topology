@@ -27,6 +27,14 @@ public static class IntropyAspire
     internal const int MicrocksPort = 8585;
 
     /// <summary>
+    /// The local Microcks origin — this package's composition of <see cref="MicrocksPort"/>.
+    /// Must agree with <c>LocalMockEndpoints.Origin</c> in the Generation package: the
+    /// <c>topology.intropy.io/v1</c> graph contract forces that package to know the origin
+    /// too. Asserted by test; keep both in sync.
+    /// </summary>
+    internal const string MicrocksOrigin = "http://localhost:8585";
+
+    /// <summary>
     /// Discovers the system in <paramref name="assembly"/>, generates its artifacts to a temp folder,
     /// builds the Aspire resource graph, and runs it. Requires Docker and the Dapr CLI to be present.
     /// </summary>
@@ -54,7 +62,7 @@ public static class IntropyAspire
             await app.RunAsync().ConfigureAwait(false);
             return 0;
         }
-        catch (Exception ex) when (ex is TopologyValidationException or DevelopmentValidationException or InvalidOperationException)
+        catch (Exception ex) when (ex is IntropyException or InvalidOperationException)
         {
             await Console.Error.WriteLineAsync($"error: {ex.Message}").ConfigureAwait(false);
             return 1;
@@ -75,40 +83,8 @@ public static class IntropyAspire
         var componentsPath = Path.Combine(generatedRoot, GeneratedArtifacts.ComponentsDir);
         var configDir = Path.Combine(generatedRoot, GeneratedArtifacts.ConfigDir);
 
-        // A plain Redis container rather than AddRedis: the generated pub/sub YAML speaks
-        // passwordless to localhost:6380, while AddRedis injects a generated password.
-        EnsureHostPortAvailable(RedisPort);
-        var redis = builder
-            .AddContainer("redis", "docker.io/library/redis", "7")
-            .WithEndpoint(port: RedisPort, targetPort: 6379);
-        // Everything a sidecar dials during component init. Sidecars must wait for Redis to be
-        // *ready* (not merely running) — daprd treats a failed component init as fatal, so racing
-        // a still-starting backend kills the sidecar. localhost:6380 is DCP's endpoint proxy,
-        // which accepts connections from host start, so the probe must demand a PONG rather
-        // than settle for an open socket.
-        var redisReadiness = new TcpReadyHealthCheck("localhost", RedisPort, TcpReadyHealthCheck.RedisHandshake);
-        WithTcpReadiness(builder, redis, redisReadiness);
-
-        MockReadiness? mockReadiness = null;
-        IResourceBuilder<ContainerResource>? microcks = null;
-        if (development.Mocks.Count > 0)
-        {
-            EnsureHostPortAvailable(MicrocksPort, "Microcks");
-            microcks = builder
-                .AddContainer("microcks", "quay.io/microcks/microcks-uber", "1.13.0")
-                .WithEndpoint(name: "http", scheme: "http", port: MicrocksPort, targetPort: 8080)
-                .WithHttpHealthCheck("/api/health");
-            mockReadiness = new MockReadiness(development);
-            builder.Services.AddSingleton(development);
-            builder.Services.AddSingleton(mockReadiness);
-            builder.Services.AddHttpClient(nameof(MicrocksImporter));
-            builder.Services.AddSingleton<MicrocksImporter>();
-            microcks.OnResourceReady(async (_, evt, cancellationToken) =>
-            {
-                var importer = evt.Services.GetRequiredService<MicrocksImporter>();
-                await importer.ImportAsync(cancellationToken).ConfigureAwait(false);
-            });
-        }
+        var (redis, redisReadiness) = AddRedisBackend(builder);
+        var (microcks, mockReadiness) = AddMicrocksBackend(builder, development);
 
         // Filled after the component loop; the hook closure only reads it at runtime.
         var sidecarWaits = new Dictionary<string, string[]>(StringComparer.Ordinal);
@@ -192,8 +168,8 @@ public static class IntropyAspire
         // subscription. Nobody declares this: it is derived from who publishes and who
         // subscribes each topic. Publish/subscribe cycles cannot be ordered — skip entirely
         // rather than deadlock.
-        var precedence = SubscriberPrecedence(topology);
-        if (HasCycle(precedence))
+        var precedence = StartupOrdering.SubscriberPrecedence(topology);
+        if (StartupOrdering.HasCycle(precedence))
         {
             Console.Error.WriteLine(
                 "intropy: the topology's topics form a publish/subscribe cycle; " +
@@ -239,58 +215,54 @@ public static class IntropyAspire
     }
 
     /// <summary>
-    /// Which components each publisher must wait for: every subscriber of every topic it
-    /// publishes. Self-loops (a component consuming its own topic) are not orderable edges.
+    /// A plain Redis container rather than AddRedis: the generated pub/sub YAML speaks
+    /// passwordless to localhost:6380, while AddRedis injects a generated password.
     /// </summary>
-    private static Dictionary<string, HashSet<string>> SubscriberPrecedence(SystemTopology topology)
+    private static (IResourceBuilder<ContainerResource> Redis, TcpReadyHealthCheck Readiness) AddRedisBackend(
+        IDistributedApplicationBuilder builder)
     {
-        var precedence = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-        foreach (var topic in topology.Topics)
-        {
-            foreach (var publisher in topic.Publishers)
-            {
-                foreach (var subscriber in topic.Subscribers)
-                {
-                    if (string.Equals(publisher, subscriber, StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-
-                    if (!precedence.TryGetValue(publisher, out var subscribers))
-                    {
-                        precedence[publisher] = subscribers = new HashSet<string>(StringComparer.Ordinal);
-                    }
-
-                    subscribers.Add(subscriber);
-                }
-            }
-        }
-
-        return precedence;
+        EnsureHostPortAvailable(RedisPort);
+        var redis = builder
+            .AddContainer("redis", "docker.io/library/redis", "7")
+            .WithEndpoint(port: RedisPort, targetPort: 6379);
+        // Everything a sidecar dials during component init. Sidecars must wait for Redis to be
+        // *ready* (not merely running) — daprd treats a failed component init as fatal, so racing
+        // a still-starting backend kills the sidecar. localhost:6380 is DCP's endpoint proxy,
+        // which accepts connections from host start, so the probe must demand a PONG rather
+        // than settle for an open socket.
+        var readiness = new TcpReadyHealthCheck("localhost", RedisPort, TcpReadyHealthCheck.RedisHandshake);
+        WithTcpReadiness(builder, redis, readiness);
+        return (redis, readiness);
     }
 
-    private static bool HasCycle(Dictionary<string, HashSet<string>> edges)
+    /// <summary>
+    /// The local Microcks Uber backend and its contract importer, when the development
+    /// manifest declares mocks; both results are null otherwise.
+    /// </summary>
+    private static (IResourceBuilder<ContainerResource>? Microcks, MockReadiness? Readiness) AddMicrocksBackend(
+        IDistributedApplicationBuilder builder, DevelopmentManifest development)
     {
-        var state = new Dictionary<string, int>(StringComparer.Ordinal); // 1 = visiting, 2 = done
-
-        bool Visit(string node)
+        if (development.Mocks.Count == 0)
         {
-            if (state.TryGetValue(node, out var seen))
-            {
-                return seen == 1;
-            }
-
-            state[node] = 1;
-            if (edges.TryGetValue(node, out var next) && next.Any(Visit))
-            {
-                return true;
-            }
-
-            state[node] = 2;
-            return false;
+            return (null, null);
         }
 
-        return edges.Keys.Any(Visit);
+        EnsureHostPortAvailable(MicrocksPort, "Microcks");
+        var microcks = builder
+            .AddContainer("microcks", "quay.io/microcks/microcks-uber", "1.13.0")
+            .WithEndpoint(name: "http", scheme: "http", port: MicrocksPort, targetPort: 8080)
+            .WithHttpHealthCheck("/api/health");
+        var readiness = new MockReadiness(development);
+        builder.Services.AddSingleton(development);
+        builder.Services.AddSingleton(readiness);
+        builder.Services.AddHttpClient(nameof(MicrocksImporter));
+        builder.Services.AddSingleton<MicrocksImporter>();
+        microcks.OnResourceReady(async (_, evt, cancellationToken) =>
+        {
+            var importer = evt.Services.GetRequiredService<MicrocksImporter>();
+            await importer.ImportAsync(cancellationToken).ConfigureAwait(false);
+        });
+        return (microcks, readiness);
     }
 
     private static void EnsureHostPortAvailable(int port, string backend = "Redis")

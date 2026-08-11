@@ -19,6 +19,17 @@ public abstract class ComponentBuilder<TSelf, TComponent>
 
     /// <summary>The typed component this builder declares — hold it to reference the block later.</summary>
     public TComponent Component { get; }
+
+    /// <summary>The fluent self-reference every chainable member returns.</summary>
+    private protected abstract TSelf Self { get; }
+
+    /// <summary>Declares that the component invokes an external platform service.</summary>
+    /// <param name="service">The Dapr app identity invoked by the component.</param>
+    public TSelf Uses(ServiceRef service)
+    {
+        Component.AddService(service);
+        return Self;
+    }
 }
 
 /// <summary>Fluent builder for an extractor: an edge block that pulls or receives data
@@ -26,6 +37,8 @@ public abstract class ComponentBuilder<TSelf, TComponent>
 public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, ExtractorComponent>
 {
     internal ExtractorBuilder(ExtractorComponent component) : base(component) { }
+
+    private protected override ExtractorBuilder Self => this;
 
     /// <summary>Declares that the extractor reads from the outside world through a connector.</summary>
     /// <param name="connector">The connector to read from.</param>
@@ -42,14 +55,6 @@ public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, Extrac
         Component.AddPublish(topic);
         return this;
     }
-
-    /// <summary>Declares that the extractor invokes an external platform service.</summary>
-    /// <param name="service">The Dapr app identity invoked by the extractor.</param>
-    public ExtractorBuilder Uses(ServiceRef service)
-    {
-        Component.AddService(service);
-        return this;
-    }
 }
 
 /// <summary>Fluent builder for a loader: an edge block that subscribes to exactly one topic
@@ -57,6 +62,8 @@ public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, Extrac
 public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderComponent>
 {
     internal LoaderBuilder(LoaderComponent component) : base(component) { }
+
+    private protected override LoaderBuilder Self => this;
 
     /// <summary>Declares the single topic the loader subscribes to.</summary>
     /// <param name="topic">The topic whose events the loader consumes.</param>
@@ -73,14 +80,6 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
         Component.AddConnector(connector, ConnectorDirection.Out);
         return this;
     }
-
-    /// <summary>Declares that the loader invokes an external platform service.</summary>
-    /// <param name="service">The Dapr app identity invoked by the loader.</param>
-    public LoaderBuilder Uses(ServiceRef service)
-    {
-        Component.AddService(service);
-        return this;
-    }
 }
 
 /// <summary>Fluent builder for a transactional integration: a synchronous block that
@@ -90,6 +89,8 @@ public sealed class TransactionalIntegrationBuilder
 {
     internal TransactionalIntegrationBuilder(TransactionalIntegrationComponent component)
         : base(component) { }
+
+    private protected override TransactionalIntegrationBuilder Self => this;
 
     /// <summary>Declares that the integration reads from an external system through a connector.</summary>
     /// <param name="connector">The connector to read from.</param>
@@ -104,14 +105,6 @@ public sealed class TransactionalIntegrationBuilder
     public TransactionalIntegrationBuilder To(ConnectorRef connector)
     {
         Component.AddConnector(connector, ConnectorDirection.Out);
-        return this;
-    }
-
-    /// <summary>Declares that the integration invokes an external platform service.</summary>
-    /// <param name="service">The Dapr app identity invoked by the integration.</param>
-    public TransactionalIntegrationBuilder Uses(ServiceRef service)
-    {
-        Component.AddService(service);
         return this;
     }
 }
