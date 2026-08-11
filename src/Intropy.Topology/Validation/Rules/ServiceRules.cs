@@ -1,11 +1,17 @@
+using Intropy.Topology.Model;
+
 namespace Intropy.Topology.Validation.Rules;
 
-/// <summary>Services cannot repeat per component or collide with component app IDs.</summary>
-internal sealed class ServiceUsageRule : ITopologyRule
+/// <summary>
+/// A component must not use the same service more than once. The materializer
+/// deduplicates service usage, so the repetition is visible only in the raw
+/// declarations.
+/// </summary>
+internal sealed class DuplicateServiceUsageRule : IDeclarationRule
 {
-    public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemBuilder builder)
     {
-        foreach (var component in context.Builder.Components)
+        foreach (var component in builder.Components)
         {
             foreach (var duplicate in component.ServiceCalls
                 .GroupBy(service => service.AppId, StringComparer.Ordinal)
@@ -17,11 +23,18 @@ internal sealed class ServiceUsageRule : ITopologyRule
                     component.Name);
             }
         }
+    }
+}
 
-        var componentNames = context.Topology.Components
+/// <summary>A service app ID must not collide with a topology component app ID.</summary>
+internal sealed class ServiceAppIdCollisionRule : IModelRule
+{
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
+    {
+        var componentNames = topology.Components
             .Select(component => component.Name)
             .ToHashSet(StringComparer.Ordinal);
-        foreach (var service in context.Topology.Services.Where(service => componentNames.Contains(service.AppId)))
+        foreach (var service in topology.Services.Where(service => componentNames.Contains(service.AppId)))
         {
             yield return new TopologyDiagnostic(
                 DiagnosticSeverity.Error,

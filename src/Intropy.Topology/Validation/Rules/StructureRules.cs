@@ -1,11 +1,13 @@
+using Intropy.Topology.Model;
+
 namespace Intropy.Topology.Validation.Rules;
 
 /// <summary>Every component needs a unique name.</summary>
-internal sealed class DuplicateComponentNameRule : ITopologyRule
+internal sealed class DuplicateComponentNameRule : IModelRule
 {
-    public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
     {
-        var duplicates = context.Topology.Components
+        var duplicates = topology.Components
             .GroupBy(c => c.Name, StringComparer.Ordinal)
             .Where(g => g.Count() > 1);
 
@@ -20,16 +22,16 @@ internal sealed class DuplicateComponentNameRule : ITopologyRule
 }
 
 /// <summary>A system must declare at least one component.</summary>
-internal sealed class EmptySystemRule : ITopologyRule
+internal sealed class EmptySystemRule : IModelRule
 {
-    public IEnumerable<TopologyDiagnostic> Evaluate(ValidationContext context)
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
     {
-        if (context.Topology.Components.Count == 0)
+        if (topology.Components.Count == 0)
         {
             yield return new TopologyDiagnostic(
                 DiagnosticSeverity.Error,
                 "The system declares no components.",
-                context.Topology.SystemName);
+                topology.SystemName);
         }
     }
 }

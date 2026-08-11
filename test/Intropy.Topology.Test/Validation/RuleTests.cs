@@ -14,10 +14,15 @@ internal static class ValidationTestHelper
         return s;
     }
 
-    /// <summary>Runs a single rule against the materialized system, isolating it from the others.</summary>
+    /// <summary>Runs a single model rule against the materialized system, isolating it from the others.</summary>
     public static IReadOnlyList<TopologyDiagnostic> DiagnosticsFor<TRule>(this SystemBuilder s)
-        where TRule : ITopologyRule, new() =>
-        new TRule().Evaluate(new ValidationContext(s, TopologyMaterializer.Materialize(s))).ToArray();
+        where TRule : IModelRule, new() =>
+        new TRule().Evaluate(TopologyMaterializer.Materialize(s)).ToArray();
+
+    /// <summary>Runs a single declaration rule against the raw builder, isolating it from the others.</summary>
+    public static IReadOnlyList<TopologyDiagnostic> DeclarationDiagnosticsFor<TRule>(this SystemBuilder s)
+        where TRule : IDeclarationRule, new() =>
+        new TRule().Evaluate(s).ToArray();
 }
 
 public class DuplicateComponentNameRuleTests
@@ -119,7 +124,7 @@ public class TopicContractConflictRuleTests
             .Publishes(TopicRef<EnrichedEvent>.Define("test-pubsub", "shared-topic"));
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor<TopicContractConflictRule>());
+        var diagnostic = Assert.Single(s.DeclarationDiagnosticsFor<TopicContractConflictRule>());
 
         // Assert
         Assert.Contains(typeof(RawEvent).FullName!, diagnostic.Message);

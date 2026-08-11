@@ -39,6 +39,22 @@ public sealed class ServiceTests
     }
 
     [Fact]
+    public void Validate_WithRepeatedServiceUsageAndAppIdCollision_ShouldReportBothErrors()
+    {
+        // Arrange: the duplicate-usage and collision halves are separate rules that must compose
+        var builder = SystemBuilder.Create("orders");
+        builder.AddExtractor("idempotency-service").Publishes(s_topic).Uses(s_idempotency).Uses(s_idempotency);
+        builder.AddLoader("loader").Subscribes(s_topic);
+
+        // Act
+        var diagnostics = builder.Validate();
+
+        // Assert
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Message.Contains("more than once", StringComparison.Ordinal));
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Message.Contains("collides", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Validate_WithComponentAppIdMatchingService_ShouldReportAnError()
     {
         // Arrange
