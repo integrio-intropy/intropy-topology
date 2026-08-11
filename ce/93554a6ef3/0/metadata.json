@@ -1,0 +1,52 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "ce93554a6ef3",
+  "session_id": "019feef3-46f6-762c-b519-5ca3bcf5ea9c",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-11T04:03:46.118262Z",
+  "branch": "refactor/solid-cleanup",
+  "checkpoints_count": 3,
+  "save_step_count": 2,
+  "files_touched": [],
+  "agent": "Pi",
+  "model": "moonshotai/Kimi-K3",
+  "turn_id": "17b762162bec",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 65819,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1567424,
+    "output_tokens": 23544,
+    "api_call_count": 33
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 754,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/designs/platform-service-development-mocks.md": 476,
+        "docs/designs/system-gateway-apis.md": 278
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1343,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1396,
+      "agent_lines_removed": 0
+    }
+  ]
+}

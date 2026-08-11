@@ -1,0 +1,9 @@
+Analyze this repo for refactoring targets. Places where we violate SOLID or have other code smells. Do not make any changes
+
+---
+
+can you make a plan for fixing all issues?
+
+---
+
+can you launch a review agent with pi --print?
