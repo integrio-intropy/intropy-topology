@@ -62,7 +62,7 @@ public static class IntropyAspire
             await app.RunAsync().ConfigureAwait(false);
             return 0;
         }
-        catch (Exception ex) when (ex is TopologyValidationException or DevelopmentValidationException or InvalidOperationException)
+        catch (Exception ex) when (ex is IntropyException or InvalidOperationException)
         {
             await Console.Error.WriteLineAsync($"error: {ex.Message}").ConfigureAwait(false);
             return 1;

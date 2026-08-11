@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Intropy.Topology;
 using Intropy.Topology.Model;
 using Microsoft.OpenApi;
 using Microsoft.OpenApi.Reader;
@@ -160,7 +161,7 @@ public sealed record ConnectorFileResolution(string ConnectorName, string RootPa
 public sealed record OpenApiMock(string AppId, string ArtifactPath, string Title, string Version);
 
 /// <summary>Thrown when a development definition or its artifacts are invalid.</summary>
-public sealed class DevelopmentValidationException : InvalidOperationException
+public sealed class DevelopmentValidationException : IntropyException
 {
     /// <summary>Creates an empty validation exception.</summary>
     public DevelopmentValidationException() { }

@@ -4,11 +4,33 @@ using System.Text;
 namespace Intropy.Topology;
 
 /// <summary>
+/// Base type for user-facing validation errors: the declared input (topology or
+/// development definition) is at fault, not the library. Entry points catch this to
+/// report the message and exit non-zero; every other exception is a programming error
+/// and must propagate.
+/// </summary>
+public abstract class IntropyException : Exception
+{
+    /// <summary>Creates the exception with no message.</summary>
+    protected IntropyException() { }
+
+    /// <summary>Creates the exception with a message.</summary>
+    /// <param name="message">The exception message.</param>
+    protected IntropyException(string message) : base(message) { }
+
+    /// <summary>Creates the exception with a message and an inner exception.</summary>
+    /// <param name="message">The exception message.</param>
+    /// <param name="innerException">The causing exception.</param>
+    protected IntropyException(string message, Exception innerException)
+        : base(message, innerException) { }
+}
+
+/// <summary>
 /// Thrown by <see cref="SystemBuilder.Build"/> when the declared topology has one or
 /// more error-severity violations. Carries every diagnostic found — not just the first —
 /// so a SystemHost run reports the whole picture at once.
 /// </summary>
-public sealed class TopologyValidationException : Exception
+public sealed class TopologyValidationException : IntropyException
 {
     /// <summary>All diagnostics found, including warnings.</summary>
     public IReadOnlyList<TopologyDiagnostic> Diagnostics { get; }

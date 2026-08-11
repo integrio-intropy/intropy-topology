@@ -23,19 +23,19 @@ public static class IntropyGenerate
     /// <param name="assembly">The assembly declaring the <see cref="ISystemDefinition"/>.</param>
     /// <param name="args">Command-line arguments; <c>args[0]</c> is the verb (check | graph | generate).</param>
     /// <returns>A process exit code.</returns>
-    public static Task<int> RunAsync(Assembly assembly, string[] args)
+    public static int Run(Assembly assembly, string[] args)
     {
         ArgumentNullException.ThrowIfNull(assembly);
         ArgumentNullException.ThrowIfNull(args);
 
         var verb = args.Length > 0 ? args[0] : "check";
-        return Task.FromResult(verb switch
+        return verb switch
         {
             "check" => Check(assembly),
             "graph" => Graph(assembly, args),
             "generate" => Generate(assembly, args),
             _ => Unknown(verb),
-        });
+        };
     }
 
     private static int Check(Assembly assembly)
@@ -47,7 +47,7 @@ public static class IntropyGenerate
             Console.WriteLine($"ok: '{discovered.Topology.SystemName}' is valid ({discovered.Topology.Components.Count} components).");
             return 0;
         }
-        catch (Exception ex) when (ex is TopologyValidationException or DevelopmentValidationException or InvalidOperationException)
+        catch (Exception ex) when (ex is IntropyException or InvalidOperationException)
         {
             Console.Error.WriteLine($"error: {ex.Message}");
             return 1;
@@ -73,7 +73,7 @@ public static class IntropyGenerate
             Console.WriteLine(JsonSerializer.Serialize(GraphDocument.From(topology, development), s_json));
             return 0;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IntropyException or InvalidOperationException)
         {
             Console.Error.WriteLine($"error: {ex.Message}");
             return 1;
@@ -226,7 +226,7 @@ public static class IntropyGenerate
 
             return 0;
         }
-        catch (Exception ex) when (ex is TopologyValidationException or DevelopmentValidationException or InvalidOperationException)
+        catch (Exception ex) when (ex is IntropyException or InvalidOperationException)
         {
             Console.Error.WriteLine($"error: {ex.Message}");
             return 1;

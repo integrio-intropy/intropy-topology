@@ -15,4 +15,4 @@ var assembly = Assembly.GetExecutingAssembly();
 
 return args is ["run", ..] or []
     ? await IntropyAspire.RunAsync(assembly, args)
-    : await IntropyGenerate.RunAsync(assembly, args);
+    : IntropyGenerate.Run(assembly, args);
