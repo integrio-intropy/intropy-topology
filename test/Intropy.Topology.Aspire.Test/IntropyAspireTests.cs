@@ -83,6 +83,14 @@ public sealed class IntropyAspireTests : IDisposable
     }
 
     [Fact]
+    public void MicrocksOrigin_ShouldAgreeWithTheGenerationCompositionPoint()
+    {
+        // The graph contract forces the dependency-free Generation package to know the
+        // local Microcks origin too; this is the guard against the two drifting.
+        Assert.Equal(IntropyAspire.MicrocksOrigin, LocalMockEndpoints.Origin);
+    }
+
+    [Fact]
     public void Apply_WithDevelopmentMocks_ShouldAddOneMicrocksResource()
     {
         // Arrange

@@ -43,7 +43,7 @@ internal sealed class MicrocksImporter(
     internal async Task ImportAsync(CancellationToken cancellationToken)
     {
         var client = clients.CreateClient(nameof(MicrocksImporter));
-        client.BaseAddress = new Uri("http://localhost:8585");
+        client.BaseAddress = new Uri(IntropyAspire.MicrocksOrigin);
         foreach (var mock in development.Mocks)
         {
             try

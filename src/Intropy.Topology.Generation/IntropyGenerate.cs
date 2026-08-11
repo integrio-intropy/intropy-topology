@@ -114,7 +114,7 @@ public static class IntropyGenerate
     private sealed record GraphMock(string AppId, string Artifact, string Title, string Version, string BaseUri)
     {
         public static GraphMock From(OpenApiMock mock) => new(
-            mock.AppId, mock.ArtifactPath, mock.Title, mock.Version, mock.BaseUri.AbsoluteUri);
+            mock.AppId, mock.ArtifactPath, mock.Title, mock.Version, LocalMockEndpoints.BaseUri(mock));
     }
 
     private sealed record GraphFileConnector(string Connector, string RootPath)

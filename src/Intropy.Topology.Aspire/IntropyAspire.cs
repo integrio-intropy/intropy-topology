@@ -27,6 +27,14 @@ public static class IntropyAspire
     internal const int MicrocksPort = 8585;
 
     /// <summary>
+    /// The local Microcks origin — this package's composition of <see cref="MicrocksPort"/>.
+    /// Must agree with <c>LocalMockEndpoints.Origin</c> in the Generation package: the
+    /// <c>topology.intropy.io/v1</c> graph contract forces that package to know the origin
+    /// too. Asserted by test; keep both in sync.
+    /// </summary>
+    internal const string MicrocksOrigin = "http://localhost:8585";
+
+    /// <summary>
     /// Discovers the system in <paramref name="assembly"/>, generates its artifacts to a temp folder,
     /// builds the Aspire resource graph, and runs it. Requires Docker and the Dapr CLI to be present.
     /// </summary>

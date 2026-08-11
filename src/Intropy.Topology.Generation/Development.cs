@@ -157,11 +157,7 @@ public sealed record DevelopmentManifest(IReadOnlyList<OpenApiMock> Mocks, IRead
 public sealed record ConnectorFileResolution(string ConnectorName, string RootPath);
 
 /// <summary>One OpenAPI-backed platform-service mock with a verified Microcks identity.</summary>
-public sealed record OpenApiMock(string AppId, string ArtifactPath, string Title, string Version)
-{
-    /// <summary>The local Microcks REST base URI, with title and version escaped as individual path segments.</summary>
-    public Uri BaseUri => new($"http://localhost:8585/rest/{Uri.EscapeDataString(Title)}/{Uri.EscapeDataString(Version)}", UriKind.Absolute);
-}
+public sealed record OpenApiMock(string AppId, string ArtifactPath, string Title, string Version);
 
 /// <summary>Thrown when a development definition or its artifacts are invalid.</summary>
 public sealed class DevelopmentValidationException : InvalidOperationException

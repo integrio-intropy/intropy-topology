@@ -10,6 +10,24 @@ namespace Intropy.Topology.Generation;
 /// <param name="Content">The file's text content.</param>
 public sealed record GeneratedFile(string RelativePath, string Content);
 
+/// <summary>
+/// The single composition point for local mock endpoint URLs. The origin is a
+/// local-runtime convention this dependency-free package would rather not know —
+/// but the <c>topology.intropy.io/v1</c> graph contract includes <c>baseUri</c>,
+/// which forces the knowledge here. The Aspire backend owns the matching port
+/// constant (<c>IntropyAspire.MicrocksPort</c>) and must agree with
+/// <see cref="Origin"/>; do not introduce a second composition site.
+/// </summary>
+internal static class LocalMockEndpoints
+{
+    public const string Origin = "http://localhost:8585";
+
+    /// <summary>The mock's local Microcks REST base URI, with title and version escaped
+    /// as individual path segments.</summary>
+    public static string BaseUri(OpenApiMock mock) =>
+        $"{Origin}/rest/{Uri.EscapeDataString(mock.Title)}/{Uri.EscapeDataString(mock.Version)}";
+}
+
 /// <summary>The artifacts generated for a system: Dapr component YAML and per-component runtime config.</summary>
 public sealed class GeneratedArtifacts
 {
@@ -124,7 +142,7 @@ public static class TopologyGenerator
 
     private static GeneratedFile HttpEndpoint(OpenApiMock mock, ServiceResource service)
     {
-        var yaml = DaprYaml.HttpEndpoint(mock.AppId, mock.BaseUri.AbsoluteUri, service.Consumers);
+        var yaml = DaprYaml.HttpEndpoint(mock.AppId, LocalMockEndpoints.BaseUri(mock), service.Consumers);
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{mock.AppId}.yaml", yaml);
     }
 
