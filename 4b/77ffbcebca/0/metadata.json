@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "4b77ffbcebca",
+  "session_id": "019feef3-46f6-762c-b519-5ca3bcf5ea9c",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-11T04:05:02.002872Z",
+  "branch": "refactor/solid-cleanup",
+  "checkpoints_count": 3,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "Pi",
+  "model": "moonshotai/Kimi-K3",
+  "turn_id": "17b762162bec",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 72296,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3282816,
+    "output_tokens": 27874,
+    "api_call_count": 55
+  },
+  "session_metrics": {
+    "turn_count": 3
+  }
+}
