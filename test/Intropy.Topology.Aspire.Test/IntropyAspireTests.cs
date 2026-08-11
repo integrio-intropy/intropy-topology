@@ -70,6 +70,53 @@ public sealed class IntropyAspireTests : IDisposable
     }
 
     [Fact]
+    public void Apply_WithCyclicTopics_ShouldWarnAndSkipOrdering()
+    {
+        // Arrange: order-extractor and order-loader publish and subscribe each other's
+        // topics. The block builders make a cycle undeclarable, so the model is built
+        // directly. The cycle cannot be ordered; Apply must warn and skip ordering.
+        var topology = Topology() with
+        {
+            Topics =
+            [
+                new TopicResource
+                {
+                    PubSubName = "pubsub-a",
+                    TopicName = "order-raw",
+                    ContractTypeName = "Test.RawOrder",
+                    Publishers = ["order-extractor"],
+                    Subscribers = ["order-loader"],
+                },
+                new TopicResource
+                {
+                    PubSubName = "pubsub-b",
+                    TopicName = "order-processed",
+                    ContractTypeName = "Test.RawOrder",
+                    Publishers = ["order-loader"],
+                    Subscribers = ["order-extractor"],
+                },
+            ],
+        };
+        var builder = CreateBuilder();
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        Console.SetError(error);
+
+        try
+        {
+            // Act
+            IntropyAspire.Apply(builder, topology, GeneratedRoot);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+
+        // Assert
+        Assert.Contains("publish/subscribe cycle", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Apply_ShouldAddRedisBackend()
     {
         // Arrange
