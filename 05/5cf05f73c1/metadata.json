@@ -1,0 +1,24 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "055cf05f73c1",
+  "strategy": "manual-commit",
+  "branch": "refactor/solid-cleanup",
+  "checkpoints_count": 3,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/05/5cf05f73c1/0/metadata.json",
+      "transcript": "/05/5cf05f73c1/0/full.jsonl",
+      "compact_transcript": "/05/5cf05f73c1/0/transcript.jsonl",
+      "content_hash": "/05/5cf05f73c1/0/content_hash.txt",
+      "prompt": "/05/5cf05f73c1/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 98176,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 11949440,
+    "output_tokens": 53489,
+    "api_call_count": 138
+  }
+}
