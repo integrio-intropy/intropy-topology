@@ -70,18 +70,19 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Generate_WithUnresolvedConnector_ShouldThrow()
+    public void Build_WithUnresolvedConnector_ShouldRejectAtTheManifestBoundary()
     {
-        // Arrange — a connector used by the topology but absent from the development manifest
+        // Arrange — a connector used by the topology but absent from the development manifest.
+        // The manifest is the single validation boundary; the generator trusts it.
         var topic = TopicRef<string>.Define("orders", "created");
         var connector = ConnectorRef.Define("erp");
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("extractor").From(connector).Publishes(topic);
         builder.AddLoader("loader").Subscribes(topic);
+        var development = new DevelopmentBuilder(builder.Build(), Directory.GetCurrentDirectory());
 
         // Act & Assert
-        var exception = Assert.Throws<InvalidOperationException>(() =>
-            TopologyGenerator.Generate(builder.Build(), new DevelopmentManifest([], [])));
+        var exception = Assert.Throws<DevelopmentValidationException>(() => development.Build());
         Assert.Contains("erp", exception.Message, StringComparison.Ordinal);
     }
 

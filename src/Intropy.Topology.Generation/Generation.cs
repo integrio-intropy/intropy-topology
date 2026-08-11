@@ -86,15 +86,12 @@ public static class TopologyGenerator
         // Local runs resolve every connector to localstorage, so the declared transport is
         // deliberately not consulted here: the placeholder default transport must not block
         // F5. Deployment generation is where an unresolved transport must hard-fail.
+        // The manifest is the single validation boundary: it already rejects unresolved
+        // connectors, so a miss here is an invariant violation, not user input.
+        var resolutions = development.Files.ToDictionary(file => file.ConnectorName, StringComparer.Ordinal);
         foreach (var connector in topology.Connectors)
         {
-            var resolution = development.Files.SingleOrDefault(file => file.ConnectorName == connector.Name);
-            if (resolution is null)
-            {
-                throw new InvalidOperationException($"Connector '{connector.Name}' has no local file resolution in the development manifest.");
-            }
-
-            files.Add(BindingComponent(connector, resolution));
+            files.Add(BindingComponent(connector, resolutions[connector.Name]));
         }
 
         foreach (var mock in development.Mocks)
