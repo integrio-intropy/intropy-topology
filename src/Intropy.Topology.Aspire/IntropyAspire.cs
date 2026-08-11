@@ -289,6 +289,13 @@ public static class IntropyAspire
         container.WithHealthCheck(key);
     }
 
+    /// <summary>
+    /// Wires a component's project to its Dapr sidecar, runtime config, and backends. The host is
+    /// a local-only development composition, so every component runs with the Development
+    /// environment as part of that contract — not left to per-AppHost launch profiles. Both
+    /// variable names are set: generic-host services read DOTNET_ENVIRONMENT, web projects read
+    /// ASPNETCORE_ENVIRONMENT, and the component model does not distinguish them.
+    /// </summary>
     private static void Wire(
         IResourceBuilder<ProjectResource> project,
         ComponentModel component,
@@ -297,6 +304,7 @@ public static class IntropyAspire
         IResourceBuilder<ContainerResource> redis,
         IResourceBuilder<ContainerResource>? microcks)
     {
+        const string development = "Development";
         project
             .WithDaprSidecar(sidecar =>
             {
@@ -309,6 +317,8 @@ public static class IntropyAspire
             })
             .WithEnvironment("INTROPY__COMPONENT", component.Name)
             .WithEnvironment("INTROPY__CONFIG", Path.Combine(configDir, $"{component.Name}.intropy.json"))
+            .WithEnvironment("DOTNET_ENVIRONMENT", development)
+            .WithEnvironment("ASPNETCORE_ENVIRONMENT", development)
             .WaitFor(redis);
         if (microcks is not null && component.Uses.Count > 0)
         {

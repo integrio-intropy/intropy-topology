@@ -278,6 +278,12 @@ public sealed class IntropyAspireTests : IDisposable
         Assert.Equal(
             Path.Combine(GeneratedRoot, GeneratedArtifacts.ConfigDir, "order-extractor.intropy.json"),
             env["INTROPY__CONFIG"]);
+
+        // The host is a local-only development composition; the environment is part of that
+        // contract, not something a consumer's launch profile should have to repeat. Both
+        // names: generic hosts read DOTNET_, web projects read ASPNETCORE_.
+        Assert.Equal("Development", env["DOTNET_ENVIRONMENT"]);
+        Assert.Equal("Development", env["ASPNETCORE_ENVIRONMENT"]);
     }
 
     [Fact]
