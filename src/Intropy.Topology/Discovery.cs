@@ -71,31 +71,57 @@ public static class SystemDiscovery
 
     private static (ISystemDefinition Definition, SystemBuilder Builder) Declare(string source, IReadOnlyList<Type> types)
     {
-        var definition = FindSingleDefinition(source, types);
+        var result = SingleImplementation.Find<ISystemDefinition>(types, requireOne: true);
+        if (result.Error is not null)
+        {
+            throw new InvalidOperationException($"{result.Error} in '{source}'.");
+        }
+
+        var definition = result.Instance!;
         var builder = SystemBuilder.Create(definition.SystemName);
         definition.Define(builder);
         return (definition, builder);
     }
+}
 
-    private static ISystemDefinition FindSingleDefinition(string source, IReadOnlyList<Type> types)
+/// <summary>
+/// Scans a type list for the concrete implementations of an interface and reports the
+/// arity outcome. The scan is shared by system and development discovery; each caller
+/// maps a failure to its own exception type, so the helper never throws for arity.
+/// Instantiation itself may throw (no parameterless constructor, constructor failure)
+/// and does — that is a programming error, not an arity problem.
+/// </summary>
+internal static class SingleImplementation
+{
+    /// <summary>Finds zero-or-one or exactly one concrete <typeparamref name="T"/> in <paramref name="types"/>.</summary>
+    /// <typeparam name="T">The interface or base type implementations must assign to.</typeparam>
+    /// <param name="types">The types to scan.</param>
+    /// <param name="requireOne">Whether zero candidates is a failure (exactly one
+    /// required) or a legal empty result (zero or one allowed).</param>
+    public static Result<T> Find<T>(IReadOnlyList<Type> types, bool requireOne) where T : class
     {
         var candidates = types
-            .Where(t => t is { IsAbstract: false, IsInterface: false } && typeof(ISystemDefinition).IsAssignableFrom(t))
+            .Where(t => t is { IsAbstract: false, IsInterface: false } && typeof(T).IsAssignableFrom(t))
             .ToList();
 
         if (candidates.Count == 0)
         {
-            throw new InvalidOperationException(
-                $"No {nameof(ISystemDefinition)} was found in '{source}'.");
+            return requireOne
+                ? new Result<T>(null, $"No {typeof(T).Name} was found")
+                : new Result<T>(null, null);
         }
 
         if (candidates.Count > 1)
         {
-            throw new InvalidOperationException(
-                $"Multiple {nameof(ISystemDefinition)} types were found in '{source}': " +
-                $"{string.Join(", ", candidates.Select(t => t.FullName))}. Exactly one is required.");
+            var names = string.Join(", ", candidates.Select(t => t.FullName));
+            var arity = requireOne ? "Exactly one is required." : "Exactly zero or one is required.";
+            return new Result<T>(null, $"Multiple {typeof(T).Name} types were found: {names}. {arity}");
         }
 
-        return (ISystemDefinition)Activator.CreateInstance(candidates[0])!;
+        return new Result<T>((T)Activator.CreateInstance(candidates[0])!, null);
     }
+
+    /// <summary>The scan outcome: the instantiated single implementation, or an error
+    /// describing the arity failure. Both are null when zero candidates are legal.</summary>
+    internal sealed record Result<T>(T? Instance, string? Error) where T : class;
 }

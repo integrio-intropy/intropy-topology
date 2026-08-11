@@ -180,22 +180,19 @@ public static class DevelopmentDiscovery
     public static DevelopmentManifest Discover(Assembly assembly, SystemTopology topology, string root)
     {
         ArgumentNullException.ThrowIfNull(assembly);
-        var candidates = assembly.GetTypes()
-            .Where(type => type is { IsAbstract: false, IsInterface: false } && typeof(IDevelopmentDefinition).IsAssignableFrom(type))
-            .ToArray();
-        if (candidates.Length > 1)
+        var result = SingleImplementation.Find<IDevelopmentDefinition>(assembly.GetTypes(), requireOne: false);
+        if (result.Error is not null)
         {
-            throw new DevelopmentValidationException(
-                $"Multiple {nameof(IDevelopmentDefinition)} types were found: {string.Join(", ", candidates.Select(type => type.FullName))}. Exactly zero or one is required.");
+            throw new DevelopmentValidationException(result.Error + ".");
         }
 
-        if (candidates.Length == 0)
+        if (result.Instance is null)
         {
             return new DevelopmentManifest([], []);
         }
 
         var builder = new DevelopmentBuilder(topology, root);
-        ((IDevelopmentDefinition)Activator.CreateInstance(candidates[0])!).Define(builder);
+        result.Instance.Define(builder);
         return builder.Build();
     }
 }
