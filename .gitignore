@@ -484,5 +484,10 @@ $RECYCLE.BIN/
 *.swp
 
 .claude/
+.codex/
+.entire/
+.opencode/
+.pi/
+.pi-subagents/
 
 Makefile
