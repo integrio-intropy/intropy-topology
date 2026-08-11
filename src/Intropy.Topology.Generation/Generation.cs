@@ -161,7 +161,7 @@ public static class TopologyGenerator
                 {
                     c.ConnectorName,
                     Direction = c.Direction.ToString(),
-                    DaprComponent = $"binding.{c.ConnectorName}",
+                    DaprComponent = ConnectorResource.DaprComponentNameFor(c.ConnectorName),
                 }),
                 Uses = component.Uses,
             },

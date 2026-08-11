@@ -9,8 +9,10 @@ namespace Intropy.Topology;
 /// </summary>
 public abstract class Component
 {
-    /// <summary>The output port name recorded for every <c>Publishes</c> call.</summary>
-    internal const string DefaultPort = "default";
+    /// <summary>The output port name recorded for every <c>Publishes</c> call. Part of the
+    /// serialized model semantics — the graph contract omits the port when it equals this
+    /// value.</summary>
+    public const string DefaultPort = "default";
 
     private readonly List<TopicRef> _subscribes = [];
     private readonly List<(string Port, TopicRef Topic)> _publishes = [];

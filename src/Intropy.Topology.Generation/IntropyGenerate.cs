@@ -135,7 +135,7 @@ public static class IntropyGenerate
             KebabCase(component.Kind.ToString()),
             Optional(component.Subscribes.Select(t => new GraphTopicReference(t.PubSubName, t.TopicName))),
             Optional(component.Publishes.Select(p => new GraphPublication(
-                p.Port == "default" ? null : p.Port, p.PubSubName, p.TopicName))),
+                p.Port == Component.DefaultPort ? null : p.Port, p.PubSubName, p.TopicName))),
             Optional(component.Connectors.Select(c => new GraphConnectorUse(
                 c.ConnectorName, Direction(c.Direction)))),
             Optional(component.Uses));
