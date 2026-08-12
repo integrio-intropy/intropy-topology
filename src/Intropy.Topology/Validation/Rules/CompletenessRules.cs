@@ -57,6 +57,43 @@ internal sealed class MissingRequiredSubscriptionRule : IModelRule
 }
 
 /// <summary>
+/// A transactional integration must declare both connector directions: at least one
+/// <c>From</c> (the receive side reads a source) and at least one <c>To</c> (the send
+/// side writes a destination). Several connectors per direction are legal — a run may
+/// touch several sources or destinations — so the rule checks presence, not count.
+/// The builder exposes both methods but cannot force the calls.
+/// </summary>
+internal sealed class MissingRequiredConnectorRule : IModelRule
+{
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
+    {
+        foreach (var component in topology.Components)
+        {
+            if (component.Kind is not ComponentKind.TransactionalIntegration)
+            {
+                continue;
+            }
+
+            if (!component.Connectors.Any(c => c.Direction is ConnectorDirection.In))
+            {
+                yield return new TopologyDiagnostic(
+                    DiagnosticSeverity.Error,
+                    "Transactional integration components must read from at least one connector; add a From call.",
+                    component.Name);
+            }
+
+            if (!component.Connectors.Any(c => c.Direction is ConnectorDirection.Out))
+            {
+                yield return new TopologyDiagnostic(
+                    DiagnosticSeverity.Error,
+                    "Transactional integration components must write to at least one connector; add a To call.",
+                    component.Name);
+            }
+        }
+    }
+}
+
+/// <summary>
 /// Every published topic should have a subscriber. A message published into the
 /// system with no consumer is a broken contract, not a fan-out reserve — but the
 /// consumer may simply not exist yet, so the rule warns and local runs proceed.

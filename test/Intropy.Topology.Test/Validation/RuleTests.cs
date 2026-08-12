@@ -111,6 +111,104 @@ public class DuplicateSubscriptionRuleTests
     }
 }
 
+public class MissingRequiredConnectorRuleTests
+{
+    [Fact]
+    public void Validate_WhenTransactionalIntegrationHasFromAndTo_ShouldReportNothing()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddTransactionalIntegration("ti").From(TestConnectors.Pim).To(TestConnectors.Erp);
+
+        // Act & Assert
+        Assert.Empty(s.DiagnosticsFor<MissingRequiredConnectorRule>());
+    }
+
+    [Fact]
+    public void Validate_WhenTransactionalIntegrationLacksTo_ShouldReportError()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddTransactionalIntegration("ti").From(TestConnectors.Pim);
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor<MissingRequiredConnectorRule>());
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("ti", diagnostic.Target);
+        Assert.Contains("To call", diagnostic.Message);
+    }
+
+    [Fact]
+    public void Validate_WhenTransactionalIntegrationLacksFrom_ShouldReportError()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddTransactionalIntegration("ti").To(TestConnectors.Erp);
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor<MissingRequiredConnectorRule>());
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("ti", diagnostic.Target);
+        Assert.Contains("From call", diagnostic.Message);
+    }
+
+    [Fact]
+    public void Validate_WhenTransactionalIntegrationHasNoConnectors_ShouldReportBothDirections()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddTransactionalIntegration("ti");
+
+        // Act
+        var diagnostics = s.DiagnosticsFor<MissingRequiredConnectorRule>();
+
+        // Assert
+        Assert.Equal(2, diagnostics.Count);
+        Assert.All(diagnostics, d => Assert.Equal(DiagnosticSeverity.Error, d.Severity));
+        Assert.All(diagnostics, d => Assert.Equal("ti", d.Target));
+    }
+
+    [Fact]
+    public void Validate_WithMultipleConnectorsPerDirection_ShouldReportNothing()
+    {
+        // Arrange: several sources and destinations are legal — the rule checks presence.
+        var s = SystemBuilder.Create("test-system");
+        s.AddTransactionalIntegration("ti")
+            .From(TestConnectors.Pim)
+            .From(ConnectorRef.Define("plm"))
+            .To(TestConnectors.Erp)
+            .To(ConnectorRef.Define("wms"));
+
+        // Act & Assert
+        Assert.Empty(s.DiagnosticsFor<MissingRequiredConnectorRule>());
+    }
+
+    [Fact]
+    public void Build_WhenTransactionalIntegrationLacksTo_ShouldThrow()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddTransactionalIntegration("ti").From(TestConnectors.Pim);
+
+        // Act & Assert
+        Assert.Throws<TopologyValidationException>(() => s.Build());
+    }
+
+    [Fact]
+    public void Validate_WithOtherKinds_ShouldReportNothing()
+    {
+        // Arrange: extractor and loader connector edges stay optional by design.
+        var s = SystemBuilder.Create("test-system").WithValidComponent();
+
+        // Act & Assert
+        Assert.Empty(s.DiagnosticsFor<MissingRequiredConnectorRule>());
+    }
+}
+
 public class TopicContractConflictRuleTests
 {
     [Fact]

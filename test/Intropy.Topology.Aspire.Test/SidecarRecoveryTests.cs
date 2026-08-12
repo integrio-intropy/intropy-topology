@@ -58,9 +58,15 @@ public sealed class DaprSidecarRecoveryTests
         }
     }
 
+    private static readonly RunToCompletionSidecars s_noRunToCompletion = new(new HashSet<string>());
+
     private static DaprSidecarRecovery NewRecovery(
-        FakeLifecycle lifecycle, FakeBackendReadiness backendReadiness, TimeProvider? time = null) =>
+        FakeLifecycle lifecycle,
+        FakeBackendReadiness backendReadiness,
+        TimeProvider? time = null,
+        RunToCompletionSidecars? runToCompletion = null) =>
         new(new FakeStateMonitor(), lifecycle, backendReadiness,
+            runToCompletion ?? s_noRunToCompletion,
             time ?? TimeProvider.System, NullLogger<DaprSidecarRecovery>.Instance);
 
     [Fact]
@@ -203,6 +209,77 @@ public sealed class DaprSidecarRecoveryTests
         time.Advance(TimeSpan.FromSeconds(1));
         await recovery.HandleStateUpdateAsync(
             new ResourceStateUpdate("order-loader-dapr-cli", KnownResourceStates.Finished),
+            CancellationToken.None);
+
+        // Assert
+        Assert.Equal(1, backendReadiness.WaitCalls);
+        Assert.Equal(
+            [("order-loader-dapr-cli", KnownResourceCommands.RestartCommand)],
+            lifecycle.Commands);
+    }
+
+    [Fact]
+    public async Task HandleStateUpdateAsync_WhenRunToCompletionSidecarExitsEarly_ShouldLeaveItAlone()
+    {
+        // Arrange — a transactional integration's fastest run (empty source list + idle
+        // timeout + drain) can finish inside the 10-second healthy-stay window; its sidecar
+        // exit is still the intended terminal state, never a component-init failure.
+        var lifecycle = new FakeLifecycle();
+        var backendReadiness = new FakeBackendReadiness();
+        var time = new FakeTimeProvider();
+        var sidecar = DaprSidecarIdentity.CliName("order-integration");
+        var recovery = NewRecovery(
+            lifecycle, backendReadiness, time,
+            new RunToCompletionSidecars(new HashSet<string>(StringComparer.Ordinal) { sidecar }));
+
+        // Act — launch, exit six seconds later (faster than the healthy-stay threshold).
+        await recovery.HandleStateUpdateAsync(
+            new ResourceStateUpdate(sidecar, KnownResourceStates.Running), CancellationToken.None);
+        time.Advance(TimeSpan.FromSeconds(6));
+        await recovery.HandleStateUpdateAsync(
+            new ResourceStateUpdate(sidecar, KnownResourceStates.Finished), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(0, backendReadiness.WaitCalls);
+        Assert.Empty(lifecycle.Commands);
+    }
+
+    [Fact]
+    public async Task HandleStateUpdateAsync_WhenRunToCompletionSidecarFailsToStart_ShouldLeaveItAlone()
+    {
+        // Arrange — a sidecar that never started belongs to the component's run outcome
+        // (the framework runner reports sidecar-wait timeout as a failed run), not to recovery.
+        var lifecycle = new FakeLifecycle();
+        var backendReadiness = new FakeBackendReadiness();
+        var sidecar = DaprSidecarIdentity.CliName("order-extractor");
+        var recovery = NewRecovery(
+            lifecycle, backendReadiness,
+            runToCompletion: new RunToCompletionSidecars(new HashSet<string>(StringComparer.Ordinal) { sidecar }));
+
+        // Act
+        await recovery.HandleStateUpdateAsync(
+            new ResourceStateUpdate(sidecar, KnownResourceStates.FailedToStart), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(0, backendReadiness.WaitCalls);
+        Assert.Empty(lifecycle.Commands);
+    }
+
+    [Fact]
+    public async Task HandleStateUpdateAsync_WhenResidentSidecarExitsAlongsideExemptOne_ShouldStillRecover()
+    {
+        // Arrange — the exemption is per sidecar: a loader's early exit is recovered even when
+        // a run-to-completion sidecar in the same system is exempt.
+        var lifecycle = new FakeLifecycle();
+        var backendReadiness = new FakeBackendReadiness();
+        var recovery = NewRecovery(
+            lifecycle, backendReadiness,
+            runToCompletion: new RunToCompletionSidecars(
+                new HashSet<string>(StringComparer.Ordinal) { "order-extractor-dapr-cli" }));
+
+        // Act
+        await recovery.HandleStateUpdateAsync(
+            new ResourceStateUpdate("order-loader-dapr-cli", KnownResourceStates.FailedToStart),
             CancellationToken.None);
 
         // Assert

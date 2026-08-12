@@ -10,7 +10,7 @@ public class MaterializationTests
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor").Publishes(TestTopics.Raw);
-        s.AddTransactionalIntegration("ti").From(TestConnectors.Pim);
+        s.AddTransactionalIntegration("ti").From(TestConnectors.Pim).To(TestConnectors.Erp);
         s.AddLoader("loader").Subscribes(TestTopics.Raw).To(TestConnectors.Erp);
 
         // Act
@@ -66,14 +66,17 @@ public class MaterializationTests
         var s = SystemBuilder.Create("test-system");
         s.AddTransactionalIntegration("ti")
             .From(TestConnectors.Pim)
-            .From(TestConnectors.Pim);
+            .From(TestConnectors.Pim)
+            .To(TestConnectors.Erp);
 
         // Act
         var topology = s.Build();
 
-        // Assert: one edge, one resource, no diagnostics
-        Assert.Single(topology.Components.Single().Connectors);
-        Assert.Single(topology.Connectors);
+        // Assert: the duplicate From collapsed to one edge; the declared To stays.
+        Assert.Equal(
+            [("pim", ConnectorDirection.In), ("erp", ConnectorDirection.Out)],
+            topology.Components.Single().Connectors.Select(c => (c.ConnectorName, c.Direction)));
+        Assert.Equal(2, topology.Connectors.Count);
         Assert.Empty(s.Validate());
     }
 

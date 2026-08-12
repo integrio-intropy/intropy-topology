@@ -31,7 +31,7 @@ Each kind exposes only its own legal edges:
 |------|-----------|-----------|-----------|----------|
 | Extractor | — | one topic | `From(connector)` | `Publishes` |
 | Loader | exactly 1 topic | — | `To(connector)` | `Subscribes` |
-| Transactional integration | — | — | `From` / `To(connector)` | — |
+| Transactional integration | — | — | `From` / `To(connector)` | `From` and `To` |
 
 `Subscribes`/`Publishes` are the asynchronous (topic) edges; `From`/`To` are the edges out through connectors. A component publishes at most one topic — a second `Publishes` call is rejected at `Build()`. See [Topics](topics.md) and [Connectors](connectors.md).
 

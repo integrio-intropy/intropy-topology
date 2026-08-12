@@ -70,6 +70,19 @@ public static class IntropyAspire
     }
 
     /// <summary>
+    /// Whether a component kind runs to completion (one sweep, then exit) rather than as a
+    /// resident service. Sound because each kind has exactly one legitimate host — the
+    /// framework's <c>RunToCompletionRunner</c> for extractors and
+    /// <c>TransactionalIntegrationRunner</c> for transactional integrations, both of which shut
+    /// the Dapr sidecar down in a <c>finally</c> so the project/sidecar pair reaches its terminal
+    /// state together. Deliberately derived from kind rather than modeled: the topology records
+    /// edges, not workload shape. If a kind ever gains a lifetime its edges do not imply, this
+    /// derivation must become an explicit model fact.
+    /// </summary>
+    internal static bool IsRunToCompletion(ComponentKind kind) =>
+        kind is ComponentKind.Extractor or ComponentKind.TransactionalIntegration;
+
+    /// <summary>
     /// Translates the topology into Aspire resources on <paramref name="builder"/>. Separated from
     /// <see cref="RunAsync"/> so the built model can be inspected in tests without running DCP.
     /// </summary>
@@ -155,7 +168,7 @@ public static class IntropyAspire
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
 
-        RegisterDaprSidecarRecovery(builder, redisReadiness);
+        RegisterDaprSidecarRecovery(builder, redisReadiness, RunToCompletionSidecarsFor(topology));
 
         if (unresolved.Count > 0)
         {
@@ -199,17 +212,32 @@ public static class IntropyAspire
     }
 
     /// <summary>
+    /// The sidecar executables exempt from recovery: every run-to-completion component's
+    /// sidecar (see <see cref="IsRunToCompletion"/>). Derived from the topology's kinds — an
+    /// unresolved component (no project on disk) still gets an entry; its sidecar never
+    /// exists, so the name is simply never observed.
+    /// </summary>
+    internal static RunToCompletionSidecars RunToCompletionSidecarsFor(SystemTopology topology) =>
+        new(topology.Components
+            .Where(c => IsRunToCompletion(c.Kind))
+            .Select(c => DaprSidecarIdentity.CliName(c.Name))
+            .ToHashSet(StringComparer.Ordinal));
+
+    /// <summary>
     /// Registers recovery for components' Dapr sidecars. The normal pre-start gate
     /// prevents the common race; recovery covers the remaining interval where a backend passes
     /// TCP readiness but daprd's component initialization still fails.
     /// </summary>
     private static void RegisterDaprSidecarRecovery(
-        IDistributedApplicationBuilder builder, IBackendReadiness backendReadiness)
+        IDistributedApplicationBuilder builder,
+        IBackendReadiness backendReadiness,
+        RunToCompletionSidecars runToCompletionSidecars)
     {
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<IResourceLifecycle, AspireResourceLifecycle>();
         builder.Services.AddSingleton<IResourceStateMonitor, AspireResourceStateMonitor>();
         builder.Services.AddSingleton<IBackendReadiness>(backendReadiness);
+        builder.Services.AddSingleton(runToCompletionSidecars);
         builder.Services.AddSingleton<DaprSidecarRecovery>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<DaprSidecarRecovery>());
     }

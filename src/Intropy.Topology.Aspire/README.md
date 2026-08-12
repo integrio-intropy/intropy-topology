@@ -39,6 +39,8 @@ A component's standalone Dapr resources live at `../<component>/local/dapr-compo
 - Redis backs development pub/sub. It is published at host port `6380` because generated Dapr resources target `localhost:6380`; `dapr init` commonly reserves Redis's default `6379`.
 - Components receive `INTROPY__COMPONENT` and `INTROPY__CONFIG` environment variables. The latter points to that component's generated `.intropy.json` file.
 - A publisher waits for its subscribers during startup when the topic graph is acyclic. Dapr sidecars also wait for Redis readiness before they start.
+- Extractors and transactional integrations run to completion: the framework runners (`RunToCompletionRunner`, `TransactionalIntegrationRunner`) shut the Dapr sidecar down when the run ends, so a Finished/Exited resource state is a completed run, not a failure. Their sidecars are exempt from the host's sidecar-recovery restarts; a resident component's (a loader's) early sidecar exit is still recovered.
+- A transactional integration's internal hop — its receive pipeline publishing to a component-owned topic and its send pipeline subscribing to it (wired via `TransactionalIntegrationOptions.DaprPubSubName`/`DaprTopicName`) — never appears in the topology model. `Publishes`/`Subscribes` edges describe inter-component contracts only, so the topic completeness rules neither see nor warn about the internal hop. Its pubsub component comes from the component's own `local/dapr-components/`, staged into the component's overlay, not from generated artifacts.
 
 ## Prerequisites
 
