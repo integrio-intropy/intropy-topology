@@ -103,6 +103,29 @@ public class MaterializationTests
         Assert.Equal(["erp", "pim"], topology.Connectors.Select(c => c.Name));
     }
 
+    [Fact]
+    public void Build_ShouldMint_InternalQueueForTransactionalIntegrations()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddTransactionalIntegration("price-sync").From(TestConnectors.Pim).To(TestConnectors.Erp);
+        s.AddExtractor("extractor").Publishes(TestTopics.Raw);
+        s.AddLoader("loader").Subscribes(TestTopics.Raw);
+
+        // Act
+        var topology = s.Build();
+
+        // Assert
+        var ti = topology.Components.Single(c => c.Name == "price-sync");
+        Assert.Equal("internal-price-sync", ti.InternalQueue?.PubSubName);
+        Assert.Equal("hop", ti.InternalQueue?.TopicName);
+        Assert.Null(topology.Components.Single(c => c.Name == "extractor").InternalQueue);
+        Assert.Null(topology.Components.Single(c => c.Name == "loader").InternalQueue);
+
+        // The hop is workload shape, not an inter-component edge: it never enters Topics.
+        Assert.DoesNotContain(topology.Topics, t => t.PubSubName == "internal-price-sync");
+    }
+
     // A second edge that a block cannot legally have is a compile error: the block
     // builders expose only that block's legal edge methods.
 }

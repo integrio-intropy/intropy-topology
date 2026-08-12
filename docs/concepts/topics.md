@@ -28,6 +28,8 @@ public static class Topics
 
 Both the pubsub name and the topic name are DNS-1123 names, validated at `Define`. The pubsub name is minted here: local runs materialize a pubsub component with exactly this name, and deployment configuration consumes it rather than maintaining its own copy.
 
+These names describe the *inter-component* vocabulary. The one pubsub a component never declares here is a transactional integration's internal hop — minted by the model as `internal-<component>`, never declarable via `TopicRef`, and scoped to exactly its owning component. The `internal-` prefix keeps the two namespaces disjoint.
+
 ## The contract type
 
 The type parameter is the topic's event contract. It flows into the materialized model as `ContractTypeName` (the type's full name) and pins the topic to one contract: using the same topic with two different contract types anywhere in the system is rejected at `Build()`.

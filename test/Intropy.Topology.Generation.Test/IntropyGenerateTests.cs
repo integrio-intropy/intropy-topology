@@ -62,7 +62,25 @@ public class IntropyGenerateTests
         Assert.Equal(["order-loader", "raw-audit"], rawTopic.GetProperty("subscribers").EnumerateArray().Select(value => value.GetString()));
         Assert.False(webshop.TryGetProperty("transport", out _));
         Assert.Equal(["out"], webshop.GetProperty("directions").EnumerateArray().Select(value => value.GetString()));
-        Assert.Equal(["order-loader"], webshop.GetProperty("usedBy").EnumerateArray().Select(value => value.GetString()));
+        Assert.Equal(["order-loader", "price-sync"], webshop.GetProperty("usedBy").EnumerateArray().Select(value => value.GetString()));
+    }
+
+    [Fact]
+    public void Run_Graph_ShouldEmit_InternalQueueForTransactionalIntegrationsOnly()
+    {
+        // Act
+        var (_, output, _) = Capture(() => IntropyGenerate.Run(s_assembly, ["graph"]));
+        using var json = JsonDocument.Parse(output);
+        var components = json.RootElement.GetProperty("components").EnumerateArray().ToArray();
+        var ti = components.Single(component => component.GetProperty("name").GetString() == "price-sync");
+
+        // Assert
+        Assert.Equal("internal-price-sync", ti.GetProperty("internalQueue").GetProperty("pubsub").GetString());
+        Assert.Equal("hop", ti.GetProperty("internalQueue").GetProperty("topic").GetString());
+        foreach (var component in components.Where(c => c.GetProperty("name").GetString() != "price-sync"))
+        {
+            Assert.False(component.TryGetProperty("internalQueue", out _));
+        }
     }
 
     [Fact]

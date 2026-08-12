@@ -83,7 +83,9 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
 }
 
 /// <summary>Fluent builder for a transactional integration: a synchronous block that
-/// reads/writes external systems through connectors; it publishes no topics.</summary>
+/// reads/writes external systems through connectors; it publishes no topics. Its internal
+/// receive-to-send queue is minted at materialization (<see cref="ComponentModel.InternalQueue"/>),
+/// never declared here.</summary>
 public sealed class TransactionalIntegrationBuilder
     : ComponentBuilder<TransactionalIntegrationBuilder, TransactionalIntegrationComponent>
 {

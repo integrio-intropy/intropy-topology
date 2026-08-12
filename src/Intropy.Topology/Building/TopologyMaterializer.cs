@@ -118,6 +118,13 @@ internal static class TopologyMaterializer
             Publishes = publishes,
             Connectors = connectorEdges,
             Uses = serviceAppIds,
+            InternalQueue = component.Kind is ComponentKind.TransactionalIntegration
+                ? new InternalQueue
+                {
+                    PubSubName = $"internal-{component.Name}",
+                    TopicName = "hop",
+                }
+                : null,
         };
     }
 
