@@ -80,7 +80,7 @@ public static class IntropyGenerate
         }
     }
 
-    /// <summary>Maps the validated internal model to the topology.intropy.io/v2 interchange contract.</summary>
+    /// <summary>Maps the validated internal model to the topology.intropy.io/v1 interchange contract.</summary>
     private sealed record GraphDocument(
         string ApiVersion,
         string Kind,
@@ -92,7 +92,7 @@ public static class IntropyGenerate
         GraphDevelopment? Development)
     {
         public static GraphDocument From(SystemTopology topology, DevelopmentManifest? development) => new(
-            "topology.intropy.io/v2",
+            "topology.intropy.io/v1",
             "SystemTopology",
             topology.SystemName,
             Optional(topology.Components.Select(GraphComponent.From)),

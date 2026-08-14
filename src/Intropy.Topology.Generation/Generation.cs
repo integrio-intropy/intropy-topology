@@ -13,7 +13,7 @@ public sealed record GeneratedFile(string RelativePath, string Content);
 /// <summary>
 /// The single composition point for local mock endpoint URLs. The origin is a
 /// local-runtime convention this dependency-free package would rather not know —
-/// but the <c>topology.intropy.io/v2</c> graph contract includes <c>baseUri</c>,
+/// but the <c>topology.intropy.io/v1</c> graph contract includes <c>baseUri</c>,
 /// which forces the knowledge here. The Aspire backend owns the matching port
 /// constant (<c>IntropyAspire.MicrocksPort</c>) and must agree with
 /// <see cref="Origin"/>; do not introduce a second composition site.

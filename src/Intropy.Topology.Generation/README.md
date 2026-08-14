@@ -24,7 +24,7 @@ It also hosts the non-Aspire CLI verbs over a discovered system:
 
 ```csharp
 await IntropyGenerate.RunAsync(assembly, ["check"]);              // validate
-await IntropyGenerate.RunAsync(assembly, ["graph"]);             // print topology.intropy.io/v2 JSON only on stdout
+await IntropyGenerate.RunAsync(assembly, ["graph"]);             // print topology.intropy.io/v1 JSON only on stdout
 await IntropyGenerate.RunAsync(assembly, ["generate", "./out"]); // write artifacts
 ```
 

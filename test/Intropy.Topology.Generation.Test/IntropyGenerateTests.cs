@@ -27,7 +27,7 @@ public class IntropyGenerateTests
         // Assert
         Assert.Equal(0, code);
         Assert.Equal(string.Empty, error);
-        Assert.Equal("topology.intropy.io/v2", root.GetProperty("apiVersion").GetString());
+        Assert.Equal("topology.intropy.io/v1", root.GetProperty("apiVersion").GetString());
         Assert.Equal("SystemTopology", root.GetProperty("kind").GetString());
         Assert.Equal("order-fulfillment", root.GetProperty("system").GetString());
         Assert.False(root.TryGetProperty("systemName", out _));

@@ -95,7 +95,7 @@ return args is ["run", ..] or []
 ```bash
 dotnet run --project examples/OrderFlow.SystemHost                     # Aspire dashboard (needs Docker + `dapr init`)
 dotnet run --project examples/OrderFlow.SystemHost -- check            # validate the topology
-dotnet run --project examples/OrderFlow.SystemHost -- graph            # print the topology.intropy.io/v2 JSON document
+dotnet run --project examples/OrderFlow.SystemHost -- graph            # print the topology.intropy.io/v1 JSON document
 # `dotnet run` prints its own build and launch-profile messages before starting the host. For a machine-readable stream:
 dotnet run --no-build --no-launch-profile --project examples/OrderFlow.SystemHost -- graph  # build first, then JSON only on stdout
 dotnet run --project examples/OrderFlow.SystemHost -- generate ./out   # write Dapr YAML + per-component config
