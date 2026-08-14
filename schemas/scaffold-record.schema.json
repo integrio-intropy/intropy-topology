@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intropy.io/schemas/scaffold-record/v1.json",
+  "title": "Intropy scaffold record",
+  "description": "The .intropy/scaffold.json record `intropy int create` writes into a scaffolded project and later commands (`sys create`, `int show`, `int list`, the manifests commands) read.",
+  "$comment": "Hosted by intropy-topology for one-stop fetching, but authored and evolved by intropy-cli (internal/template/scaffold.go is the authoritative shape). The topology repo never reads or writes this record. Additive-only within schemaVersion 1: new fields do not bump the version; incompatible changes bump schemaVersion, which older CLIs reject rather than guess at.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "template", "owner", "repo", "version", "values"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Bumped only for incompatible changes; additive fields do not require a bump."
+    },
+    "template": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The template's directory name in the template library repo."
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "description": "GitHub owner of the template library repo the template was fetched from."
+    },
+    "repo": {
+      "type": "string",
+      "minLength": 1,
+      "description": "GitHub repository name of the template library."
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The template library release tag the scaffold was rendered from."
+    },
+    "values": {
+      "type": "object",
+      "description": "The resolved parameter values the render used. Keys are declared by each template's spec.parameters; values for system blocks include the wiring facts `sys create` assembles (appId, topic, contract, port, fromPort/toPort, pubsub).",
+      "additionalProperties": true
+    },
+    "role": {
+      "type": "string",
+      "description": "The template's intropy.dev/template-role label, when declared. Distinguishes support projects from system blocks.",
+      "enum": ["shared-library", "system-host"]
+    },
+    "blockKind": {
+      "type": "string",
+      "description": "The template's intropy.dev/block-kind label, when declared. Canonical values are enumerated in block-kinds.schema.json; not repeated here so the vocabulary has exactly one owner.",
+      "$comment": "Intentionally not an enum: block-kinds.schema.json is the single owner of the vocabulary. Older records predate this field entirely; readers treat its absence as a warning, not an error."
+    },
+    "dataFlow": {
+      "type": "string",
+      "description": "The template's intropy.dev/data-flow label, when declared: the block's data flow direction relative to the system.",
+      "enum": ["in", "out", "both", "internal"]
+    },
+    "dependsOn": {
+      "type": "array",
+      "description": "Sibling projects the template declared under spec.dependencies.",
+      "items": { "$ref": "#/$defs/dependency" }
+    }
+  },
+  "$defs": {
+    "dependency": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["template", "dir"],
+      "properties": {
+        "template": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The dependency template's directory name."
+        },
+        "dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Slash-separated path relative to the component root (e.g. ../Contracts)."
+        }
+      }
+    }
+  }
+}

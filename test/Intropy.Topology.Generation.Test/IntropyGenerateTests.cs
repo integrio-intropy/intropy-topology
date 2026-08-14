@@ -2,6 +2,7 @@ using System.Text.Json;
 
 namespace Intropy.Topology.Generation.Test;
 
+[Collection("ConsoleCapture")]
 public class IntropyGenerateTests
 {
     private static readonly System.Reflection.Assembly s_assembly = typeof(OrderSystem).Assembly;
@@ -218,7 +219,9 @@ public class IntropyGenerateTests
             TopologyGenerator.Generate(builder.Build(), manifest));
     }
 
-    private static (int Code, string Output, string Error) Capture(Func<int> run)
+    // internal, not private: the schema-conformance tests validate the same
+    // captured wire output.
+    internal static (int Code, string Output, string Error) Capture(Func<int> run)
     {
         var originalOut = Console.Out;
         var originalError = Console.Error;

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intropy.io/schemas/port-bindings/v1.json",
+  "title": "Intropy port binding kinds",
+  "description": "The closed set of Dapr binding kinds a port can deploy as or resolve to locally. Two template catalogs draw from this one enum: deploy-host's spec.gitops.bindingKinds (GitOps adapter files) and deploy-component's spec.local.fixtures (local development fixtures). This document is the single owner so the two catalogs cannot drift.",
+  "$comment": "Names are the catalog spelling, not the Dapr component type: 'file' deploys as bindings.localstorage — there is no bindings.file. Adding a kind requires a fixture server in the k3s setup scripts and an adapter skeleton in deploy-host; it is a template-library change, not a CLI release. Removing a kind is breaking.",
+  "type": "string",
+  "enum": [
+    "blob",
+    "file",
+    "http",
+    "sftp"
+  ]
+}
