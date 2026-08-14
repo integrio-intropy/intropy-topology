@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intropy.io/schemas/topology-graph/v1.json",
+  "title": "SystemTopology graph record",
+  "description": "The topology.intropy.io/v1 document a system host's `graph` verb prints on stdout. This schema describes what the emitter (GraphDocument in Intropy.Topology.Generation) produces; consumers validate against it rather than re-declaring the shape.",
+  "$comment": "Owned and emitted by intropy-topology. Additive-only: fields may be added without an apiVersion bump; removing, renaming, or retyping a field requires topology.intropy.io/v2.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["apiVersion", "system"],
+  "properties": {
+    "apiVersion": {
+      "const": "topology.intropy.io/v1"
+    },
+    "kind": {
+      "const": "SystemTopology"
+    },
+    "system": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The system's DNS-1123 name (e.g. order-flow)."
+    },
+    "components": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/component" }
+    },
+    "topics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/topic" }
+    },
+    "ports": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/port" }
+    },
+    "services": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/service" }
+    },
+    "contracts": {
+      "type": "array",
+      "description": "Message contract registry. Emitted by hosts on the full-topology branch; the minimal model does not emit it. Consumers pass it through opaquely.",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "apis": {
+      "type": "array",
+      "description": "Request/response contract surfaces. Element shape is not finalized; parsed opaquely for round-tripping.",
+      "items": true
+    },
+    "development": {
+      "$ref": "#/$defs/development",
+      "description": "Present only when the graph verb runs with --development. Local-run facts: mocked platform services and per-port file resolutions."
+    }
+  },
+  "$defs": {
+    "component": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["name", "kind"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The component's name; also its Dapr app-id and its directory relative to the system root."
+        },
+        "kind": {
+          "type": "string",
+          "description": "The block kind. Canonical values are enumerated in block-kinds.schema.json; not repeated here so the vocabulary has exactly one owner.",
+          "$comment": "Intentionally not an enum: block-kinds.schema.json is the single owner of the vocabulary."
+        },
+        "subscribes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/topicReference" }
+        },
+        "publishes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/topicReference" }
+        },
+        "ports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/portUse" }
+        },
+        "uses": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "App-ids of platform services the component invokes."
+        },
+        "internalQueue": {
+          "$ref": "#/$defs/internalQueue",
+          "description": "A transactional integration's internal hop, minted in the model rather than declared as a topic edge."
+        },
+        "provides": {
+          "type": "array",
+          "description": "Contract surfaces provided. Element shape not finalized; opaque.",
+          "items": true
+        },
+        "consumes": {
+          "type": "array",
+          "description": "Contract surfaces consumed. Element shape not finalized; opaque.",
+          "items": true
+        }
+      }
+    },
+    "topicReference": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["pubsub", "topic"],
+      "properties": {
+        "pubsub": { "type": "string", "minLength": 1 },
+        "topic": { "type": "string", "minLength": 1 }
+      }
+    },
+    "portUse": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["port", "direction"],
+      "properties": {
+        "port": { "type": "string", "minLength": 1 },
+        "direction": { "enum": ["in", "out"] }
+      }
+    },
+    "internalQueue": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["pubsub", "topic"],
+      "properties": {
+        "pubsub": { "type": "string", "minLength": 1 },
+        "topic": { "type": "string", "minLength": 1 }
+      }
+    },
+    "topic": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["pubsub", "topic"],
+      "properties": {
+        "pubsub": { "type": "string", "minLength": 1 },
+        "topic": { "type": "string", "minLength": 1 },
+        "contract": {
+          "type": "string",
+          "description": "Fully-qualified message contract type name."
+        },
+        "publishers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "subscribers": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "port": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The port's whole identity. The deployed Dapr binding's type, address, and credentials are environment-owned and never appear here."
+        },
+        "externalSystem": { "type": "string" },
+        "directions": {
+          "type": "array",
+          "items": { "enum": ["in", "out"] }
+        },
+        "usedBy": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["appId"],
+      "properties": {
+        "appId": { "type": "string", "minLength": 1 },
+        "consumers": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "development": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "mocks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/mock" }
+        },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/filePort" }
+        }
+      }
+    },
+    "mock": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["appId", "baseUri"],
+      "properties": {
+        "appId": { "type": "string", "minLength": 1 },
+        "artifact": {
+          "type": "string",
+          "description": "Absolute path to the OpenAPI document on the machine that ran the graph verb. Local to that run; not portable."
+        },
+        "title": { "type": "string" },
+        "version": { "type": "string" },
+        "baseUri": {
+          "type": "string",
+          "description": "The mock's local Microcks REST base URI."
+        }
+      }
+    },
+    "filePort": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["port", "rootPath"],
+      "properties": {
+        "port": { "type": "string", "minLength": 1 },
+        "rootPath": {
+          "type": "string",
+          "description": "Absolute path the port resolves to on the machine that ran the graph verb. Local to that run; not portable."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intropy.io/schemas/block-kinds/v1.json",
+  "title": "Intropy block kinds",
+  "description": "The canonical spelling of every block kind in an Intropy system. Templates mint these values via the intropy.dev/block-kind label, the topology builders declare them, the graph record carries them verbatim, and the CLI's system assembly and manifest model parse them. This document is the single owner of the vocabulary — every other site validates against it rather than re-declaring it.",
+  "$comment": "Canonical spelling is kebab-case. Some legacy emitters produce camelCase (e.g. transactionalIntegration); consumers may normalize on input, but the values below are the only canonical forms. Adding a kind is additive; removing or renaming one is a breaking change coordinated across all three repos.",
+  "type": "string",
+  "enum": [
+    "extractor",
+    "loader",
+    "transactional-integration"
+  ]
+}
