@@ -24,6 +24,7 @@ public sealed class OrderSystem : ISystemDefinition
         builder.AddExtractor("fulfillment-extractor").Publishes(Fulfillment);
         builder.AddLoader("fulfillment-loader").Subscribes(Fulfillment);
         builder.AddLoader("raw-audit").Subscribes(Raw);
+        builder.AddTransactionalIntegration("price-sync").From(Erp).To(Webshop);
     }
 }
 

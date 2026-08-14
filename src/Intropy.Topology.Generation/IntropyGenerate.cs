@@ -128,7 +128,8 @@ public static class IntropyGenerate
         IReadOnlyList<GraphTopicReference>? Subscribes,
         IReadOnlyList<GraphPublication>? Publishes,
         IReadOnlyList<GraphConnectorUse>? Connectors,
-        IReadOnlyList<string>? Uses)
+        IReadOnlyList<string>? Uses,
+        GraphInternalQueue? InternalQueue)
     {
         public static GraphComponent From(ComponentModel component) => new(
             component.Name,
@@ -138,8 +139,15 @@ public static class IntropyGenerate
                 p.Port == Component.DefaultPort ? null : p.Port, p.PubSubName, p.TopicName))),
             Optional(component.Connectors.Select(c => new GraphConnectorUse(
                 c.ConnectorName, Direction(c.Direction)))),
-            Optional(component.Uses));
+            Optional(component.Uses),
+            component.InternalQueue is null
+                ? null
+                : new GraphInternalQueue(component.InternalQueue.PubSubName, component.InternalQueue.TopicName));
     }
+
+    private sealed record GraphInternalQueue(
+        [property: JsonPropertyName("pubsub")] string PubSub,
+        string Topic);
 
     private sealed record GraphTopicReference(
         [property: JsonPropertyName("pubsub")] string PubSub,

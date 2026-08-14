@@ -13,6 +13,7 @@ internal static class TopologyRules
         new Rules.DuplicateSubscriptionRule(),
         new Rules.MissingRequiredOutputRule(),
         new Rules.MissingRequiredSubscriptionRule(),
+        new Rules.MissingRequiredConnectorRule(),
         new Rules.UnconsumedTopicRule(),
         new Rules.UnproducedTopicRule(),
         new Rules.NoEdgesRule(),

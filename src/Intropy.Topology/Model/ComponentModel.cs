@@ -24,4 +24,13 @@ public sealed record ComponentModel
 
     /// <summary>External platform-service app IDs the component invokes.</summary>
     public required IReadOnlyList<string> Uses { get; init; }
+
+    /// <summary>
+    /// The internal receive-to-send queue of a transactional integration, minted by the
+    /// materializer; <see langword="null"/> for other kinds. This is workload shape, not an
+    /// inter-component edge: nothing declares it, and it never appears in
+    /// <see cref="SystemTopology.Topics"/>. It is minted here (not derived per backend) so
+    /// every consumer — local generation, Aspire, deployment tooling — agrees on the name.
+    /// </summary>
+    public required InternalQueue? InternalQueue { get; init; }
 }

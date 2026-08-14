@@ -62,9 +62,10 @@ public class BuildValidationTests
     [Fact]
     public void TryBuild_WithValidSystemAndWarnings_ShouldReturnTrueWithWarnings()
     {
-        // Arrange: a valid component plus an edgeless transactional integration (warning only)
+        // Arrange: a valid system plus a topic nobody subscribes to yet — an unconsumed
+        // topic is a warning (the consumer may simply not exist), so the build succeeds.
         var s = SystemBuilder.Create("test-system").WithValidComponent();
-        s.AddTransactionalIntegration("idle");
+        s.AddExtractor("extra-source").Publishes(TestTopics.Enriched);
 
         // Act
         var ok = s.TryBuild(out var topology, out var diagnostics);
@@ -72,7 +73,8 @@ public class BuildValidationTests
         // Assert
         Assert.True(ok);
         Assert.NotNull(topology);
-        Assert.Contains(diagnostics, d => d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("no edges"));
+        Assert.Contains(diagnostics, d => d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("no component subscribes"));
+        Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
     }
 
     [Fact]

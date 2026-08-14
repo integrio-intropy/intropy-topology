@@ -118,10 +118,18 @@ internal static class DaprSidecarIdentity
     public static bool IsCli(string resourceName) => resourceName.EndsWith(CliSuffix, StringComparison.Ordinal);
 }
 
+/// <summary>
+/// The sidecar executables of run-to-completion components. Their components shut the sidecar
+/// down deliberately at the end of the run, so a Finished/Exited state is the intended terminal
+/// state — recovery must leave them alone. Registered by the host from the topology's kinds.
+/// </summary>
+internal sealed record RunToCompletionSidecars(IReadOnlySet<string> Names);
+
 internal sealed class DaprSidecarRecovery(
     IResourceStateMonitor states,
     IResourceLifecycle lifecycle,
     IBackendReadiness backendReadiness,
+    RunToCompletionSidecars runToCompletion,
     TimeProvider time,
     ILogger<DaprSidecarRecovery> logger) : BackgroundService
 {
@@ -156,6 +164,13 @@ internal sealed class DaprSidecarRecovery(
     internal async Task HandleStateUpdateAsync(ResourceStateUpdate update, CancellationToken cancellationToken)
     {
         if (!DaprSidecarIdentity.IsCli(update.ResourceName))
+        {
+            return;
+        }
+
+        // A run-to-completion sidecar's exit — however fast — is the component's intended
+        // terminal state, decided by the framework runner. No timing heuristic applies.
+        if (runToCompletion.Names.Contains(update.ResourceName))
         {
             return;
         }

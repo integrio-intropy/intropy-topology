@@ -116,6 +116,28 @@ public sealed class IntropyAspireTests : IDisposable
         Assert.Contains("publish/subscribe cycle", error.ToString(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(ComponentKind.Extractor, true)]
+    [InlineData(ComponentKind.TransactionalIntegration, true)]
+    [InlineData(ComponentKind.Loader, false)]
+    public void IsRunToCompletion_ShouldFollowTheKindsSingleLegitimateHost(
+        ComponentKind kind, bool expected)
+    {
+        // Extractors and transactional integrations are hosted by the framework's
+        // run-to-completion runners; loaders stay resident on their subscription.
+        Assert.Equal(expected, IntropyAspire.IsRunToCompletion(kind));
+    }
+
+    [Fact]
+    public void RunToCompletionSidecarsFor_ShouldExemptRunToCompletionSidecarsOnly()
+    {
+        // Act
+        var exempt = IntropyAspire.RunToCompletionSidecarsFor(Topology());
+
+        // Assert — the extractor runs to completion; the resident loader's sidecar keeps recovery.
+        Assert.Equal(["order-extractor-dapr-cli"], exempt.Names.Order(StringComparer.Ordinal));
+    }
+
     [Fact]
     public void Apply_ShouldAddRedisBackend()
     {

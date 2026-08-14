@@ -12,7 +12,7 @@ public class BuilderMappingTests
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("a").Publishes(TestTopics.Raw);
         s.AddLoader("d").Subscribes(TestTopics.Raw).To(TestConnectors.Erp);
-        s.AddTransactionalIntegration("e").From(TestConnectors.Pim);
+        s.AddTransactionalIntegration("e").From(TestConnectors.Pim).To(TestConnectors.Erp);
 
         // Act
         var topology = s.Build();

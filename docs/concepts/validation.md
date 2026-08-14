@@ -43,6 +43,7 @@ The system topology is invalid (2 error(s)):
 | Error | One topic must not be used with two different event contract types |
 | Error | Extractors must publish (a loader's destination may stay a private local component) |
 | Error | Loaders subscribe to exactly one topic |
+| Error | Transactional integrations must declare at least one `From` and one `To` connector |
 | Error | A published topic must have a subscriber |
 | Error | A subscribed topic must have a publisher |
 | Warning | A component with no edges (no subscriptions, publishes, or connectors) is likely unfinished |

@@ -31,7 +31,7 @@ Each kind exposes only its own legal edges:
 |------|-----------|-----------|-----------|----------|
 | Extractor | — | one topic | `From(connector)` | `Publishes` |
 | Loader | exactly 1 topic | — | `To(connector)` | `Subscribes` |
-| Transactional integration | — | — | `From` / `To(connector)` | — |
+| Transactional integration | — | — | `From` / `To(connector)` | `From` and `To` |
 
 `Subscribes`/`Publishes` are the asynchronous (topic) edges; `From`/`To` are the edges out through connectors. A component publishes at most one topic — a second `Publishes` call is rejected at `Build()`. See [Topics](topics.md) and [Connectors](connectors.md).
 
@@ -52,6 +52,8 @@ Component names are DNS-1123 labels, validated at the call site with an `Argumen
 The names in the topology — component names, service app-ids, pubsub names, the derived binding names — are facts the topology *mints*: the local run backend materializes them, generated artifacts carry them, and deployment honors them. They are not copies of deployment configuration, so they cannot drift from it; breaking one (renaming a deployed app-id without updating the topology) fails loudly at runtime. Deployment treats these names as owned by the topology, never as values to maintain a second copy of.
 
 One qualification: a `ServiceRef` app-id is unqualified, while Dapr service resolution in a cluster is namespace-scoped. The minted identity holds within the system's own namespace; invoking a service across namespaces would need qualified app-ids, which the model does not express today.
+
+A second minted identity is derived rather than declared: a transactional integration's `InternalQueue` (`internal-<component>` pubsub, `hop` topic) — the queue joining its receive and send pipelines. It is workload shape, not an inter-component edge, so it never enters `SystemTopology.Topics` and the DSL exposes nothing for it. It is minted in the model so every backend materializes the same component (locally: Redis, scoped to exactly the owning integration) and the framework runner reads the names from the generated `.intropy.json` instead of a scaffold constant.
 
 ## What the compiler rejects
 

@@ -99,6 +99,43 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
+    public void Generate_ShouldEmit_InternalPubSubPerTransactionalIntegration_ScopedToItself()
+    {
+        // Act — the internal hop is minted in the model, not declared as a topic edge, so it
+        // does not emerge from the topic-pubsub loop; generation emits it explicitly.
+        var yaml = Content("components/internal-price-sync.yaml");
+
+        // Assert
+        Assert.Contains("type: \"pubsub.redis\"", yaml, StringComparison.Ordinal);
+        Assert.Contains("value: \"localhost:6380\"", yaml, StringComparison.Ordinal);
+        Assert.Contains("scopes:", yaml, StringComparison.Ordinal);
+        Assert.Contains("- \"price-sync\"", yaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("order-extractor", yaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generate_ShouldCarry_InternalQueueInTheRuntimeConfig()
+    {
+        // Act
+        var json = Content("config/price-sync.intropy.json");
+
+        // Assert
+        Assert.Contains("\"InternalQueue\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"PubSubName\": \"internal-price-sync\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"TopicName\": \"hop\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generate_ShouldOmit_InternalQueueForNonTransactionalComponents()
+    {
+        // Act
+        var json = Content("config/order-extractor.intropy.json");
+
+        // Assert
+        Assert.DoesNotContain("InternalQueue", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Generate_ShouldEmit_PerComponentRuntimeConfig()
     {
         // Act

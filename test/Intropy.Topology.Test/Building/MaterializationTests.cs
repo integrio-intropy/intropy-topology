@@ -10,7 +10,7 @@ public class MaterializationTests
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor").Publishes(TestTopics.Raw);
-        s.AddTransactionalIntegration("ti").From(TestConnectors.Pim);
+        s.AddTransactionalIntegration("ti").From(TestConnectors.Pim).To(TestConnectors.Erp);
         s.AddLoader("loader").Subscribes(TestTopics.Raw).To(TestConnectors.Erp);
 
         // Act
@@ -66,14 +66,17 @@ public class MaterializationTests
         var s = SystemBuilder.Create("test-system");
         s.AddTransactionalIntegration("ti")
             .From(TestConnectors.Pim)
-            .From(TestConnectors.Pim);
+            .From(TestConnectors.Pim)
+            .To(TestConnectors.Erp);
 
         // Act
         var topology = s.Build();
 
-        // Assert: one edge, one resource, no diagnostics
-        Assert.Single(topology.Components.Single().Connectors);
-        Assert.Single(topology.Connectors);
+        // Assert: the duplicate From collapsed to one edge; the declared To stays.
+        Assert.Equal(
+            [("pim", ConnectorDirection.In), ("erp", ConnectorDirection.Out)],
+            topology.Components.Single().Connectors.Select(c => (c.ConnectorName, c.Direction)));
+        Assert.Equal(2, topology.Connectors.Count);
         Assert.Empty(s.Validate());
     }
 
@@ -98,6 +101,29 @@ public class MaterializationTests
         // Assert
         Assert.Equal(["aaa-topic", "zzz-topic"], topology.Topics.Select(t => t.TopicName));
         Assert.Equal(["erp", "pim"], topology.Connectors.Select(c => c.Name));
+    }
+
+    [Fact]
+    public void Build_ShouldMint_InternalQueueForTransactionalIntegrations()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddTransactionalIntegration("price-sync").From(TestConnectors.Pim).To(TestConnectors.Erp);
+        s.AddExtractor("extractor").Publishes(TestTopics.Raw);
+        s.AddLoader("loader").Subscribes(TestTopics.Raw);
+
+        // Act
+        var topology = s.Build();
+
+        // Assert
+        var ti = topology.Components.Single(c => c.Name == "price-sync");
+        Assert.Equal("internal-price-sync", ti.InternalQueue?.PubSubName);
+        Assert.Equal("hop", ti.InternalQueue?.TopicName);
+        Assert.Null(topology.Components.Single(c => c.Name == "extractor").InternalQueue);
+        Assert.Null(topology.Components.Single(c => c.Name == "loader").InternalQueue);
+
+        // The hop is workload shape, not an inter-component edge: it never enters Topics.
+        Assert.DoesNotContain(topology.Topics, t => t.PubSubName == "internal-price-sync");
     }
 
     // A second edge that a block cannot legally have is a compile error: the block

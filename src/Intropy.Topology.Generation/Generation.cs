@@ -83,6 +83,14 @@ public static class TopologyGenerator
             files.Add(PubSubComponent(topic, topology));
         }
 
+        // The transactional integration's internal hop is minted in the model, not declared as
+        // a topic edge, so its pubsub does not emerge from the Topics loop above. Same Redis
+        // backend as the inter-component pubsubs; scoped to exactly the owning component.
+        foreach (var component in topology.Components.Where(c => c.InternalQueue is not null))
+        {
+            files.Add(PubSubComponent(component.InternalQueue!.PubSubName, [component.Name]));
+        }
+
         // Local runs resolve every connector to localstorage, so the declared transport is
         // deliberately not consulted here: the placeholder default transport must not block
         // F5. Deployment generation is where an unresolved transport must hard-fail.
@@ -112,8 +120,13 @@ public static class TopologyGenerator
     {
         var scopes = topology.Components
             .Where(c => c.Subscribes.Any(s => s.PubSubName == pubSubName) || c.Publishes.Any(p => p.PubSubName == pubSubName))
-            .Select(c => c.Name)
-            .OrderBy(n => n, StringComparer.Ordinal);
+            .Select(c => c.Name);
+        return PubSubComponent(pubSubName, scopes);
+    }
+
+    private static GeneratedFile PubSubComponent(string pubSubName, IEnumerable<string> scopes)
+    {
+        scopes = scopes.OrderBy(n => n, StringComparer.Ordinal);
 
         // Redis Streams with consumer groups: an unacked or RETRY'd message is redelivered
         // after the component's redeliverInterval instead of being dropped. Port 6380 because
@@ -161,6 +174,9 @@ public static class TopologyGenerator
                     DaprComponent = ConnectorResource.DaprComponentNameFor(c.ConnectorName),
                 }),
                 Uses = component.Uses,
+                InternalQueue = component.InternalQueue is null
+                    ? null
+                    : new { component.InternalQueue.PubSubName, component.InternalQueue.TopicName },
             },
         };
 
