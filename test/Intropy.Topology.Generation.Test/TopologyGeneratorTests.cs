@@ -33,7 +33,7 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Generate_ShouldEmit_OneBindingComponentPerConnector_ResolvedToLocalstorage()
+    public void Generate_ShouldEmit_OneBindingComponentPerPort_ResolvedToLocalstorage()
     {
         // Act
         var webshop = Content("components/binding.webshop.yaml");
@@ -70,14 +70,14 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Build_WithUnresolvedConnector_ShouldRejectAtTheManifestBoundary()
+    public void Build_WithUnresolvedPort_ShouldRejectAtTheManifestBoundary()
     {
-        // Arrange — a connector used by the topology but absent from the development manifest.
+        // Arrange — a port used by the topology but absent from the development manifest.
         // The manifest is the single validation boundary; the generator trusts it.
         var topic = TopicRef<string>.Define("orders", "created");
-        var connector = ConnectorRef.Define("erp");
+        var port = PortRef.Define("erp");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").From(connector).Publishes(topic);
+        builder.AddExtractor("extractor").From(port).Publishes(topic);
         builder.AddLoader("loader").Subscribes(topic);
         var development = new DevelopmentBuilder(builder.Build(), Directory.GetCurrentDirectory());
 
@@ -197,19 +197,19 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Generate_WithStandaloneConnector_ShouldEmitLocalstorageBinding()
+    public void Generate_WithStandalonePort_ShouldEmitLocalstorageBinding()
     {
-        // Arrange — local generation resolves every connector to localstorage; the deployed
+        // Arrange — local generation resolves every port to localstorage; the deployed
         // binding type is deployment-owned and never declared in the topology.
         var topic = TopicRef<string>.Define("orders", "created");
-        var connector = ConnectorRef.Define("placeholder");
+        var port = PortRef.Define("placeholder");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").From(connector).Publishes(topic);
+        builder.AddExtractor("extractor").From(port).Publishes(topic);
         builder.AddLoader("loader").Subscribes(topic);
         var topology = builder.Build();
         var manifest = new DevelopmentManifest(
             [],
-            [new ConnectorFileResolution("placeholder", "./test/placeholder")]);
+            [new PortFileResolution("placeholder", "./test/placeholder")]);
 
         // Act
         var artifacts = TopologyGenerator.Generate(topology, manifest);

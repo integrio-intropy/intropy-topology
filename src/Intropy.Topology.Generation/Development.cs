@@ -50,22 +50,22 @@ public sealed class DevelopmentBuilder
         return new MockBuilder(declaration);
     }
 
-    /// <summary>Declares the local file resolution for a connector used by this topology.</summary>
-    /// <param name="connector">The connector to resolve locally.</param>
-    public FileBuilder Files(ConnectorRef connector)
+    /// <summary>Declares the local file resolution for a port used by this topology.</summary>
+    /// <param name="port">The port to resolve locally.</param>
+    public FileBuilder Files(PortRef port)
     {
-        ArgumentNullException.ThrowIfNull(connector);
-        if (!_topology.Connectors.Any(candidate => candidate.Name == connector.Name))
+        ArgumentNullException.ThrowIfNull(port);
+        if (!_topology.Ports.Any(candidate => candidate.Name == port.Name))
         {
-            throw new DevelopmentValidationException($"Connector '{connector.Name}' is not used by the system topology.");
+            throw new DevelopmentValidationException($"Port '{port.Name}' is not used by the system topology.");
         }
 
-        if (_files.Any(candidate => candidate.ConnectorName == connector.Name))
+        if (_files.Any(candidate => candidate.PortName == port.Name))
         {
-            throw new DevelopmentValidationException($"Connector '{connector.Name}' has more than one file resolution.");
+            throw new DevelopmentValidationException($"Port '{port.Name}' has more than one file resolution.");
         }
 
-        var declaration = new FileDeclaration(connector.Name);
+        var declaration = new FileDeclaration(port.Name);
         _files.Add(declaration);
         return new FileBuilder(declaration);
     }
@@ -81,21 +81,21 @@ public sealed class DevelopmentBuilder
                 $"Mocks for services '{string.Join("', '", duplicateIdentity.Select(mock => mock.AppId))}' resolve to the same Microcks identity '{duplicateIdentity.Key.Title}' version '{duplicateIdentity.Key.Version}'.");
         }
 
-        var unresolved = _topology.Connectors
-            .Where(connector => !_files.Any(file => file.ConnectorName == connector.Name))
-            .Select(connector => connector.Name)
+        var unresolved = _topology.Ports
+            .Where(port => !_files.Any(file => file.PortName == port.Name))
+            .Select(port => port.Name)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
         if (unresolved.Length > 0)
         {
             throw new DevelopmentValidationException(
-                $"Connectors '{string.Join("', '", unresolved)}' have no local file resolution.");
+                $"Ports '{string.Join("', '", unresolved)}' have no local file resolution.");
         }
 
         var files = _files.Select(file => FileRootPath.Inspect(_root, file)).ToArray();
         return new DevelopmentManifest(
             mocks.OrderBy(mock => mock.AppId, StringComparer.Ordinal).ToArray(),
-            files.OrderBy(file => file.ConnectorName, StringComparer.Ordinal).ToArray());
+            files.OrderBy(file => file.PortName, StringComparer.Ordinal).ToArray());
     }
 
     /// <summary>Configures the OpenAPI artifact for one service mock.</summary>
@@ -119,7 +119,7 @@ public sealed class DevelopmentBuilder
         }
     }
 
-    /// <summary>Configures the local root path for one connector file resolution.</summary>
+    /// <summary>Configures the local root path for one port file resolution.</summary>
     public sealed class FileBuilder
     {
         private readonly FileDeclaration _declaration;
@@ -132,7 +132,7 @@ public sealed class DevelopmentBuilder
             ArgumentException.ThrowIfNullOrWhiteSpace(path);
             if (_declaration.Path is not null)
             {
-                throw new DevelopmentValidationException($"Connector '{_declaration.ConnectorName}' has more than one root path.");
+                throw new DevelopmentValidationException($"Port '{_declaration.PortName}' has more than one root path.");
             }
 
             _declaration.Path = path;
@@ -146,18 +146,18 @@ public sealed class DevelopmentBuilder
         public string? Path { get; set; }
     }
 
-    internal sealed class FileDeclaration(string connectorName)
+    internal sealed class FileDeclaration(string portName)
     {
-        public string ConnectorName { get; } = connectorName;
+        public string PortName { get; } = portName;
         public string? Path { get; set; }
     }
 }
 
 /// <summary>Validated development substitutions consumed by generation and local runtime backends.</summary>
-public sealed record DevelopmentManifest(IReadOnlyList<OpenApiMock> Mocks, IReadOnlyList<ConnectorFileResolution> Files);
+public sealed record DevelopmentManifest(IReadOnlyList<OpenApiMock> Mocks, IReadOnlyList<PortFileResolution> Files);
 
-/// <summary>One connector's validated local file resolution.</summary>
-public sealed record ConnectorFileResolution(string ConnectorName, string RootPath);
+/// <summary>One port's validated local file resolution.</summary>
+public sealed record PortFileResolution(string PortName, string RootPath);
 
 /// <summary>One OpenAPI-backed platform-service mock with a verified Microcks identity.</summary>
 public sealed record OpenApiMock(string AppId, string ArtifactPath, string Title, string Version);
@@ -201,18 +201,18 @@ public static class DevelopmentDiscovery
 
 internal static class FileRootPath
 {
-    public static ConnectorFileResolution Inspect(string root, DevelopmentBuilder.FileDeclaration declaration)
+    public static PortFileResolution Inspect(string root, DevelopmentBuilder.FileDeclaration declaration)
     {
-        var connectorName = declaration.ConnectorName;
+        var portName = declaration.PortName;
         var relativePath = declaration.Path;
         if (relativePath is null)
         {
-            throw new DevelopmentValidationException($"File resolution for connector '{connectorName}' does not declare a root path.");
+            throw new DevelopmentValidationException($"File resolution for port '{portName}' does not declare a root path.");
         }
 
         var rootPath = PathContainment.ResolveRoot(root);
         var folderPath = PathContainment.Resolve(rootPath, relativePath, out var escaped);
-        var error = $"File resolution '{relativePath}' for connector '{connectorName}'";
+        var error = $"File resolution '{relativePath}' for port '{portName}'";
         if (Directory.Exists(folderPath))
         {
             folderPath = PathContainment.ResolveDirectory(folderPath, $"{error} cannot be resolved");
@@ -223,13 +223,13 @@ internal static class FileRootPath
             throw new DevelopmentValidationException($"{error} escapes the SystemHost directory.");
         }
 
-        return new ConnectorFileResolution(connectorName, folderPath);
+        return new PortFileResolution(portName, folderPath);
     }
 }
 
 /// <summary>
 /// Canonicalizes paths against the SystemHost directory and rejects escapes. Both
-/// development artifact kinds (connector file roots, OpenAPI mock documents) resolve
+/// development artifact kinds (port file roots, OpenAPI mock documents) resolve
 /// the same way: the root is canonicalized through its symlink target, the relative
 /// path is combined and canonicalized, and any path landing outside the root is a
 /// validation error.

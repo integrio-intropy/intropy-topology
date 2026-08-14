@@ -34,24 +34,24 @@ public sealed record ServiceResource
     public required IReadOnlyList<string> Consumers { get; init; }
 }
 
-/// <summary>A system-owned connector materialized from usage.</summary>
-public sealed record ConnectorResource
+/// <summary>A system-owned port materialized from usage.</summary>
+public sealed record PortResource
 {
-    /// <summary>Derives a connector's Dapr binding component name:
-    /// <c>binding.&lt;connector-name&gt;</c>. The single derivation site — every consumer
+    /// <summary>Derives a port's Dapr binding component name:
+    /// <c>binding.&lt;port-name&gt;</c>. The single derivation site — every consumer
     /// of the name goes through here.</summary>
-    public static string DaprComponentNameFor(string connectorName) => $"binding.{connectorName}";
+    public static string DaprComponentNameFor(string portName) => $"binding.{portName}";
 
-    /// <summary>The connector's name (DNS-1123 label) — its whole identity.</summary>
+    /// <summary>The port's name (DNS-1123 label) — its whole identity.</summary>
     public required string Name { get; init; }
 
-    /// <summary>The derived Dapr binding component name: <c>binding.&lt;connector-name&gt;</c>.</summary>
+    /// <summary>The derived Dapr binding component name: <c>binding.&lt;port-name&gt;</c>.</summary>
     public string DaprComponentName => DaprComponentNameFor(Name);
 
-    /// <summary>The union of directions the connector is used in.</summary>
-    public required IReadOnlyList<ConnectorDirection> Directions { get; init; }
+    /// <summary>The union of directions the port is used in.</summary>
+    public required IReadOnlyList<PortDirection> Directions { get; init; }
 
-    /// <summary>Names of components using the connector (sorted).</summary>
+    /// <summary>Names of components using the port (sorted).</summary>
     public required IReadOnlyList<string> UsedBy { get; init; }
 }
 

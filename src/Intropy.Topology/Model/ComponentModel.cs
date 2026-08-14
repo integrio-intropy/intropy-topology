@@ -19,8 +19,8 @@ public sealed record ComponentModel
     /// <summary>Topics the component publishes to, by output port.</summary>
     public required IReadOnlyList<PublishEdge> Publishes { get; init; }
 
-    /// <summary>Connectors the component uses (explicit From/To usage).</summary>
-    public required IReadOnlyList<ConnectorEdge> Connectors { get; init; }
+    /// <summary>Ports the component uses (explicit From/To usage).</summary>
+    public required IReadOnlyList<PortEdge> Ports { get; init; }
 
     /// <summary>External platform-service app IDs the component invokes.</summary>
     public required IReadOnlyList<string> Uses { get; init; }

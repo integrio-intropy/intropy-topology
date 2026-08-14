@@ -43,15 +43,15 @@ The system topology is invalid (2 error(s)):
 | Error | One topic must not be used with two different event contract types |
 | Error | Extractors must publish (a loader's destination may stay a private local component) |
 | Error | Loaders subscribe to exactly one topic |
-| Error | Transactional integrations must declare at least one `From` and one `To` connector |
+| Error | Transactional integrations must declare at least one `From` and one `To` port |
 | Error | A published topic must have a subscriber |
 | Error | A subscribed topic must have a publisher |
-| Warning | A component with no edges (no subscriptions, publishes, or connectors) is likely unfinished |
-| Error | A pubsub name must not equal a connector's derived Dapr component name |
+| Warning | A component with no edges (no subscriptions, publishes, or ports) is likely unfinished |
+| Error | A pubsub name must not equal a port's derived Dapr component name |
 
 ## Argument validation
 
-Name and argument invariants are enforced eagerly at the call site, not collected: component, topic, and connector names are DNS-1123 labels/subdomains and throw `ArgumentException` immediately when invalid. Only *semantic* topology validation is deferred to `Build()` so all diagnostics report at once.
+Name and argument invariants are enforced eagerly at the call site, not collected: component, topic, and port names are DNS-1123 labels/subdomains and throw `ArgumentException` immediately when invalid. Only *semantic* topology validation is deferred to `Build()` so all diagnostics report at once.
 
 ## Related
 

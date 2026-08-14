@@ -11,8 +11,8 @@ public class BuilderMappingTests
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("a").Publishes(TestTopics.Raw);
-        s.AddLoader("d").Subscribes(TestTopics.Raw).To(TestConnectors.Erp);
-        s.AddTransactionalIntegration("e").From(TestConnectors.Pim).To(TestConnectors.Erp);
+        s.AddLoader("d").Subscribes(TestTopics.Raw).To(TestPorts.Erp);
+        s.AddTransactionalIntegration("e").From(TestPorts.Pim).To(TestPorts.Erp);
 
         // Act
         var topology = s.Build();
@@ -33,7 +33,7 @@ public class BuilderMappingTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        s.AddLoader("loader").Subscribes(TestTopics.Raw).To(TestConnectors.Erp);
+        s.AddLoader("loader").Subscribes(TestTopics.Raw).To(TestPorts.Erp);
         s.AddExtractor("source").Publishes(TestTopics.Raw);
 
         // Act
@@ -50,20 +50,20 @@ public class BuilderMappingTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("extractor").From(TestConnectors.Pim).Publishes(TestTopics.Raw);
+        s.AddExtractor("extractor").From(TestPorts.Pim).Publishes(TestTopics.Raw);
         s.AddLoader("sink").Subscribes(TestTopics.Raw);
 
         // Act
         var component = s.Build().Components[0];
 
         // Assert
-        var edge = Assert.Single(component.Connectors);
-        Assert.Equal("pim", edge.ConnectorName);
-        Assert.Equal(ConnectorDirection.In, edge.Direction);
+        var edge = Assert.Single(component.Ports);
+        Assert.Equal("pim", edge.PortName);
+        Assert.Equal(PortDirection.In, edge.Direction);
     }
 
     [Fact]
-    public void Publishes_ShouldUseDefaultPort()
+    public void Publishes_ShouldRecordTopic()
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
@@ -74,7 +74,6 @@ public class BuilderMappingTests
         var edge = s.Build().Components[0].Publishes.Single();
 
         // Assert
-        Assert.Equal("default", edge.Port);
         Assert.Equal("test-pubsub", edge.PubSubName);
         Assert.Equal("raw-events", edge.TopicName);
     }
@@ -85,16 +84,16 @@ public class BuilderMappingTests
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddTransactionalIntegration("ti")
-            .From(TestConnectors.Pim)
-            .To(TestConnectors.Erp);
+            .From(TestPorts.Pim)
+            .To(TestPorts.Erp);
 
         // Act
         var component = s.Build().Components.Single();
 
         // Assert
         Assert.Equal(
-            [("pim", ConnectorDirection.In), ("erp", ConnectorDirection.Out)],
-            component.Connectors.Select(c => (c.ConnectorName, c.Direction)));
+            [("pim", PortDirection.In), ("erp", PortDirection.Out)],
+            component.Ports.Select(c => (c.PortName, c.Direction)));
     }
 
     [Fact]
@@ -106,7 +105,7 @@ public class BuilderMappingTests
 
         // Assert
         Assert.Same(builder, builder.Publishes(TestTopics.Raw));
-        Assert.Same(builder, builder.From(TestConnectors.Pim));
+        Assert.Same(builder, builder.From(TestPorts.Pim));
     }
 
     [Fact]
@@ -118,8 +117,8 @@ public class BuilderMappingTests
 
         // Act
         var extractor = s.AddExtractor("extractor").Uses(service).Publishes(TestTopics.Raw);
-        var loader = s.AddLoader("loader").Subscribes(TestTopics.Raw).Uses(service).To(TestConnectors.Erp);
-        var integration = s.AddTransactionalIntegration("ti").From(TestConnectors.Pim).Uses(service).To(TestConnectors.Erp);
+        var loader = s.AddLoader("loader").Subscribes(TestTopics.Raw).Uses(service).To(TestPorts.Erp);
+        var integration = s.AddTransactionalIntegration("ti").From(TestPorts.Pim).Uses(service).To(TestPorts.Erp);
         var topology = s.Build();
 
         // Assert
@@ -135,7 +134,7 @@ public class BuilderMappingTests
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor").Publishes(TestTopics.Raw);
-        s.AddLoader("loader").Subscribes(TestTopics.Raw).To(TestConnectors.Erp);
+        s.AddLoader("loader").Subscribes(TestTopics.Raw).To(TestPorts.Erp);
         var first = s.Build();
 
         // Act

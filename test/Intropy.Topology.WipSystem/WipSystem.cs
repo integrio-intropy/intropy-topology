@@ -12,7 +12,7 @@ public sealed record WipOrder(string OrderNumber);
 public sealed class WipSystemDefinition : ISystemDefinition
 {
     public static readonly TopicRef<WipOrder> Raw = TopicRef<WipOrder>.Define("pubsub-a", "wip-raw");
-    public static readonly ConnectorRef Placeholder = ConnectorRef.Define("placeholder");
+    public static readonly PortRef Placeholder = PortRef.Define("placeholder");
 
     public string SystemName => "wip-system";
 
@@ -22,7 +22,7 @@ public sealed class WipSystemDefinition : ISystemDefinition
     }
 }
 
-/// <summary>The local file resolution backing <see cref="WipSystemDefinition"/>'s connector.</summary>
+/// <summary>The local file resolution backing <see cref="WipSystemDefinition"/>'s port.</summary>
 public sealed class WipDevelopment : IDevelopmentDefinition
 {
     public void Define(DevelopmentBuilder development)

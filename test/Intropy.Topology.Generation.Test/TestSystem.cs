@@ -6,14 +6,14 @@ public sealed record RawOrder(string OrderNumber);
 public sealed record FulfillmentOrder(string OrderNumber);
 
 // Exactly one ISystemDefinition lives in this assembly so IntropyGenerate/SystemDiscovery resolve it.
-// Two extractor -> loader flows across two pub/subs (pubsub-a, pubsub-b); connectors resolve
+// Two extractor -> loader flows across two pub/subs (pubsub-a, pubsub-b); ports resolve
 // locally to ./test folders via the development definition below.
 public sealed class OrderSystem : ISystemDefinition
 {
     public static readonly TopicRef<RawOrder> Raw = TopicRef<RawOrder>.Define("pubsub-a", "order-raw");
     public static readonly TopicRef<FulfillmentOrder> Fulfillment = TopicRef<FulfillmentOrder>.Define("pubsub-b", "order-fulfillment");
-    public static readonly ConnectorRef Webshop = ConnectorRef.Define("webshop");
-    public static readonly ConnectorRef Erp = ConnectorRef.Define("erp");
+    public static readonly PortRef Webshop = PortRef.Define("webshop");
+    public static readonly PortRef Erp = PortRef.Define("erp");
 
     public string SystemName => "order-fulfillment";
 
@@ -28,7 +28,7 @@ public sealed class OrderSystem : ISystemDefinition
     }
 }
 
-/// <summary>The local file resolutions backing <see cref="OrderSystem"/>'s connectors.</summary>
+/// <summary>The local file resolutions backing <see cref="OrderSystem"/>'s ports.</summary>
 public sealed class OrderDevelopment : IDevelopmentDefinition
 {
     public void Define(DevelopmentBuilder development)

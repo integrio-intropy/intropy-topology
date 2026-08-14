@@ -7,7 +7,7 @@ profile. Backend-agnostic and dependency-free (YAML is emitted by a small intern
 It produces, deterministically:
 
 - one Dapr **pub/sub** component per distinct `PubSubName` (Redis Streams backed),
-- one Dapr **binding** per connector (`bindings.localstorage` rooted at the connector's
+- one Dapr **binding** per port (`bindings.localstorage` rooted at the port's
   development-manifest folder, `scopes` from `UsedBy`),
 - one Dapr **HTTPEndpoint** per development-mocked platform service, named after the service's
   app-id so service invocation resolves to the mock,

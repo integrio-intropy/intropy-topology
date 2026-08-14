@@ -9,14 +9,9 @@ namespace Intropy.Topology;
 /// </summary>
 public abstract class Component
 {
-    /// <summary>The output port name recorded for every <c>Publishes</c> call. Part of the
-    /// serialized model semantics — the graph contract omits the port when it equals this
-    /// value.</summary>
-    public const string DefaultPort = "default";
-
     private readonly List<TopicRef> _subscribes = [];
-    private readonly List<(string Port, TopicRef Topic)> _publishes = [];
-    private readonly List<(ConnectorRef Connector, ConnectorDirection Direction)> _connectors = [];
+    private readonly List<TopicRef> _publishes = [];
+    private readonly List<(PortRef Port, PortDirection Direction)> _ports = [];
     private readonly List<ServiceRef> _services = [];
 
     private protected Component(string name, ComponentKind kind)
@@ -33,9 +28,9 @@ public abstract class Component
 
     internal IReadOnlyList<TopicRef> SubscribeCalls => _subscribes;
 
-    internal IReadOnlyList<(string Port, TopicRef Topic)> PublishCalls => _publishes;
+    internal IReadOnlyList<TopicRef> PublishCalls => _publishes;
 
-    internal IReadOnlyList<(ConnectorRef Connector, ConnectorDirection Direction)> ConnectorCalls => _connectors;
+    internal IReadOnlyList<(PortRef Port, PortDirection Direction)> PortCalls => _ports;
 
     internal IReadOnlyList<ServiceRef> ServiceCalls => _services;
 
@@ -48,13 +43,13 @@ public abstract class Component
     internal void AddPublish(TopicRef topic)
     {
         ArgumentNullException.ThrowIfNull(topic);
-        _publishes.Add((DefaultPort, topic));
+        _publishes.Add(topic);
     }
 
-    internal void AddConnector(ConnectorRef connector, ConnectorDirection direction)
+    internal void AddPort(PortRef port, PortDirection direction)
     {
-        ArgumentNullException.ThrowIfNull(connector);
-        _connectors.Add((connector, direction));
+        ArgumentNullException.ThrowIfNull(port);
+        _ports.Add((port, direction));
     }
 
     internal void AddService(ServiceRef service)
@@ -80,7 +75,7 @@ public sealed class LoaderComponent : Component
 }
 
 /// <summary>The declared transactional integration: a synchronous block that reads/writes
-/// external systems through connectors. Obtained from the integration builder's
+/// external systems through ports. Obtained from the integration builder's
 /// <c>Component</c> property.</summary>
 public sealed class TransactionalIntegrationComponent : Component
 {

@@ -13,11 +13,11 @@ public static class TestTopics
         TopicRef<EnrichedEvent>.Define("test-pubsub", "enriched-events");
 }
 
-public static class TestConnectors
+public static class TestPorts
 {
-    public static readonly ConnectorRef Pim =
-        ConnectorRef.Define("pim");
+    public static readonly PortRef Pim =
+        PortRef.Define("pim");
 
-    public static readonly ConnectorRef Erp =
-        ConnectorRef.Define("erp");
+    public static readonly PortRef Erp =
+        PortRef.Define("erp");
 }

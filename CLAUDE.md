@@ -31,13 +31,13 @@ A typed, fluent DSL for declaring Intropy integration-system topologies in .NET 
 Key invariants:
 
 - **Per-block builders = compile-time legality**: each `Add*` on `SystemBuilder` returns that block's builder, whose members are exactly the edges legal for that block. Illegal topology is a compile error; only what types cannot check (completeness, cross-component conflicts) is validated at `Build()`, which collects every diagnostic before throwing (`TryBuild`/`Validate` are the non-throwing variants).
-- **Edges, not triggers**: topics (`Publishes`/`Subscribes`) and connectors (`From`/`To`) are the whole topology — activation (cron) is deployment-owned and lives in the component scaffold, never in the model. A component publishes at most one topic; a loader's `To` is optional. A topic missing its publisher or subscriber is a *deployment* invariant — validation warns so a partially built system still compiles and runs locally; deployment validation must treat it as an error.
-- **Resources materialize from usage**: `TopicRef<T>.Define` / `ConnectorRef.Define` are declared as static fields in scaffolded `Topics.cs` / `Connectors.cs`; there is no `AddTopic`. Materialization never fails (first-seen wins, deterministic ordering).
+- **Edges, not triggers**: topics (`Publishes`/`Subscribes`) and ports (`From`/`To`) are the whole topology — activation (cron) is deployment-owned and lives in the component scaffold, never in the model. A component publishes at most one topic; a loader's `To` is optional. A topic missing its publisher or subscriber is a *deployment* invariant — validation warns so a partially built system still compiles and runs locally; deployment validation must treat it as an error.
+- **Resources materialize from usage**: `TopicRef<T>.Define` / `PortRef.Define` are declared as static fields in scaffolded `Topics.cs` / `Ports.cs`; there is no `AddTopic`. Materialization never fails (first-seen wins, deterministic ordering).
 - **Names are DNS-1123**, validated eagerly at the call site by `NameRules` (`ArgumentException`); only semantic validation is deferred to `Build()`.
 - **Namespaces**: flat `Intropy.Topology` is the user-facing DSL surface; `.Building` is fluent machinery users never name; `.Model` is the output model; `.Validation(.Rules)` is internal.
 - **File layout is grouped, not one-type-per-file**: cohesive types share a file (`Components.cs`, `Refs.cs`, `Building/ComponentBuilders.cs`, `Model/Resources.cs`). Put new types in the existing file they belong with.
 
-The example SystemHost's `Topics.cs` / `Connectors.cs` / `OrderFlowSystem.cs` mirror `intropy sys create` codegen **verbatim** (golden output in intropy-cli's `internal/system/create_test.go`) — they double as a compile-time guarantee that CLI-generated code builds against this library. Keep them in sync with the CLI templates.
+The example SystemHost's `Topics.cs` / `Ports.cs` / `OrderFlowSystem.cs` mirror `intropy sys create` codegen **verbatim** (golden output in intropy-cli's `internal/system/create_test.go`) — they double as a compile-time guarantee that CLI-generated code builds against this library. Keep them in sync with the CLI templates.
 
 ## Testing
 

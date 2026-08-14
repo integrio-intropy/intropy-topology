@@ -87,7 +87,7 @@ public static class IntropyGenerate
         string System,
         IReadOnlyList<GraphComponent>? Components,
         IReadOnlyList<GraphTopic>? Topics,
-        IReadOnlyList<GraphConnector>? Connectors,
+        IReadOnlyList<GraphPort>? Ports,
         IReadOnlyList<GraphService>? Services,
         GraphDevelopment? Development)
     {
@@ -97,18 +97,18 @@ public static class IntropyGenerate
             topology.SystemName,
             Optional(topology.Components.Select(GraphComponent.From)),
             Optional(topology.Topics.Select(GraphTopic.From)),
-            Optional(topology.Connectors.Select(GraphConnector.From)),
+            Optional(topology.Ports.Select(GraphPort.From)),
             Optional(topology.Services.Select(GraphService.From)),
             development is null ? null : GraphDevelopment.From(development));
     }
 
     private sealed record GraphDevelopment(
         IReadOnlyList<GraphMock>? Mocks,
-        IReadOnlyList<GraphFileConnector>? Files)
+        IReadOnlyList<GraphFilePort>? Files)
     {
         public static GraphDevelopment From(DevelopmentManifest development) => new(
             Optional(development.Mocks.Select(GraphMock.From)),
-            Optional(development.Files.Select(GraphFileConnector.From)));
+            Optional(development.Files.Select(GraphFilePort.From)));
     }
 
     private sealed record GraphMock(string AppId, string Artifact, string Title, string Version, string BaseUri)
@@ -117,9 +117,9 @@ public static class IntropyGenerate
             mock.AppId, mock.ArtifactPath, mock.Title, mock.Version, LocalMockEndpoints.BaseUri(mock));
     }
 
-    private sealed record GraphFileConnector(string Connector, string RootPath)
+    private sealed record GraphFilePort(string Port, string RootPath)
     {
-        public static GraphFileConnector From(ConnectorFileResolution file) => new(file.ConnectorName, file.RootPath);
+        public static GraphFilePort From(PortFileResolution file) => new(file.PortName, file.RootPath);
     }
 
     private sealed record GraphComponent(
@@ -127,7 +127,7 @@ public static class IntropyGenerate
         string Kind,
         IReadOnlyList<GraphTopicReference>? Subscribes,
         IReadOnlyList<GraphPublication>? Publishes,
-        IReadOnlyList<GraphConnectorUse>? Connectors,
+        IReadOnlyList<GraphPortUse>? Ports,
         IReadOnlyList<string>? Uses,
         GraphInternalQueue? InternalQueue)
     {
@@ -136,9 +136,9 @@ public static class IntropyGenerate
             KebabCase(component.Kind.ToString()),
             Optional(component.Subscribes.Select(t => new GraphTopicReference(t.PubSubName, t.TopicName))),
             Optional(component.Publishes.Select(p => new GraphPublication(
-                p.Port == Component.DefaultPort ? null : p.Port, p.PubSubName, p.TopicName))),
-            Optional(component.Connectors.Select(c => new GraphConnectorUse(
-                c.ConnectorName, Direction(c.Direction)))),
+                p.PubSubName, p.TopicName))),
+            Optional(component.Ports.Select(c => new GraphPortUse(
+                c.PortName, Direction(c.Direction)))),
             Optional(component.Uses),
             component.InternalQueue is null
                 ? null
@@ -154,11 +154,10 @@ public static class IntropyGenerate
         string Topic);
 
     private sealed record GraphPublication(
-        string? Port,
         [property: JsonPropertyName("pubsub")] string PubSub,
         string Topic);
 
-    private sealed record GraphConnectorUse(string Connector, string Direction);
+    private sealed record GraphPortUse(string Port, string Direction);
 
     private sealed record GraphTopic(
         [property: JsonPropertyName("pubsub")] string PubSub,
@@ -175,15 +174,15 @@ public static class IntropyGenerate
             Optional(topic.Subscribers));
     }
 
-    private sealed record GraphConnector(
+    private sealed record GraphPort(
         string Name,
         IReadOnlyList<string>? Directions,
         IReadOnlyList<string>? UsedBy)
     {
-        public static GraphConnector From(ConnectorResource connector) => new(
-            connector.Name,
-            Optional(connector.Directions.Select(Direction)),
-            Optional(connector.UsedBy));
+        public static GraphPort From(PortResource port) => new(
+            port.Name,
+            Optional(port.Directions.Select(Direction)),
+            Optional(port.UsedBy));
     }
 
     private sealed record GraphService(string AppId, IReadOnlyList<string>? Consumers)
@@ -197,8 +196,8 @@ public static class IntropyGenerate
         return array.Length > 0 ? array : null;
     }
 
-    private static string Direction(ConnectorDirection direction) =>
-        direction == ConnectorDirection.In ? "in" : "out";
+    private static string Direction(PortDirection direction) =>
+        direction == PortDirection.In ? "in" : "out";
 
     private static string KebabCase(string pascal)
     {

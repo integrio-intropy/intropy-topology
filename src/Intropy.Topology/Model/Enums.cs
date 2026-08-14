@@ -13,10 +13,10 @@ public enum ComponentKind
     TransactionalIntegration,
 }
 
-/// <summary>The direction a component uses a connector in.</summary>
-public enum ConnectorDirection
+/// <summary>The direction a component uses a port in.</summary>
+public enum PortDirection
 {
-    /// <summary>Reads from the external system (<c>From</c> / connector trigger).</summary>
+    /// <summary>Reads from the external system (<c>From</c> / port trigger).</summary>
     In,
 
     /// <summary>Writes to the external system (<c>To</c>).</summary>

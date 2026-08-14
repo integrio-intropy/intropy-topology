@@ -14,12 +14,12 @@ internal static class TopologyMaterializer
     {
         var components = new List<ComponentModel>();
         var topics = new Dictionary<(string PubSub, string Topic), TopicAccumulator>();
-        var connectors = new Dictionary<string, ConnectorAccumulator>();
+        var ports = new Dictionary<string, PortAccumulator>();
         var services = new Dictionary<string, ServiceAccumulator>(StringComparer.Ordinal);
 
         foreach (var component in builder.Components)
         {
-            components.Add(MaterializeComponent(component, topics, connectors, services));
+            components.Add(MaterializeComponent(component, topics, ports, services));
         }
 
         return new SystemTopology
@@ -38,9 +38,9 @@ internal static class TopologyMaterializer
                     Subscribers = [.. t.Value.Subscribers],
                 })
                 .ToArray(),
-            Connectors = connectors
+            Ports = ports
                 .OrderBy(c => c.Key, StringComparer.Ordinal)
-                .Select(c => new ConnectorResource
+                .Select(c => new PortResource
                 {
                     Name = c.Key,
                     Directions = [.. c.Value.Directions.Order()],
@@ -57,7 +57,7 @@ internal static class TopologyMaterializer
     private static ComponentModel MaterializeComponent(
         Component component,
         Dictionary<(string PubSub, string Topic), TopicAccumulator> topics,
-        Dictionary<string, ConnectorAccumulator> connectors,
+        Dictionary<string, PortAccumulator> ports,
         Dictionary<string, ServiceAccumulator> services)
     {
         var subscribes = new List<TopicSubscription>();
@@ -72,25 +72,24 @@ internal static class TopologyMaterializer
         }
 
         var publishes = new List<PublishEdge>();
-        foreach (var (port, topic) in component.PublishCalls)
+        foreach (var topic in component.PublishCalls)
         {
             publishes.Add(new PublishEdge
             {
-                Port = port,
                 PubSubName = topic.PubSubName,
                 TopicName = topic.TopicName,
             });
             AccumulateTopic(topics, topic).Publishers.Add(component.Name);
         }
 
-        var connectorEdges = new List<ConnectorEdge>();
-        var seenConnectorEdges = new HashSet<(string, ConnectorDirection)>();
-        foreach (var (connector, direction) in component.ConnectorCalls)
+        var portEdges = new List<PortEdge>();
+        var seenPortEdges = new HashSet<(string, PortDirection)>();
+        foreach (var (port, direction) in component.PortCalls)
         {
-            AccumulateConnector(connectors, connector, direction).UsedBy.Add(component.Name);
-            if (seenConnectorEdges.Add((connector.Name, direction)))
+            AccumulatePort(ports, port, direction).UsedBy.Add(component.Name);
+            if (seenPortEdges.Add((port.Name, direction)))
             {
-                connectorEdges.Add(new ConnectorEdge { ConnectorName = connector.Name, Direction = direction });
+                portEdges.Add(new PortEdge { PortName = port.Name, Direction = direction });
             }
         }
 
@@ -116,7 +115,7 @@ internal static class TopologyMaterializer
             Kind = component.Kind,
             Subscribes = subscribes,
             Publishes = publishes,
-            Connectors = connectorEdges,
+            Ports = portEdges,
             Uses = serviceAppIds,
             InternalQueue = component.Kind is ComponentKind.TransactionalIntegration
                 ? new InternalQueue
@@ -142,15 +141,15 @@ internal static class TopologyMaterializer
         return accumulator;
     }
 
-    private static ConnectorAccumulator AccumulateConnector(
-        Dictionary<string, ConnectorAccumulator> connectors,
-        ConnectorRef connector,
-        ConnectorDirection direction)
+    private static PortAccumulator AccumulatePort(
+        Dictionary<string, PortAccumulator> ports,
+        PortRef port,
+        PortDirection direction)
     {
-        if (!connectors.TryGetValue(connector.Name, out var accumulator))
+        if (!ports.TryGetValue(port.Name, out var accumulator))
         {
-            accumulator = new ConnectorAccumulator();
-            connectors[connector.Name] = accumulator;
+            accumulator = new PortAccumulator();
+            ports[port.Name] = accumulator;
         }
 
         accumulator.Directions.Add(direction);
@@ -169,9 +168,9 @@ internal static class TopologyMaterializer
         public SortedSet<string> Consumers { get; } = new(StringComparer.Ordinal);
     }
 
-    private sealed class ConnectorAccumulator
+    private sealed class PortAccumulator
     {
-        public HashSet<ConnectorDirection> Directions { get; } = [];
+        public HashSet<PortDirection> Directions { get; } = [];
         public SortedSet<string> UsedBy { get; } = new(StringComparer.Ordinal);
     }
 }

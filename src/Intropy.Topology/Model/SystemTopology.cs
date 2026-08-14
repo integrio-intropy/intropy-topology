@@ -16,8 +16,8 @@ public sealed record SystemTopology
     /// <summary>Topics materialized from publish and subscribe edges.</summary>
     public required IReadOnlyList<TopicResource> Topics { get; init; }
 
-    /// <summary>Connectors materialized from connector usage.</summary>
-    public required IReadOnlyList<ConnectorResource> Connectors { get; init; }
+    /// <summary>Ports materialized from port usage.</summary>
+    public required IReadOnlyList<PortResource> Ports { get; init; }
 
     /// <summary>External platform services materialized from component usage.</summary>
     public required IReadOnlyList<ServiceResource> Services { get; init; }

@@ -40,11 +40,11 @@ public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, Extrac
 
     private protected override ExtractorBuilder Self => this;
 
-    /// <summary>Declares that the extractor reads from the outside world through a connector.</summary>
-    /// <param name="connector">The connector to read from.</param>
-    public ExtractorBuilder From(ConnectorRef connector)
+    /// <summary>Declares that the extractor reads from the outside world through a port.</summary>
+    /// <param name="port">The port to read from.</param>
+    public ExtractorBuilder From(PortRef port)
     {
-        Component.AddConnector(connector, ConnectorDirection.In);
+        Component.AddPort(port, PortDirection.In);
         return this;
     }
 
@@ -58,7 +58,7 @@ public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, Extrac
 }
 
 /// <summary>Fluent builder for a loader: an edge block that subscribes to exactly one topic
-/// and writes to an external system through a connector; loaders publish nothing.</summary>
+/// and writes to an external system through a port; loaders publish nothing.</summary>
 public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderComponent>
 {
     internal LoaderBuilder(LoaderComponent component) : base(component) { }
@@ -73,17 +73,17 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
         return this;
     }
 
-    /// <summary>Declares that the loader writes to the outside world through a connector.</summary>
-    /// <param name="connector">The connector to write to.</param>
-    public LoaderBuilder To(ConnectorRef connector)
+    /// <summary>Declares that the loader writes to the outside world through a port.</summary>
+    /// <param name="port">The port to write to.</param>
+    public LoaderBuilder To(PortRef port)
     {
-        Component.AddConnector(connector, ConnectorDirection.Out);
+        Component.AddPort(port, PortDirection.Out);
         return this;
     }
 }
 
 /// <summary>Fluent builder for a transactional integration: a synchronous block that
-/// reads/writes external systems through connectors; it publishes no topics. Its internal
+/// reads/writes external systems through ports; it publishes no topics. Its internal
 /// receive-to-send queue is minted at materialization (<see cref="ComponentModel.InternalQueue"/>),
 /// never declared here.</summary>
 public sealed class TransactionalIntegrationBuilder
@@ -94,19 +94,19 @@ public sealed class TransactionalIntegrationBuilder
 
     private protected override TransactionalIntegrationBuilder Self => this;
 
-    /// <summary>Declares that the integration reads from an external system through a connector.</summary>
-    /// <param name="connector">The connector to read from.</param>
-    public TransactionalIntegrationBuilder From(ConnectorRef connector)
+    /// <summary>Declares that the integration reads from an external system through a port.</summary>
+    /// <param name="port">The port to read from.</param>
+    public TransactionalIntegrationBuilder From(PortRef port)
     {
-        Component.AddConnector(connector, ConnectorDirection.In);
+        Component.AddPort(port, PortDirection.In);
         return this;
     }
 
-    /// <summary>Declares that the integration writes to an external system through a connector.</summary>
-    /// <param name="connector">The connector to write to.</param>
-    public TransactionalIntegrationBuilder To(ConnectorRef connector)
+    /// <summary>Declares that the integration writes to an external system through a port.</summary>
+    /// <param name="port">The port to write to.</param>
+    public TransactionalIntegrationBuilder To(PortRef port)
     {
-        Component.AddConnector(connector, ConnectorDirection.Out);
+        Component.AddPort(port, PortDirection.Out);
         return this;
     }
 }

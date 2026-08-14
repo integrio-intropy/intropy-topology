@@ -1,15 +1,15 @@
 namespace Intropy.Topology.Test.Refs;
 
-public class ConnectorRefTests
+public class PortRefTests
 {
     [Fact]
     public void Define_WithValidName_ShouldExposeProperties()
     {
         // Act
-        var connector = ConnectorRef.Define("pim");
+        var port = PortRef.Define("pim");
 
         // Assert
-        Assert.Equal("pim", connector.Name);
+        Assert.Equal("pim", port.Name);
     }
 
     [Theory]
@@ -22,7 +22,7 @@ public class ConnectorRefTests
         // Act & Assert: Define carries [ConstantExpected] (CA1857 fires on this non-constant
         // argument, proving the attribute works); suppressed here to test the runtime guard.
 #pragma warning disable CA1857
-        Assert.Throws<ArgumentException>(() => ConnectorRef.Define(name));
+        Assert.Throws<ArgumentException>(() => PortRef.Define(name));
 #pragma warning restore CA1857
     }
 
@@ -30,8 +30,8 @@ public class ConnectorRefTests
     public void Equals_WithSameName_ShouldBeEqual()
     {
         // Arrange
-        var first = ConnectorRef.Define("pim");
-        var second = ConnectorRef.Define("pim");
+        var first = PortRef.Define("pim");
+        var second = PortRef.Define("pim");
 
         // Assert
         Assert.Equal(first, second);

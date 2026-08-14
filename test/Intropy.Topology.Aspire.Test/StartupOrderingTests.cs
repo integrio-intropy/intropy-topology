@@ -91,7 +91,7 @@ public class StartupOrderingTests
                     Subscribers = t.Subscribers,
                 }),
             ],
-            Connectors = [],
+            Ports = [],
             Services = [],
         };
 }
