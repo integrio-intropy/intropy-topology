@@ -13,7 +13,7 @@ public sealed record GeneratedFile(string RelativePath, string Content);
 /// <summary>
 /// The single composition point for local mock endpoint URLs. The origin is a
 /// local-runtime convention this dependency-free package would rather not know —
-/// but the <c>topology.intropy.io/v1</c> graph contract includes <c>baseUri</c>,
+/// but the <c>topology.intropy.io/v2</c> graph contract includes <c>baseUri</c>,
 /// which forces the knowledge here. The Aspire backend owns the matching port
 /// constant (<c>IntropyAspire.MicrocksPort</c>) and must agree with
 /// <see cref="Origin"/>; do not introduce a second composition site.
@@ -91,15 +91,15 @@ public static class TopologyGenerator
             files.Add(PubSubComponent(component.InternalQueue!.PubSubName, [component.Name]));
         }
 
-        // Local runs resolve every connector to localstorage, so the declared transport is
+        // Local runs resolve every port to localstorage, so the declared transport is
         // deliberately not consulted here: the placeholder default transport must not block
         // F5. Deployment generation is where an unresolved transport must hard-fail.
         // The manifest is the single validation boundary: it already rejects unresolved
-        // connectors, so a miss here is an invariant violation, not user input.
-        var resolutions = development.Files.ToDictionary(file => file.ConnectorName, StringComparer.Ordinal);
-        foreach (var connector in topology.Connectors)
+        // ports, so a miss here is an invariant violation, not user input.
+        var resolutions = development.Files.ToDictionary(file => file.PortName, StringComparer.Ordinal);
+        foreach (var port in topology.Ports)
         {
-            files.Add(BindingComponent(connector, resolutions[connector.Name]));
+            files.Add(BindingComponent(port, resolutions[port.Name]));
         }
 
         foreach (var mock in development.Mocks)
@@ -139,15 +139,15 @@ public static class TopologyGenerator
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{pubSubName}.yaml", yaml);
     }
 
-    private static GeneratedFile BindingComponent(ConnectorResource connector, ConnectorFileResolution resolution)
+    private static GeneratedFile BindingComponent(PortResource port, PortFileResolution resolution)
     {
-        // Local runs resolve every connector to a localstorage folder. The manifest path is
+        // Local runs resolve every port to a localstorage folder. The manifest path is
         // already absolute (anchored at the SystemHost directory); artifacts land in per-run
         // temp dirs and the sidecar's cwd is not guaranteed, so an absolute path is required.
         var metadata = new List<(string, string)> { ("rootPath", resolution.RootPath) };
         var yaml = DaprYaml.Component(
-            connector.DaprComponentName, "bindings.localstorage", metadata, connector.UsedBy);
-        return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{connector.DaprComponentName}.yaml", yaml);
+            port.DaprComponentName, "bindings.localstorage", metadata, port.UsedBy);
+        return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{port.DaprComponentName}.yaml", yaml);
     }
 
     private static GeneratedFile HttpEndpoint(OpenApiMock mock, ServiceResource service)
@@ -166,12 +166,12 @@ public static class TopologyGenerator
                 Component = component.Name,
                 Kind = component.Kind.ToString(),
                 Subscribes = component.Subscribes.Select(s => new { s.PubSubName, s.TopicName }),
-                Publishes = component.Publishes.Select(p => new { p.Port, p.PubSubName, p.TopicName }),
-                Connectors = component.Connectors.Select(c => new
+                Publishes = component.Publishes.Select(p => new { p.PubSubName, p.TopicName }),
+                Ports = component.Ports.Select(c => new
                 {
-                    c.ConnectorName,
+                    c.PortName,
                     Direction = c.Direction.ToString(),
-                    DaprComponent = ConnectorResource.DaprComponentNameFor(c.ConnectorName),
+                    DaprComponent = PortResource.DaprComponentNameFor(c.PortName),
                 }),
                 Uses = component.Uses,
                 InternalQueue = component.InternalQueue is null

@@ -10,13 +10,13 @@ public sealed class OrderFlowSystem : ISystemDefinition
     public void Define(SystemBuilder builder)
     {
         builder.AddExtractor("order-extractor")
-            .From(Connectors.OrderExtractorSource)
+            .From(Ports.OrderExtractorSource)
             .Publishes(Topics.Orders)
             .Uses(Services.Idempotency)
             .Uses(Services.BusinessIncidents);
         builder.AddLoader("order-loader")
             .Subscribes(Topics.Orders)
-            .To(Connectors.OrderLoaderDestination)
+            .To(Ports.OrderLoaderDestination)
             .Uses(Services.Idempotency)
             .Uses(Services.BusinessIncidents);
     }

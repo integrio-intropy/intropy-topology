@@ -16,8 +16,8 @@ public sealed class IntropyAspireTests : IDisposable
     private sealed record RawOrder(string OrderNumber);
 
     private static readonly TopicRef<RawOrder> s_raw = TopicRef<RawOrder>.Define("pubsub-a", "order-raw");
-    private static readonly ConnectorRef s_webshop = ConnectorRef.Define("webshop");
-    private static readonly ConnectorRef s_erp = ConnectorRef.Define("erp");
+    private static readonly PortRef s_webshop = PortRef.Define("webshop");
+    private static readonly PortRef s_erp = PortRef.Define("erp");
 
     private const string GeneratedRoot = "/tmp/intropy-aspire-test";
 

@@ -71,7 +71,7 @@ public class MultiplePublishesRuleTests
             .Publishes(TestTopics.Enriched);
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor<DuplicatePortRule>());
+        var diagnostic = Assert.Single(s.DiagnosticsFor<DuplicatePublishRule>());
 
         // Assert
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
@@ -88,7 +88,7 @@ public class MultiplePublishesRuleTests
         var s = SystemBuilder.Create("test-system").WithValidComponent();
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor<DuplicatePortRule>());
+        Assert.Empty(s.DiagnosticsFor<DuplicatePublishRule>());
     }
 }
 
@@ -111,17 +111,17 @@ public class DuplicateSubscriptionRuleTests
     }
 }
 
-public class MissingRequiredConnectorRuleTests
+public class MissingRequiredPortRuleTests
 {
     [Fact]
     public void Validate_WhenTransactionalIntegrationHasFromAndTo_ShouldReportNothing()
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        s.AddTransactionalIntegration("ti").From(TestConnectors.Pim).To(TestConnectors.Erp);
+        s.AddTransactionalIntegration("ti").From(TestPorts.Pim).To(TestPorts.Erp);
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor<MissingRequiredConnectorRule>());
+        Assert.Empty(s.DiagnosticsFor<MissingRequiredPortRule>());
     }
 
     [Fact]
@@ -129,10 +129,10 @@ public class MissingRequiredConnectorRuleTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        s.AddTransactionalIntegration("ti").From(TestConnectors.Pim);
+        s.AddTransactionalIntegration("ti").From(TestPorts.Pim);
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor<MissingRequiredConnectorRule>());
+        var diagnostic = Assert.Single(s.DiagnosticsFor<MissingRequiredPortRule>());
 
         // Assert
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
@@ -145,10 +145,10 @@ public class MissingRequiredConnectorRuleTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        s.AddTransactionalIntegration("ti").To(TestConnectors.Erp);
+        s.AddTransactionalIntegration("ti").To(TestPorts.Erp);
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor<MissingRequiredConnectorRule>());
+        var diagnostic = Assert.Single(s.DiagnosticsFor<MissingRequiredPortRule>());
 
         // Assert
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
@@ -157,14 +157,14 @@ public class MissingRequiredConnectorRuleTests
     }
 
     [Fact]
-    public void Validate_WhenTransactionalIntegrationHasNoConnectors_ShouldReportBothDirections()
+    public void Validate_WhenTransactionalIntegrationHasNoPorts_ShouldReportBothDirections()
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddTransactionalIntegration("ti");
 
         // Act
-        var diagnostics = s.DiagnosticsFor<MissingRequiredConnectorRule>();
+        var diagnostics = s.DiagnosticsFor<MissingRequiredPortRule>();
 
         // Assert
         Assert.Equal(2, diagnostics.Count);
@@ -173,18 +173,18 @@ public class MissingRequiredConnectorRuleTests
     }
 
     [Fact]
-    public void Validate_WithMultipleConnectorsPerDirection_ShouldReportNothing()
+    public void Validate_WithMultiplePortsPerDirection_ShouldReportNothing()
     {
         // Arrange: several sources and destinations are legal — the rule checks presence.
         var s = SystemBuilder.Create("test-system");
         s.AddTransactionalIntegration("ti")
-            .From(TestConnectors.Pim)
-            .From(ConnectorRef.Define("plm"))
-            .To(TestConnectors.Erp)
-            .To(ConnectorRef.Define("wms"));
+            .From(TestPorts.Pim)
+            .From(PortRef.Define("plm"))
+            .To(TestPorts.Erp)
+            .To(PortRef.Define("wms"));
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor<MissingRequiredConnectorRule>());
+        Assert.Empty(s.DiagnosticsFor<MissingRequiredPortRule>());
     }
 
     [Fact]
@@ -192,7 +192,7 @@ public class MissingRequiredConnectorRuleTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        s.AddTransactionalIntegration("ti").From(TestConnectors.Pim);
+        s.AddTransactionalIntegration("ti").From(TestPorts.Pim);
 
         // Act & Assert
         Assert.Throws<TopologyValidationException>(() => s.Build());
@@ -201,11 +201,11 @@ public class MissingRequiredConnectorRuleTests
     [Fact]
     public void Validate_WithOtherKinds_ShouldReportNothing()
     {
-        // Arrange: extractor and loader connector edges stay optional by design.
+        // Arrange: extractor and loader port edges stay optional by design.
         var s = SystemBuilder.Create("test-system").WithValidComponent();
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor<MissingRequiredConnectorRule>());
+        Assert.Empty(s.DiagnosticsFor<MissingRequiredPortRule>());
     }
 }
 
@@ -230,19 +230,19 @@ public class TopicContractConflictRuleTests
     }
 }
 
-public class PubSubConnectorNameCollisionRuleTests
+public class PubSubPortNameCollisionRuleTests
 {
     [Fact]
     public void Validate_WithPubSubNameEqualToDerivedComponentName_ShouldReportError()
     {
-        // Arrange: the connector "shared" derives the Dapr component name "binding.shared"
+        // Arrange: the port "shared" derives the Dapr component name "binding.shared"
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor")
-            .From(ConnectorRef.Define("shared"))
+            .From(PortRef.Define("shared"))
             .Publishes(TopicRef<RawEvent>.Define("binding.shared", "some-topic"));
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor<PubSubConnectorNameCollisionRule>());
+        var diagnostic = Assert.Single(s.DiagnosticsFor<PubSubPortNameCollisionRule>());
 
         // Assert
         Assert.Equal("binding.shared", diagnostic.Target);
@@ -253,13 +253,13 @@ public class PubSubConnectorNameCollisionRuleTests
 public class AllowedPatternsTests
 {
     [Fact]
-    public void Validate_WithMultipleDistinctConnectorsOnOneComponent_ShouldNotReportErrors()
+    public void Validate_WithMultipleDistinctPortsOnOneComponent_ShouldNotReportErrors()
     {
         // Arrange: a transactional integration touching two externals
         var s = SystemBuilder.Create("test-system");
         s.AddTransactionalIntegration("ti")
-            .From(TestConnectors.Pim)
-            .To(TestConnectors.Erp);
+            .From(TestPorts.Pim)
+            .To(TestPorts.Erp);
 
         // Act & Assert
         Assert.Empty(s.Validate());

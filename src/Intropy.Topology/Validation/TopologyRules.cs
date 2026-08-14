@@ -9,15 +9,15 @@ internal static class TopologyRules
     [
         new Rules.DuplicateComponentNameRule(),
         new Rules.EmptySystemRule(),
-        new Rules.DuplicatePortRule(),
+        new Rules.DuplicatePublishRule(),
         new Rules.DuplicateSubscriptionRule(),
         new Rules.MissingRequiredOutputRule(),
         new Rules.MissingRequiredSubscriptionRule(),
-        new Rules.MissingRequiredConnectorRule(),
+        new Rules.MissingRequiredPortRule(),
         new Rules.UnconsumedTopicRule(),
         new Rules.UnproducedTopicRule(),
         new Rules.NoEdgesRule(),
-        new Rules.PubSubConnectorNameCollisionRule(),
+        new Rules.PubSubPortNameCollisionRule(),
         new Rules.ServiceAppIdCollisionRule(),
     ];
 

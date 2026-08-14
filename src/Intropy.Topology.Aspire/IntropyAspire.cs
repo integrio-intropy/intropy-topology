@@ -29,7 +29,7 @@ public static class IntropyAspire
     /// <summary>
     /// The local Microcks origin — this package's composition of <see cref="MicrocksPort"/>.
     /// Must agree with <c>LocalMockEndpoints.Origin</c> in the Generation package: the
-    /// <c>topology.intropy.io/v1</c> graph contract forces that package to know the origin
+    /// <c>topology.intropy.io/v2</c> graph contract forces that package to know the origin
     /// too. Asserted by test; keep both in sync.
     /// </summary>
     internal const string MicrocksOrigin = "http://localhost:8585";

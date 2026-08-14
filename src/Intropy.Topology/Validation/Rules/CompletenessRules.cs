@@ -57,13 +57,13 @@ internal sealed class MissingRequiredSubscriptionRule : IModelRule
 }
 
 /// <summary>
-/// A transactional integration must declare both connector directions: at least one
+/// A transactional integration must declare both port directions: at least one
 /// <c>From</c> (the receive side reads a source) and at least one <c>To</c> (the send
-/// side writes a destination). Several connectors per direction are legal — a run may
+/// side writes a destination). Several ports per direction are legal — a run may
 /// touch several sources or destinations — so the rule checks presence, not count.
 /// The builder exposes both methods but cannot force the calls.
 /// </summary>
-internal sealed class MissingRequiredConnectorRule : IModelRule
+internal sealed class MissingRequiredPortRule : IModelRule
 {
     public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
     {
@@ -74,19 +74,19 @@ internal sealed class MissingRequiredConnectorRule : IModelRule
                 continue;
             }
 
-            if (!component.Connectors.Any(c => c.Direction is ConnectorDirection.In))
+            if (!component.Ports.Any(c => c.Direction is PortDirection.In))
             {
                 yield return new TopologyDiagnostic(
                     DiagnosticSeverity.Error,
-                    "Transactional integration components must read from at least one connector; add a From call.",
+                    "Transactional integration components must read from at least one port; add a From call.",
                     component.Name);
             }
 
-            if (!component.Connectors.Any(c => c.Direction is ConnectorDirection.Out))
+            if (!component.Ports.Any(c => c.Direction is PortDirection.Out))
             {
                 yield return new TopologyDiagnostic(
                     DiagnosticSeverity.Error,
-                    "Transactional integration components must write to at least one connector; add a To call.",
+                    "Transactional integration components must write to at least one port; add a To call.",
                     component.Name);
             }
         }

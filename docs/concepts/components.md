@@ -16,7 +16,7 @@ Underneath, every declaration is a **`Component`** — the shared substance each
 
 ```csharp
 ExtractorComponent orders = s.AddExtractor("order-extractor")
-    .From(Connectors.OrderExtractorSource)
+    .From(Ports.OrderExtractorSource)
     .Publishes(Topics.Orders)
     .Component;                       // optional typed handle — Name, Kind
 ```
@@ -27,13 +27,13 @@ Holding the handle is opt-in; chains that don't need it are unchanged. The compo
 
 Each kind exposes only its own legal edges:
 
-| Kind | Subscribes | Publishes | Connector | Required |
+| Kind | Subscribes | Publishes | Port | Required |
 |------|-----------|-----------|-----------|----------|
-| Extractor | — | one topic | `From(connector)` | `Publishes` |
-| Loader | exactly 1 topic | — | `To(connector)` | `Subscribes` |
-| Transactional integration | — | — | `From` / `To(connector)` | `From` and `To` |
+| Extractor | — | one topic | `From(port)` | `Publishes` |
+| Loader | exactly 1 topic | — | `To(port)` | `Subscribes` |
+| Transactional integration | — | — | `From` / `To(port)` | `From` and `To` |
 
-`Subscribes`/`Publishes` are the asynchronous (topic) edges; `From`/`To` are the edges out through connectors. A component publishes at most one topic — a second `Publishes` call is rejected at `Build()`. See [Topics](topics.md) and [Connectors](connectors.md).
+`Subscribes`/`Publishes` are the asynchronous (topic) edges; `From`/`To` are the edges out through ports. A component publishes at most one topic — a second `Publishes` call is rejected at `Build()`. See [Topics](topics.md) and [Ports](ports.md).
 
 ## Declaring components
 
@@ -41,7 +41,7 @@ Each kind exposes only its own legal edges:
 var s = SystemBuilder.Create("order-flow");
 
 s.AddExtractor("order-extractor")
-    .From(Connectors.OrderExtractorSource)
+    .From(Ports.OrderExtractorSource)
     .Publishes(Topics.Orders);
 ```
 
@@ -59,7 +59,7 @@ A second minted identity is derived rather than declared: a transactional integr
 
 ```csharp
 s.AddLoader("l").Publishes(topic);        // loaders publish nothing
-s.AddExtractor("e").Subscribes(topic);    // extractors read connectors, not topics
+s.AddExtractor("e").Subscribes(topic);    // extractors read ports, not topics
 ```
 
 Only what types cannot check is validated at `Build()`: completeness (a required output that was never declared, a missing subscription, a topic with only one side) and cross-component conflicts. A loader needs no `To`: its destination may stay a private local component. See [Validation](validation.md).
@@ -67,5 +67,5 @@ Only what types cannot check is validated at `Build()`: completeness (a required
 ## Related
 
 - [Topics](topics.md) — the asynchronous `Subscribes` / `Publishes` edges
-- [Connectors](connectors.md) — the `From` / `To` edges out of the system
+- [Ports](ports.md) — the `From` / `To` edges out of the system
 - [Validation](validation.md) — what remains for Build-time rules

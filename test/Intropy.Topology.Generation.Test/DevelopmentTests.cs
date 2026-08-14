@@ -5,40 +5,40 @@ namespace Intropy.Topology.Generation.Test;
 
 public class DevelopmentBuilderTests
 {
-    private static readonly ConnectorRef s_connector = ConnectorRef.Define("erp");
+    private static readonly PortRef s_port = PortRef.Define("erp");
 
-    private static SystemTopology TopologyWithConnector()
+    private static SystemTopology TopologyWithPort()
     {
         var topic = TopicRef<string>.Define("orders", "created");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").From(s_connector).Publishes(topic);
+        builder.AddExtractor("extractor").From(s_port).Publishes(topic);
         builder.AddLoader("loader").Subscribes(topic);
         return builder.Build();
     }
 
     [Fact]
-    public void Build_WithAllConnectorsResolved_ShouldProduceAbsoluteRootPaths()
+    public void Build_WithAllPortsResolved_ShouldProduceAbsoluteRootPaths()
     {
         // Arrange
-        var builder = new DevelopmentBuilder(TopologyWithConnector(), Directory.GetCurrentDirectory());
-        builder.Files(s_connector).RootPath("./test/erp");
+        var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
+        builder.Files(s_port).RootPath("./test/erp");
 
         // Act
         var manifest = builder.Build();
 
         // Assert
         var file = Assert.Single(manifest.Files);
-        Assert.Equal("erp", file.ConnectorName);
+        Assert.Equal("erp", file.PortName);
         Assert.Equal(Path.GetFullPath("./test/erp"), file.RootPath);
         Assert.Empty(manifest.Mocks);
     }
 
     [Fact]
-    public void Files_WithUnknownConnector_ShouldThrow()
+    public void Files_WithUnknownPort_ShouldThrow()
     {
         // Arrange
-        var builder = new DevelopmentBuilder(TopologyWithConnector(), Directory.GetCurrentDirectory());
-        var unknown = ConnectorRef.Define("unknown");
+        var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
+        var unknown = PortRef.Define("unknown");
 
         // Act & Assert
         var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Files(unknown));
@@ -50,11 +50,11 @@ public class DevelopmentBuilderTests
     public void Files_WithDuplicateResolution_ShouldThrow()
     {
         // Arrange
-        var builder = new DevelopmentBuilder(TopologyWithConnector(), Directory.GetCurrentDirectory());
-        builder.Files(s_connector).RootPath("./test/erp");
+        var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
+        builder.Files(s_port).RootPath("./test/erp");
 
         // Act & Assert
-        var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Files(s_connector));
+        var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Files(s_port));
         Assert.Contains("more than one file resolution", exception.Message, StringComparison.Ordinal);
     }
 
@@ -62,8 +62,8 @@ public class DevelopmentBuilderTests
     public void RootPath_WithSecondPath_ShouldThrow()
     {
         // Arrange
-        var builder = new DevelopmentBuilder(TopologyWithConnector(), Directory.GetCurrentDirectory());
-        var files = builder.Files(s_connector);
+        var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
+        var files = builder.Files(s_port);
         files.RootPath("./test/erp");
 
         // Act & Assert
@@ -72,10 +72,10 @@ public class DevelopmentBuilderTests
     }
 
     [Fact]
-    public void Build_WithUnresolvedConnector_ShouldThrow()
+    public void Build_WithUnresolvedPort_ShouldThrow()
     {
         // Arrange: the topology uses 'erp' but no file resolution is declared
-        var builder = new DevelopmentBuilder(TopologyWithConnector(), Directory.GetCurrentDirectory());
+        var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
 
         // Act & Assert
         var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Build());
@@ -87,8 +87,8 @@ public class DevelopmentBuilderTests
     public void Build_WithPathEscapingSystemHost_ShouldThrow()
     {
         // Arrange
-        var builder = new DevelopmentBuilder(TopologyWithConnector(), Directory.GetCurrentDirectory());
-        builder.Files(s_connector).RootPath("../outside");
+        var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
+        builder.Files(s_port).RootPath("../outside");
 
         // Act & Assert
         var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Build());
@@ -99,9 +99,9 @@ public class DevelopmentBuilderTests
     public void Build_WithMissingRootPath_ShouldThrow()
     {
         // Arrange: Files() declared but RootPath never called — bypass the duplicate guard
-        var topology = TopologyWithConnector();
+        var topology = TopologyWithPort();
         var builder = new DevelopmentBuilder(topology, Directory.GetCurrentDirectory());
-        builder.Files(s_connector);
+        builder.Files(s_port);
 
         // Act & Assert
         var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Build());
@@ -112,8 +112,8 @@ public class DevelopmentBuilderTests
     public void Build_WithRootPathEqualToSystemHost_ShouldResolve()
     {
         // Arrange
-        var builder = new DevelopmentBuilder(TopologyWithConnector(), Directory.GetCurrentDirectory());
-        builder.Files(s_connector).RootPath(".");
+        var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
+        builder.Files(s_port).RootPath(".");
 
         // Act
         var manifest = builder.Build();
@@ -133,8 +133,8 @@ public class DevelopmentBuilderTests
             var host = Directory.CreateDirectory(Path.Combine(workspace.FullName, "host"));
             Directory.CreateSymbolicLink(Path.Combine(host.FullName, "link"), outside.FullName);
 
-            var builder = new DevelopmentBuilder(TopologyWithConnector(), host.FullName);
-            builder.Files(s_connector).RootPath("./link");
+            var builder = new DevelopmentBuilder(TopologyWithPort(), host.FullName);
+            builder.Files(s_port).RootPath("./link");
 
             // Act & Assert
             var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Build());

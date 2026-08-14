@@ -3,11 +3,10 @@ using Intropy.Topology.Model;
 namespace Intropy.Topology.Validation.Rules;
 
 /// <summary>
-/// A component must not publish more than one topic. Every <c>Publishes</c> call
-/// records the single <c>default</c> output port; multi-output components (named ports)
-/// are not part of the minimal model.
+/// A component must not publish more than one topic; multi-output components are not
+/// supported.
 /// </summary>
-internal sealed class DuplicatePortRule : IModelRule
+internal sealed class DuplicatePublishRule : IModelRule
 {
     public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
     {
@@ -75,7 +74,7 @@ internal sealed class TopicContractConflictRule : IDeclarationRule
 
     private static IEnumerable<TopicRef> TopicUsages(Component component)
     {
-        foreach (var (_, topic) in component.PublishCalls)
+        foreach (var topic in component.PublishCalls)
         {
             yield return topic;
         }

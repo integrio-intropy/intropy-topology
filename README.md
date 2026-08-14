@@ -4,7 +4,7 @@ A typed, fluent DSL for declaring integration-system topologies in .NET, and two
 a declaration into something you can run or deploy.
 
 A system is a class implementing `ISystemDefinition`: it declares components (extractors, loaders,
-transactional integrations) and the edges between them (topics, connectors). `Build()` validates the
+transactional integrations) and the edges between them (topics, ports). `Build()` validates the
 declaration and produces an immutable, serializable `SystemTopology`. From that one validated model,
 the backends generate Dapr components / runtime config, or translate it into a live .NET Aspire
 application for local F5.
@@ -22,7 +22,7 @@ builder that exposes only the edges legal for that block. *Illegal topology is a
 a validation diagnostic*; only what types cannot check (completeness and cross-component conflicts)
 is validated at `Build()`.
 
-The topology records the edges **between** components — subscriptions, publishes, and connectors
+The topology records the edges **between** components — subscriptions, publishes, and ports
 out to the outside world. Everything about the workload shape, including activation (a cron
 schedule is deployment-owned configuration), lives in the component's own scaffold.
 
@@ -46,18 +46,18 @@ public sealed class OrderFlowSystem : ISystemDefinition
     public void Define(SystemBuilder builder)
     {
         builder.AddExtractor("order-extractor")
-            .From(Connectors.OrderExtractorSource)
+            .From(Ports.OrderExtractorSource)
             .Publishes(Topics.Orders);
 
         builder.AddLoader("order-loader")
             .Subscribes(Topics.Orders)
-            .To(Connectors.OrderLoaderDestination);
+            .To(Ports.OrderLoaderDestination);
     }
 }
 ```
 
-Topics and connectors are declared as static fields; the backing resources materialize from usage
-(there is no `AddTopic`). The Dapr binding component name is derived from the connector's name
+Topics and ports are declared as static fields; the backing resources materialize from usage
+(there is no `AddTopic`). The Dapr binding component name is derived from the port's name
 (`binding.order-extractor-source`), never declared:
 
 ```csharp
@@ -66,19 +66,19 @@ public static class Topics
     public static readonly TopicRef<Order> Orders = TopicRef<Order>.Define("pubsub", "orders");
 }
 
-public static class Connectors
+public static class Ports
 {
-    public static readonly ConnectorRef OrderExtractorSource =
-        ConnectorRef.Define("order-extractor-source");
-    public static readonly ConnectorRef OrderLoaderDestination =
-        ConnectorRef.Define("order-loader-destination");
+    public static readonly PortRef OrderExtractorSource =
+        PortRef.Define("order-extractor-source");
+    public static readonly PortRef OrderLoaderDestination =
+        PortRef.Define("order-loader-destination");
 }
 ```
 
-All connectivity runs through Dapr — a connector never bypasses it. The connector's name is its
+All connectivity runs through Dapr — a port never bypasses it. The port's name is its
 whole identity; the deployed binding's `spec.type`, address, and credentials are environment-owned
 deployment configuration the topology deliberately does not repeat. Local runs resolve every
-connector to a folder on the host through the development definition, so the system runs with zero
+port to a folder on the host through the development definition, so the system runs with zero
 external configuration.
 
 ## One model, two backends
@@ -95,7 +95,7 @@ return args is ["run", ..] or []
 ```bash
 dotnet run --project examples/OrderFlow.SystemHost                     # Aspire dashboard (needs Docker + `dapr init`)
 dotnet run --project examples/OrderFlow.SystemHost -- check            # validate the topology
-dotnet run --project examples/OrderFlow.SystemHost -- graph            # print the topology.intropy.io/v1 JSON document
+dotnet run --project examples/OrderFlow.SystemHost -- graph            # print the topology.intropy.io/v2 JSON document
 # `dotnet run` prints its own build and launch-profile messages before starting the host. For a machine-readable stream:
 dotnet run --no-build --no-launch-profile --project examples/OrderFlow.SystemHost -- graph  # build first, then JSON only on stdout
 dotnet run --project examples/OrderFlow.SystemHost -- generate ./out   # write Dapr YAML + per-component config
@@ -121,12 +121,12 @@ method simply does not exist:
 
 ```csharp
 builder.AddLoader("l").Subscribes(t).Publishes(t);   // loaders publish nothing
-builder.AddExtractor("e").Subscribes(t);             // extractors read connectors, not topics
+builder.AddExtractor("e").Subscribes(t);             // extractors read ports, not topics
 ```
 
-Per block: extractors read a connector (`From`) and publish one topic; loaders subscribe to one
-topic and may write through a connector (a private local destination needs no declared edge);
-transactional integrations read/write connectors. Every topic must have both sides: `Build()`
+Per block: extractors read a port (`From`) and publish one topic; loaders subscribe to one
+topic and may write through a port (a private local destination needs no declared edge);
+transactional integrations read/write ports. Every topic must have both sides: `Build()`
 rejects a published topic nobody subscribes to and a subscription nothing publishes.
 
 ## Requirements
@@ -140,7 +140,7 @@ Full documentation lives in [`docs/`](docs/index.md):
 
 - [Getting Started](docs/getting-started.md) — declare a complete order-flow topology
 - [Components](docs/concepts/components.md) — component kinds and block builders
-- [Topics](docs/concepts/topics.md) and [Connectors](docs/concepts/connectors.md) — refs, materialize-from-usage
+- [Topics](docs/concepts/topics.md) and [Ports](docs/concepts/ports.md) — refs, materialize-from-usage
 - [Validation](docs/concepts/validation.md) — the validation rules and Build/TryBuild/Validate
 - [Materialization](docs/concepts/materialization.md) — the immutable, deterministic output model
 

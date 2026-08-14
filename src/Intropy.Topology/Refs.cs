@@ -71,28 +71,28 @@ public sealed record ServiceRef
 }
 
 /// <summary>
-/// A connector — the named connection point between the system and the outside world.
-/// Every edge block reaches the outside world through a connector. The name is the whole
+/// A port — the named connection point between the system and the outside world.
+/// Every edge block reaches the outside world through a port. The name is the whole
 /// identity: the Dapr binding component's name is always derived
-/// (<c>binding.&lt;connector-name&gt;</c>), never declared, and the binding's deployed
+/// (<c>binding.&lt;port-name&gt;</c>), never declared, and the binding's deployed
 /// <c>spec.type</c> (with its address and credentials) is environment-owned deployment
 /// configuration the topology deliberately does not repeat. Local F5 runs substitute their
-/// own resolution via the development definition. Connectors are declared in the SystemHost
-/// (typically a scaffolded <c>Connectors.cs</c>); they are system-owned and never shared
+/// own resolution via the development definition. Ports are declared in the SystemHost
+/// (typically a scaffolded <c>Ports.cs</c>); they are system-owned and never shared
 /// across systems. Direction is not part of the identity — it follows from usage
 /// (<c>From</c> / <c>To</c>).
 /// </summary>
-public sealed record ConnectorRef
+public sealed record PortRef
 {
-    /// <summary>The connector's name (DNS-1123 label, e.g. <c>pim</c>).</summary>
+    /// <summary>The port's name (DNS-1123 label, e.g. <c>pim</c>).</summary>
     public string Name { get; }
 
-    private ConnectorRef(string name) => Name = name;
+    private PortRef(string name) => Name = name;
 
-    /// <summary>Declares a connector.</summary>
-    /// <param name="name">The connector's name (DNS-1123 label).</param>
+    /// <summary>Declares a port.</summary>
+    /// <param name="name">The port's name (DNS-1123 label).</param>
     /// <exception cref="ArgumentException">The name is not a valid DNS-1123 label.</exception>
-    public static ConnectorRef Define([ConstantExpected] string name) =>
+    public static PortRef Define([ConstantExpected] string name) =>
         new(NameRules.RequireLabel(name, nameof(name)));
 }
 

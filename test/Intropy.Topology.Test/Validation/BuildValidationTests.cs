@@ -7,7 +7,7 @@ public class BuildValidationTests
         var s = SystemBuilder.Create("test-system");
         // Extractor with no Publishes; duplicate component name; published topic nobody
         // subscribes to.
-        s.AddExtractor("dup").From(TestConnectors.Pim);
+        s.AddExtractor("dup").From(TestPorts.Pim);
         s.AddExtractor("dup").Publishes(TestTopics.Raw);
         return s;
     }

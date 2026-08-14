@@ -12,7 +12,7 @@ public class ComponentTests
 
         // Act
         ExtractorComponent component = s.AddExtractor("pim-extractor")
-            .From(TestConnectors.Pim)
+            .From(TestPorts.Pim)
             .Publishes(TestTopics.Raw)
             .Component;
 
@@ -30,7 +30,7 @@ public class ComponentTests
 
         // Act
         var beforeTo = builder.Component;
-        var afterTo = builder.To(TestConnectors.Erp).Component;
+        var afterTo = builder.To(TestPorts.Erp).Component;
 
         // Assert
         Assert.Same(beforeTo, afterTo);
@@ -58,7 +58,7 @@ public class ComponentTests
         List<Component> components =
         [
             s.AddExtractor("a").Publishes(TestTopics.Raw).Component,
-            s.AddLoader("b").Subscribes(TestTopics.Raw).To(TestConnectors.Erp).Component,
+            s.AddLoader("b").Subscribes(TestTopics.Raw).To(TestPorts.Erp).Component,
         ];
 
         // Assert

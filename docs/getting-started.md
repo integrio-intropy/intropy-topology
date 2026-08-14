@@ -26,22 +26,22 @@ public static class Topics
 
 There is no `AddTopic` on the builder — publishing to or subscribing to a topic is what brings it (and its pubsub) into the model.
 
-## Declare your connectors
+## Declare your ports
 
-A connector is the named port an edge block reaches the outside world through. The Dapr component name is always derived from the connector's name (`binding.order-extractor-source`), never declared:
+A port is the named port an edge block reaches the outside world through. The Dapr component name is always derived from the port's name (`binding.order-extractor-source`), never declared:
 
 ```csharp
-public static class Connectors
+public static class Ports
 {
-    public static readonly ConnectorRef OrderExtractorSource =
-        ConnectorRef.Define("order-extractor-source");
+    public static readonly PortRef OrderExtractorSource =
+        PortRef.Define("order-extractor-source");
 
-    public static readonly ConnectorRef OrderLoaderDestination =
-        ConnectorRef.Define("order-loader-destination");
+    public static readonly PortRef OrderLoaderDestination =
+        PortRef.Define("order-loader-destination");
 }
 ```
 
-The name is the connector's whole identity; the deployed binding's type and credentials are environment-owned deployment configuration. Locally, the development definition resolves every connector to a folder on the host, so the system runs with zero external configuration. Connectors are system-owned and never shared across systems. Direction is not part of the identity — it follows from usage (`From` reads, `To` writes).
+The name is the port's whole identity; the deployed binding's type and credentials are environment-owned deployment configuration. Locally, the development definition resolves every port to a folder on the host, so the system runs with zero external configuration. Ports are system-owned and never shared across systems. Direction is not part of the identity — it follows from usage (`From` reads, `To` writes).
 
 ## Declare the system
 
@@ -54,15 +54,15 @@ public sealed class OrderFlowSystem : ISystemDefinition
 
     public void Define(SystemBuilder builder)
     {
-        // Extractor: edge block, pulls data out through a connector and publishes it.
+        // Extractor: edge block, pulls data out through a port and publishes it.
         builder.AddExtractor("order-extractor")
-            .From(Connectors.OrderExtractorSource)
+            .From(Ports.OrderExtractorSource)
             .Publishes(Topics.Orders);
 
-        // Loader: edge block, subscribes to exactly one topic and writes through a connector.
+        // Loader: edge block, subscribes to exactly one topic and writes through a port.
         builder.AddLoader("order-loader")
             .Subscribes(Topics.Orders)
-            .To(Connectors.OrderLoaderDestination);
+            .To(Ports.OrderLoaderDestination);
     }
 }
 ```
@@ -107,11 +107,11 @@ dotnet run -- graph              # print the SystemTopology JSON
 dotnet run -- generate ./out     # write Dapr YAML + per-component config
 ```
 
-`generate` emits `components/<pubsub>.yaml` (Redis-backed pub/sub), one `components/binding.<connector>.yaml` per connector (root path absolutized), and `config/<component>.intropy.json` per component. A transactional integration additionally gets `components/internal-<component>.yaml` — the Redis pub/sub backing its internal receive-to-send hop, scoped to itself; the runner picks the names up from its `.intropy.json`, so no hand-maintained Dapr component is needed.
+`generate` emits `components/<pubsub>.yaml` (Redis-backed pub/sub), one `components/binding.<port>.yaml` per port (root path absolutized), and `config/<component>.intropy.json` per component. A transactional integration additionally gets `components/internal-<component>.yaml` — the Redis pub/sub backing its internal receive-to-send hop, scoped to itself; the runner picks the names up from its `.intropy.json`, so no hand-maintained Dapr component is needed.
 
 ## Next steps
 
 - [Components](concepts/components.md) — the component kinds and their block builders
 - [Topics](concepts/topics.md) — the asynchronous edge between components
-- [Connectors](concepts/connectors.md) — derived binding names and environment-owned deployment
+- [Ports](concepts/ports.md) — derived binding names and environment-owned deployment
 - [Validation](concepts/validation.md) — the validation rules

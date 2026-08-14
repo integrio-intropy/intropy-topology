@@ -10,8 +10,8 @@ public class MaterializationTests
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor").Publishes(TestTopics.Raw);
-        s.AddTransactionalIntegration("ti").From(TestConnectors.Pim).To(TestConnectors.Erp);
-        s.AddLoader("loader").Subscribes(TestTopics.Raw).To(TestConnectors.Erp);
+        s.AddTransactionalIntegration("ti").From(TestPorts.Pim).To(TestPorts.Erp);
+        s.AddLoader("loader").Subscribes(TestTopics.Raw).To(TestPorts.Erp);
 
         // Act
         var topology = s.Build();
@@ -41,42 +41,42 @@ public class MaterializationTests
     }
 
     [Fact]
-    public void Build_WithSameConnectorInBothDirections_ShouldMaterializeOneResourceWithBothDirections()
+    public void Build_WithSamePortInBothDirections_ShouldMaterializeOneResourceWithBothDirections()
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddTransactionalIntegration("ti")
-            .From(TestConnectors.Pim)
-            .To(TestConnectors.Pim);
+            .From(TestPorts.Pim)
+            .To(TestPorts.Pim);
 
         // Act
-        var connector = s.Build().Connectors.Single();
+        var port = s.Build().Ports.Single();
 
         // Assert
-        Assert.Equal("pim", connector.Name);
-        Assert.Equal("binding.pim", connector.DaprComponentName);
-        Assert.Equal([ConnectorDirection.In, ConnectorDirection.Out], connector.Directions);
-        Assert.Equal(["ti"], connector.UsedBy);
+        Assert.Equal("pim", port.Name);
+        Assert.Equal("binding.pim", port.DaprComponentName);
+        Assert.Equal([PortDirection.In, PortDirection.Out], port.Directions);
+        Assert.Equal(["ti"], port.UsedBy);
     }
 
     [Fact]
-    public void Build_WithDuplicateSameDirectionConnectorCalls_ShouldDedupeSilently()
+    public void Build_WithDuplicateSameDirectionPortCalls_ShouldDedupeSilently()
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddTransactionalIntegration("ti")
-            .From(TestConnectors.Pim)
-            .From(TestConnectors.Pim)
-            .To(TestConnectors.Erp);
+            .From(TestPorts.Pim)
+            .From(TestPorts.Pim)
+            .To(TestPorts.Erp);
 
         // Act
         var topology = s.Build();
 
         // Assert: the duplicate From collapsed to one edge; the declared To stays.
         Assert.Equal(
-            [("pim", ConnectorDirection.In), ("erp", ConnectorDirection.Out)],
-            topology.Components.Single().Connectors.Select(c => (c.ConnectorName, c.Direction)));
-        Assert.Equal(2, topology.Connectors.Count);
+            [("pim", PortDirection.In), ("erp", PortDirection.Out)],
+            topology.Components.Single().Ports.Select(c => (c.PortName, c.Direction)));
+        Assert.Equal(2, topology.Ports.Count);
         Assert.Empty(s.Validate());
     }
 
@@ -84,11 +84,11 @@ public class MaterializationTests
     public void Build_ShouldSortResourcesDeterministically()
     {
         // Arrange: declare in non-alphabetical order
-        var erp = ConnectorRef.Define("erp");
+        var erp = PortRef.Define("erp");
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("zeta")
             .Publishes(TopicRef<RawEvent>.Define("test-pubsub", "zzz-topic"))
-            .From(TestConnectors.Pim);
+            .From(TestPorts.Pim);
         s.AddExtractor("alpha")
             .Publishes(TopicRef<RawEvent>.Define("test-pubsub", "aaa-topic"))
             .From(erp);
@@ -100,7 +100,7 @@ public class MaterializationTests
 
         // Assert
         Assert.Equal(["aaa-topic", "zzz-topic"], topology.Topics.Select(t => t.TopicName));
-        Assert.Equal(["erp", "pim"], topology.Connectors.Select(c => c.Name));
+        Assert.Equal(["erp", "pim"], topology.Ports.Select(c => c.Name));
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public class MaterializationTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        s.AddTransactionalIntegration("price-sync").From(TestConnectors.Pim).To(TestConnectors.Erp);
+        s.AddTransactionalIntegration("price-sync").From(TestPorts.Pim).To(TestPorts.Erp);
         s.AddExtractor("extractor").Publishes(TestTopics.Raw);
         s.AddLoader("loader").Subscribes(TestTopics.Raw);
 

@@ -12,13 +12,13 @@ internal sealed class NoEdgesRule : IModelRule
             var hasEdges =
                 component.Subscribes.Count > 0
                 || component.Publishes.Count > 0
-                || component.Connectors.Count > 0;
+                || component.Ports.Count > 0;
 
             if (!hasEdges)
             {
                 yield return new TopologyDiagnostic(
                     DiagnosticSeverity.Warning,
-                    "The component has no edges (no subscriptions, publishes, or connectors); it is likely unfinished.",
+                    "The component has no edges (no subscriptions, publishes, or ports); it is likely unfinished.",
                     component.Name);
             }
         }
@@ -26,11 +26,11 @@ internal sealed class NoEdgesRule : IModelRule
 }
 
 /// <summary>
-/// A pubsub name must not equal a connector's derived Dapr binding component name
-/// (<c>binding.&lt;connector-name&gt;</c>) — both become Dapr Component names in the same
+/// A pubsub name must not equal a port's derived Dapr binding component name
+/// (<c>binding.&lt;port-name&gt;</c>) — both become Dapr Component names in the same
 /// Kubernetes namespace.
 /// </summary>
-internal sealed class PubSubConnectorNameCollisionRule : IModelRule
+internal sealed class PubSubPortNameCollisionRule : IModelRule
 {
     public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
     {
@@ -38,13 +38,13 @@ internal sealed class PubSubConnectorNameCollisionRule : IModelRule
             .Select(t => t.PubSubName)
             .ToHashSet(StringComparer.Ordinal);
 
-        foreach (var connector in topology.Connectors
+        foreach (var port in topology.Ports
             .Where(c => pubSubNames.Contains(c.DaprComponentName)))
         {
             yield return new TopologyDiagnostic(
                 DiagnosticSeverity.Error,
-                $"The pubsub name '{connector.DaprComponentName}' equals the Dapr binding component name derived from connector '{connector.Name}'; both become Dapr Component names in the same namespace.",
-                connector.DaprComponentName);
+                $"The pubsub name '{port.DaprComponentName}' equals the Dapr binding component name derived from port '{port.Name}'; both become Dapr Component names in the same namespace.",
+                port.DaprComponentName);
         }
     }
 }

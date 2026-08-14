@@ -6,8 +6,8 @@ namespace Intropy.Topology;
 
 /// <summary>
 /// Entry point for declaring an integration system's topology. Add components, wire
-/// them to topics and connectors, then call <see cref="Build"/> to materialize and
-/// validate the immutable <see cref="SystemTopology"/>. Resources (topics, connectors)
+/// them to topics and ports, then call <see cref="Build"/> to materialize and
+/// validate the immutable <see cref="SystemTopology"/>. Resources (topics, ports)
 /// materialize from usage — there is no <c>AddTopic</c>. Not thread-safe;
 /// a second <see cref="Build"/> after further mutation reflects the mutations.
 /// </summary>

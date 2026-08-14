@@ -27,7 +27,7 @@ public class IntropyGenerateTests
         // Assert
         Assert.Equal(0, code);
         Assert.Equal(string.Empty, error);
-        Assert.Equal("topology.intropy.io/v1", root.GetProperty("apiVersion").GetString());
+        Assert.Equal("topology.intropy.io/v2", root.GetProperty("apiVersion").GetString());
         Assert.Equal("SystemTopology", root.GetProperty("kind").GetString());
         Assert.Equal("order-fulfillment", root.GetProperty("system").GetString());
         Assert.False(root.TryGetProperty("systemName", out _));
@@ -44,15 +44,15 @@ public class IntropyGenerateTests
             .Single(component => component.GetProperty("name").GetString() == "order-extractor");
         var rawTopic = root.GetProperty("topics").EnumerateArray()
             .Single(topic => topic.GetProperty("topic").GetString() == "order-raw");
-        var webshop = root.GetProperty("connectors").EnumerateArray()
-            .Single(connector => connector.GetProperty("name").GetString() == "webshop");
+        var webshop = root.GetProperty("ports").EnumerateArray()
+            .Single(port => port.GetProperty("name").GetString() == "webshop");
 
         // Assert
         Assert.Equal("extractor", extractor.GetProperty("kind").GetString());
         Assert.False(extractor.TryGetProperty("schedule", out _));
         Assert.False(extractor.TryGetProperty("subscribes", out _));
-        Assert.Equal("erp", extractor.GetProperty("connectors")[0].GetProperty("connector").GetString());
-        Assert.Equal("in", extractor.GetProperty("connectors")[0].GetProperty("direction").GetString());
+        Assert.Equal("erp", extractor.GetProperty("ports")[0].GetProperty("port").GetString());
+        Assert.Equal("in", extractor.GetProperty("ports")[0].GetProperty("direction").GetString());
         Assert.Equal("pubsub-a", extractor.GetProperty("publishes")[0].GetProperty("pubsub").GetString());
         Assert.False(extractor.GetProperty("publishes")[0].TryGetProperty("pubSub", out _));
         Assert.Equal("pubsub-a", rawTopic.GetProperty("pubsub").GetString());
@@ -103,14 +103,14 @@ public class IntropyGenerateTests
         using var json = JsonDocument.Parse(output);
         var development = json.RootElement.GetProperty("development");
 
-        // Assert: no mocks declared in this assembly; both connectors resolve to ./test folders
+        // Assert: no mocks declared in this assembly; both ports resolve to ./test folders
         Assert.Equal(0, code);
         Assert.False(development.TryGetProperty("mocks", out _));
         var files = development.GetProperty("files").EnumerateArray().ToArray();
         Assert.Equal(2, files.Length);
-        var webshop = files.Single(file => file.GetProperty("connector").GetString() == "webshop");
+        var webshop = files.Single(file => file.GetProperty("port").GetString() == "webshop");
         Assert.Equal(Path.GetFullPath("./test/webshop"), webshop.GetProperty("rootPath").GetString());
-        var erp = files.Single(file => file.GetProperty("connector").GetString() == "erp");
+        var erp = files.Single(file => file.GetProperty("port").GetString() == "erp");
         Assert.Equal(Path.GetFullPath("./test/erp"), erp.GetProperty("rootPath").GetString());
     }
 
@@ -176,7 +176,7 @@ public class IntropyGenerateTests
         // Assert
         Assert.Equal(0, code);
         var placeholder = Assert.Single(files);
-        Assert.Equal("placeholder", placeholder.GetProperty("connector").GetString());
+        Assert.Equal("placeholder", placeholder.GetProperty("port").GetString());
     }
 
     [Fact]

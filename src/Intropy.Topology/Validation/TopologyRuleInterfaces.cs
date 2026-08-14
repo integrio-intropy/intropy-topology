@@ -15,7 +15,7 @@ internal interface IModelRule
 /// <summary>
 /// A rule over the raw builder declarations — the declaration view. Declaration rules
 /// exist only for detail the materializer erases or dedups: service duplicates
-/// (deduplicated in the model), connector directions per call, and the topic contract
+/// (deduplicated in the model), port directions per call, and the topic contract
 /// <see cref="Type"/> (the model carries only its name). Rules whose needs the model
 /// already meets must be model rules instead.
 /// </summary>
