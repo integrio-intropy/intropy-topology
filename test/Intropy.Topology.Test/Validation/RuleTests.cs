@@ -235,17 +235,18 @@ public class PubSubPortNameCollisionRuleTests
     [Fact]
     public void Validate_WithPubSubNameEqualToDerivedComponentName_ShouldReportError()
     {
-        // Arrange: the port "shared" derives the Dapr component name "binding.shared"
+        // Arrange: port "shared" collides with a pubsub named "shared" — both become
+        // Dapr Component names in the same namespace.
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor")
             .From(PortRef.Define("shared"))
-            .Publishes(TopicRef<RawEvent>.Define("binding.shared", "some-topic"));
+            .Publishes(TopicRef<RawEvent>.Define("shared", "some-topic"));
 
         // Act
         var diagnostic = Assert.Single(s.DiagnosticsFor<PubSubPortNameCollisionRule>());
 
         // Assert
-        Assert.Equal("binding.shared", diagnostic.Target);
+        Assert.Equal("shared", diagnostic.Target);
         Assert.Contains("shared", diagnostic.Message);
     }
 }

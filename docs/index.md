@@ -40,7 +40,7 @@ Topics and ports are declared as static fields in a scaffolded `Topics.cs` / `Po
 
 - **Compile-time legality** — block builders make illegal topology uncompilable. [Learn more](concepts/components.md)
 - **Typed refs** — `TopicRef<T>` carries an async event contract; `PortRef` names the port an edge block reaches the outside world through. [Learn more](concepts/topics.md)
-- **Derived Dapr binding names** — every port materializes as exactly one Dapr binding component (`binding.<name>`); local runs resolve it to a host folder. [Learn more](concepts/ports.md)
+- **Port-named Dapr bindings** — every port materializes as exactly one Dapr binding component named after the port; local runs resolve it to a host folder. [Learn more](concepts/ports.md)
 - **Collect-all validation** — `Build()` reports every violation at once, never just the first. [Learn more](concepts/validation.md)
 - **Deterministic materialization** — the output model is immutable, sorted, and byte-stable across runs. [Learn more](concepts/materialization.md)
 
@@ -51,7 +51,7 @@ Topics and ports are declared as static fields in a scaffolded `Topics.cs` / `Po
 | [Getting Started](getting-started.md) | Declare the complete order-flow topology from scratch |
 | [Components](concepts/components.md) | Component kinds, block builders, and their legal edges |
 | [Topics](concepts/topics.md) | Typed topic refs and the materialize-from-usage model |
-| [Ports](concepts/ports.md) | Ports and derived binding names |
+| [Ports](concepts/ports.md) | Ports and their Dapr bindings |
 | [Validation](concepts/validation.md) | The validation rules and the Build/TryBuild/Validate API |
 | [Materialization](concepts/materialization.md) | How declarations fold into the immutable model |
 

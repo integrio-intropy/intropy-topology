@@ -87,10 +87,10 @@ public class EndToEndTests
 
         Assert.Equal(["erp", "pim"], topology.Ports.Select(c => c.Name));
         var erp = topology.Ports[0];
-        Assert.Equal("binding.erp", erp.DaprComponentName);
+        Assert.Equal("erp", erp.DaprComponentName);
         Assert.Equal(["pricing-service", "product-loader"], erp.UsedBy);
         var pim = topology.Ports[1];
-        Assert.Equal("binding.pim", pim.DaprComponentName);
+        Assert.Equal("pim", pim.DaprComponentName);
         Assert.Equal(["pim-extractor", "pricing-service"], pim.UsedBy);
     }
 
@@ -107,7 +107,7 @@ public class EndToEndTests
         // Byte-exact snapshot of the sample system's serialized model: guards materializer
         // output against unintentional change. Regenerate only on intentional model changes.
         const string expected =
-            """{"SystemName":"product-distribution","Components":[{"Name":"pim-extractor","Kind":0,"Subscribes":[],"Publishes":[{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Ports":[{"PortName":"pim","Direction":0}],"Uses":[],"InternalQueue":null},{"Name":"pricing-service","Kind":2,"Subscribes":[],"Publishes":[],"Ports":[{"PortName":"pim","Direction":0},{"PortName":"erp","Direction":1}],"Uses":[],"InternalQueue":{"PubSubName":"internal-pricing-service","TopicName":"hop"}},{"Name":"product-loader","Kind":1,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Publishes":[],"Ports":[{"PortName":"erp","Direction":1}],"Uses":[],"InternalQueue":null},{"Name":"price-extractor","Kind":0,"Subscribes":[],"Publishes":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Ports":[],"Uses":[],"InternalQueue":null},{"Name":"price-loader","Kind":1,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Publishes":[],"Ports":[],"Uses":[],"InternalQueue":null}],"Topics":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["price-extractor"],"Subscribers":["price-loader"]},{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["pim-extractor"],"Subscribers":["product-loader"]}],"Ports":[{"Name":"erp","DaprComponentName":"binding.erp","Directions":[1],"UsedBy":["pricing-service","product-loader"]},{"Name":"pim","DaprComponentName":"binding.pim","Directions":[0],"UsedBy":["pim-extractor","pricing-service"]}],"Services":[]}""";
+            """{"SystemName":"product-distribution","Components":[{"Name":"pim-extractor","Kind":0,"Subscribes":[],"Publishes":[{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Ports":[{"PortName":"pim","Direction":0}],"Uses":[],"InternalQueue":null},{"Name":"pricing-service","Kind":2,"Subscribes":[],"Publishes":[],"Ports":[{"PortName":"pim","Direction":0},{"PortName":"erp","Direction":1}],"Uses":[],"InternalQueue":{"PubSubName":"internal-pricing-service","TopicName":"hop"}},{"Name":"product-loader","Kind":1,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Publishes":[],"Ports":[{"PortName":"erp","Direction":1}],"Uses":[],"InternalQueue":null},{"Name":"price-extractor","Kind":0,"Subscribes":[],"Publishes":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Ports":[],"Uses":[],"InternalQueue":null},{"Name":"price-loader","Kind":1,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Publishes":[],"Ports":[],"Uses":[],"InternalQueue":null}],"Topics":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["price-extractor"],"Subscribers":["price-loader"]},{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["pim-extractor"],"Subscribers":["product-loader"]}],"Ports":[{"Name":"erp","DaprComponentName":"erp","Directions":[1],"UsedBy":["pricing-service","product-loader"]},{"Name":"pim","DaprComponentName":"pim","Directions":[0],"UsedBy":["pim-extractor","pricing-service"]}],"Services":[]}""";
         // Act
         var json = JsonSerializer.Serialize(DeclareSystem().Build());
 
@@ -130,6 +130,6 @@ public class EndToEndTests
         Assert.Equal(topology.SystemName, deserialized.SystemName);
         Assert.Equal(topology.Components.Count, deserialized.Components.Count);
         Assert.Equal(["product-raw"], deserialized.Components[2].Subscribes.Select(t => t.TopicName));
-        Assert.Equal("binding.erp", deserialized.Ports.Single(c => c.Name == "erp").DaprComponentName);
+        Assert.Equal("erp", deserialized.Ports.Single(c => c.Name == "erp").DaprComponentName);
     }
 }

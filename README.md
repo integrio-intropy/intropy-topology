@@ -57,8 +57,8 @@ public sealed class OrderFlowSystem : ISystemDefinition
 ```
 
 Topics and ports are declared as static fields; the backing resources materialize from usage
-(there is no `AddTopic`). The Dapr binding component name is derived from the port's name
-(`binding.order-extractor-source`), never declared:
+(there is no `AddTopic`). The Dapr binding component takes the port's name unchanged
+(`order-extractor-source`), never declared separately:
 
 ```csharp
 public static class Topics

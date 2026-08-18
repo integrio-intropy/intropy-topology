@@ -14,7 +14,7 @@ public class PortRefTests
 
     [Theory]
     [InlineData("Pim")]
-    [InlineData("binding.pim")]
+    [InlineData("order.pim")]
     [InlineData("-pim")]
     [InlineData("")]
     public void Define_WithInvalidLabel_ShouldThrowArgumentException(string name)

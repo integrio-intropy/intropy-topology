@@ -26,9 +26,8 @@ internal sealed class NoEdgesRule : IModelRule
 }
 
 /// <summary>
-/// A pubsub name must not equal a port's derived Dapr binding component name
-/// (<c>binding.&lt;port-name&gt;</c>) — both become Dapr Component names in the same
-/// Kubernetes namespace.
+/// A pubsub name must not equal a port's Dapr binding component name (the port name
+/// itself) — both become Dapr Component names in the same Kubernetes namespace.
 /// </summary>
 internal sealed class PubSubPortNameCollisionRule : IModelRule
 {
@@ -43,7 +42,7 @@ internal sealed class PubSubPortNameCollisionRule : IModelRule
         {
             yield return new TopologyDiagnostic(
                 DiagnosticSeverity.Error,
-                $"The pubsub name '{port.DaprComponentName}' equals the Dapr binding component name derived from port '{port.Name}'; both become Dapr Component names in the same namespace.",
+                $"The pubsub name '{port.DaprComponentName}' equals port '{port.Name}'s Dapr binding component name; both become Dapr Component names in the same namespace.",
                 port.DaprComponentName);
         }
     }

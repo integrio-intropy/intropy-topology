@@ -34,7 +34,7 @@ public sealed record SystemTopology
 | `TopicResource` | Every topic published to or subscribed from, with `Publishers`/`Subscribers` precomputed |
 | `PortResource` | Every port used, with the union of directions and `UsedBy` |
 
-A `PortResource` is `{ Name, DaprComponentName, Directions, UsedBy }` — the name is the whole identity, and `DaprComponentName` is derived (`binding.<name>`), never stored.
+A `PortResource` is `{ Name, DaprComponentName, Directions, UsedBy }` — the name is the whole identity, and `DaprComponentName` repeats it (the binding takes the port name unchanged).
 
 ## Determinism
 
@@ -53,7 +53,7 @@ The model round-trips through `System.Text.Json`:
 ```json
 {
   "Name": "order-loader-destination",
-  "DaprComponentName": "binding.order-loader-destination",
+  "DaprComponentName": "order-loader-destination",
   "Directions": [1],
   "UsedBy": ["order-loader"]
 }

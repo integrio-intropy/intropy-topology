@@ -28,7 +28,7 @@ There is no `AddTopic` on the builder — publishing to or subscribing to a topi
 
 ## Declare your ports
 
-A port is the named port an edge block reaches the outside world through. The Dapr component name is always derived from the port's name (`binding.order-extractor-source`), never declared:
+A port is the named port an edge block reaches the outside world through. The Dapr binding component takes the port's name unchanged (`order-extractor-source`), never declared separately:
 
 ```csharp
 public static class Ports
@@ -107,11 +107,11 @@ dotnet run -- graph              # print the SystemTopology JSON
 dotnet run -- generate ./out     # write Dapr YAML + per-component config
 ```
 
-`generate` emits `components/<pubsub>.yaml` (Redis-backed pub/sub), one `components/binding.<port>.yaml` per port (root path absolutized), and `config/<component>.intropy.json` per component. A transactional integration additionally gets `components/internal-<component>.yaml` — the Redis pub/sub backing its internal receive-to-send hop, scoped to itself; the runner picks the names up from its `.intropy.json`, so no hand-maintained Dapr component is needed.
+`generate` emits `components/<pubsub>.yaml` (Redis-backed pub/sub), one `components/<port>.yaml` binding per port (root path absolutized), and `config/<component>.intropy.json` per component. A transactional integration additionally gets `components/internal-<component>.yaml` — the Redis pub/sub backing its internal receive-to-send hop, scoped to itself; the runner picks the names up from its `.intropy.json`, so no hand-maintained Dapr component is needed.
 
 ## Next steps
 
 - [Components](concepts/components.md) — the component kinds and their block builders
 - [Topics](concepts/topics.md) — the asynchronous edge between components
-- [Ports](concepts/ports.md) — derived binding names and environment-owned deployment
+- [Ports](concepts/ports.md) — port-named bindings and environment-owned deployment
 - [Validation](concepts/validation.md) — the validation rules

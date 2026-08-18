@@ -37,15 +37,14 @@ public sealed record ServiceResource
 /// <summary>A system-owned port materialized from usage.</summary>
 public sealed record PortResource
 {
-    /// <summary>Derives a port's Dapr binding component name:
-    /// <c>binding.&lt;port-name&gt;</c>. The single derivation site — every consumer
-    /// of the name goes through here.</summary>
-    public static string DaprComponentNameFor(string portName) => $"binding.{portName}";
+    /// <summary>Derives a port's Dapr binding component name: the port name itself.
+    /// The single derivation site — every consumer of the name goes through here.</summary>
+    public static string DaprComponentNameFor(string portName) => portName;
 
     /// <summary>The port's name (DNS-1123 label) — its whole identity.</summary>
     public required string Name { get; init; }
 
-    /// <summary>The derived Dapr binding component name: <c>binding.&lt;port-name&gt;</c>.</summary>
+    /// <summary>The Dapr binding component name — identical to <see cref="Name"/>.</summary>
     public string DaprComponentName => DaprComponentNameFor(Name);
 
     /// <summary>The union of directions the port is used in.</summary>

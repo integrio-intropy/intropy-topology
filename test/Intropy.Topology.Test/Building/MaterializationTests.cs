@@ -54,7 +54,7 @@ public class MaterializationTests
 
         // Assert
         Assert.Equal("pim", port.Name);
-        Assert.Equal("binding.pim", port.DaprComponentName);
+        Assert.Equal("pim", port.DaprComponentName);
         Assert.Equal([PortDirection.In, PortDirection.Out], port.Directions);
         Assert.Equal(["ti"], port.UsedBy);
     }

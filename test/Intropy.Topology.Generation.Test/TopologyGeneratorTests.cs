@@ -36,8 +36,8 @@ public class TopologyGeneratorTests
     public void Generate_ShouldEmit_OneBindingComponentPerPort_ResolvedToLocalstorage()
     {
         // Act
-        var webshop = Content("components/binding.webshop.yaml");
-        var erp = Content("components/binding.erp.yaml");
+        var webshop = Content("components/webshop.yaml");
+        var erp = Content("components/erp.yaml");
 
         // Assert
         Assert.Contains("type: \"bindings.localstorage\"", webshop, StringComparison.Ordinal);
@@ -62,7 +62,7 @@ public class TopologyGeneratorTests
     public void Generate_WithFileResolution_ShouldAbsolutizeRootPath()
     {
         // Act — artifacts land in per-run temp dirs, so the development resolution is absolute.
-        var yaml = Content("components/binding.webshop.yaml");
+        var yaml = Content("components/webshop.yaml");
 
         // Assert
         Assert.Contains("- name: \"rootPath\"", yaml, StringComparison.Ordinal);
@@ -90,7 +90,7 @@ public class TopologyGeneratorTests
     public void Generate_ShouldScope_BindingToItsUsers()
     {
         // Act — webshop is used only by order-loader.
-        var yaml = Content("components/binding.webshop.yaml");
+        var yaml = Content("components/webshop.yaml");
 
         // Assert
         Assert.Contains("scopes:", yaml, StringComparison.Ordinal);
@@ -145,7 +145,7 @@ public class TopologyGeneratorTests
         Assert.Contains("\"System\": \"order-fulfillment\"", json, StringComparison.Ordinal);
         Assert.Contains("\"Component\": \"order-extractor\"", json, StringComparison.Ordinal);
         Assert.Contains("\"Kind\": \"Extractor\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"binding.erp\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"erp\"", json, StringComparison.Ordinal);
         Assert.Contains("\"Direction\": \"In\"", json, StringComparison.Ordinal);
     }
 
@@ -215,7 +215,7 @@ public class TopologyGeneratorTests
         var artifacts = TopologyGenerator.Generate(topology, manifest);
 
         // Assert
-        var yaml = artifacts.Files.Single(f => f.RelativePath == "components/binding.placeholder.yaml").Content;
+        var yaml = artifacts.Files.Single(f => f.RelativePath == "components/placeholder.yaml").Content;
         Assert.Contains("type: \"bindings.localstorage\"", yaml, StringComparison.Ordinal);
     }
 

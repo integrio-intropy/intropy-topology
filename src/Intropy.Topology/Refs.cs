@@ -73,8 +73,8 @@ public sealed record ServiceRef
 /// <summary>
 /// A port — the named connection point between the system and the outside world.
 /// Every edge block reaches the outside world through a port. The name is the whole
-/// identity: the Dapr binding component's name is always derived
-/// (<c>binding.&lt;port-name&gt;</c>), never declared, and the binding's deployed
+/// identity: the Dapr binding component takes the port's name unchanged, never
+/// declared separately, and the binding's deployed
 /// <c>spec.type</c> (with its address and credentials) is environment-owned deployment
 /// configuration the topology deliberately does not repeat. Local F5 runs substitute their
 /// own resolution via the development definition. Ports are declared in the SystemHost

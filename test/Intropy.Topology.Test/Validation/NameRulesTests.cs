@@ -35,7 +35,7 @@ public class NameRulesTests
     }
 
     [Theory]
-    [InlineData("binding.pim")]
+    [InlineData("order.pim")]
     [InlineData("iss-idempotency-service")]
     [InlineData("a.b.c")]
     public void IsValidSubdomain_WithValidSubdomain_ShouldReturnTrue(string value)
