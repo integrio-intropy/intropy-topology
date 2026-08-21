@@ -223,7 +223,7 @@ internal static class FileRootPath
             throw new DevelopmentValidationException($"{error} escapes the SystemHost directory.");
         }
 
-        return new PortFileResolution(portName, folderPath);
+        return new PortFileResolution(portName, Path.GetRelativePath(rootPath, folderPath));
     }
 }
 
