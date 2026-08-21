@@ -215,7 +215,7 @@ public class IntropyGenerateTests
 
         // Act & Assert
         Assert.Throws<InvalidOperationException>(() =>
-            TopologyGenerator.Generate(builder.Build(), manifest));
+            TopologyGenerator.Generate(builder.Build(), manifest, Directory.GetCurrentDirectory()));
     }
 
     private static (int Code, string Output, string Error) Capture(Func<int> run)

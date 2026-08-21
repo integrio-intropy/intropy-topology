@@ -72,10 +72,14 @@ public static class TopologyGenerator
     /// <summary>Generates local artifacts, including validated development mock endpoints when declared.</summary>
     /// <param name="topology">The validated topology.</param>
     /// <param name="development">The optional validated development substitutions.</param>
-    public static GeneratedArtifacts Generate(SystemTopology topology, DevelopmentManifest development)
+    /// <param name="hostRoot">The SystemHost directory the development resolutions are declared
+    /// relative to. Callers pass the same root they anchored discovery at (the current directory
+    /// for the CLI verbs, the AppHost directory for Aspire).</param>
+    public static GeneratedArtifacts Generate(SystemTopology topology, DevelopmentManifest development, string hostRoot)
     {
         ArgumentNullException.ThrowIfNull(topology);
         ArgumentNullException.ThrowIfNull(development);
+        ArgumentException.ThrowIfNullOrEmpty(hostRoot);
         var files = new List<GeneratedFile>();
 
         foreach (var topic in topology.Topics.Select(t => t.PubSubName).Distinct(StringComparer.Ordinal))
@@ -99,7 +103,7 @@ public static class TopologyGenerator
         var resolutions = development.Files.ToDictionary(file => file.PortName, StringComparer.Ordinal);
         foreach (var port in topology.Ports)
         {
-            files.Add(BindingComponent(port, resolutions[port.Name]));
+            files.Add(BindingComponent(port, resolutions[port.Name], hostRoot));
         }
 
         foreach (var mock in development.Mocks)
@@ -139,12 +143,13 @@ public static class TopologyGenerator
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{pubSubName}.yaml", yaml);
     }
 
-    private static GeneratedFile BindingComponent(PortResource port, PortFileResolution resolution)
+    private static GeneratedFile BindingComponent(PortResource port, PortFileResolution resolution, string hostRoot)
     {
-        // Local runs resolve every port to a localstorage folder. The manifest path is
-        // already absolute (anchored at the SystemHost directory); artifacts land in per-run
-        // temp dirs and the sidecar's cwd is not guaranteed, so an absolute path is required.
-        var metadata = new List<(string, string)> { ("rootPath", resolution.RootPath) };
+        // Local runs resolve every port to a localstorage folder. The manifest path is declared
+        // relative to the SystemHost directory; the binding metadata must be absolute — the
+        // artifacts land in per-run temp dirs and the sidecar's cwd is not guaranteed.
+        var rootPath = Path.GetFullPath(Path.Combine(hostRoot, resolution.RootPath));
+        var metadata = new List<(string, string)> { ("rootPath", rootPath) };
         var yaml = DaprYaml.Component(
             port.DaprComponentName, "bindings.localstorage", metadata, port.UsedBy);
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{port.DaprComponentName}.yaml", yaml);

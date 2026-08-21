@@ -42,7 +42,7 @@ public sealed class AspireDaprIntegrationTests : IAsyncDisposable
         WriteWebProject("order-extractor");
         WriteWebProject("order-loader");
         var generatedRoot = Path.Combine(_workspace, "generated");
-        TopologyGenerator.Generate(Topology(), new DevelopmentManifest([], [])).WriteTo(generatedRoot);
+        TopologyGenerator.Generate(Topology(), new DevelopmentManifest([], []), appHostDirectory).WriteTo(generatedRoot);
         var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions
         {
             ProjectDirectory = appHostDirectory,
@@ -102,7 +102,7 @@ public sealed class AspireDaprIntegrationTests : IAsyncDisposable
             [new OpenApiMock("idempotency-service", artifactPath, "Idempotency Service", "1.0.0")],
             []);
         var generatedRoot = Path.Combine(_workspace, "generated");
-        TopologyGenerator.Generate(topology, development).WriteTo(generatedRoot);
+        TopologyGenerator.Generate(topology, development, appHostDirectory).WriteTo(generatedRoot);
         var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions
         {
             ProjectDirectory = appHostDirectory,

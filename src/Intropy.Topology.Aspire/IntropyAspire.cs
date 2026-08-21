@@ -54,7 +54,7 @@ public static class IntropyAspire
 
             var generatedRoot = Path.Combine(
                 Path.GetTempPath(), "intropy-aspire", $"{discovered.Topology.SystemName}-{Guid.NewGuid():N}");
-            TopologyGenerator.Generate(discovered.Topology, development).WriteTo(generatedRoot);
+            TopologyGenerator.Generate(discovered.Topology, development, builder.AppHostDirectory).WriteTo(generatedRoot);
 
             Apply(builder, discovered.Topology, generatedRoot, development);
 

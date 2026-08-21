@@ -13,7 +13,7 @@ public class TopologyGeneratorTests
     public void Generate_ShouldEmit_OnePubSubComponentPerDistinctPubSubName()
     {
         // Act
-        var artifacts = TopologyGenerator.Generate(s_topology, s_development);
+        var artifacts = TopologyGenerator.Generate(s_topology, s_development, Directory.GetCurrentDirectory());
 
         // Assert
         Assert.Contains(artifacts.Files, f => f.RelativePath == "components/pubsub-a.yaml");
@@ -59,15 +59,17 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Generate_WithFileResolution_ShouldEmitRootPathRelativeToSystemHost()
+    public void Generate_WithFileResolution_ShouldEmitRootPathAbsoluteUnderSystemHost()
     {
-        // Act — the development resolution is relative to the SystemHost directory, so the
-        // generated binding works regardless of where the artifacts land.
+        // Act — the development resolution is declared relative to the SystemHost directory,
+        // but the binding metadata must be absolute: the artifacts land in per-run temp dirs
+        // and the sidecar's cwd is not guaranteed.
         var yaml = Content("components/webshop.yaml");
 
         // Assert
         Assert.Contains("- name: \"rootPath\"", yaml, StringComparison.Ordinal);
-        Assert.Contains($"value: \"{Path.Combine("test", "webshop")}\"", yaml, StringComparison.Ordinal);
+        var expected = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "test", "webshop"));
+        Assert.Contains($"value: \"{expected}\"", yaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -174,7 +176,7 @@ public class TopologyGeneratorTests
             []);
 
         // Act
-        var yaml = TopologyGenerator.Generate(builder.Build(), manifest).Files
+        var yaml = TopologyGenerator.Generate(builder.Build(), manifest, Directory.GetCurrentDirectory()).Files
             .Single(file => file.RelativePath == "components/idempotency-service.yaml").Content;
 
         // Assert
@@ -188,8 +190,8 @@ public class TopologyGeneratorTests
     public void Generate_ShouldBeDeterministic()
     {
         // Act
-        var first = TopologyGenerator.Generate(s_topology, s_development);
-        var second = TopologyGenerator.Generate(s_topology, s_development);
+        var first = TopologyGenerator.Generate(s_topology, s_development, Directory.GetCurrentDirectory());
+        var second = TopologyGenerator.Generate(s_topology, s_development, Directory.GetCurrentDirectory());
 
         // Assert
         Assert.Equal(
@@ -213,7 +215,7 @@ public class TopologyGeneratorTests
             [new PortFileResolution("placeholder", "./test/placeholder")]);
 
         // Act
-        var artifacts = TopologyGenerator.Generate(topology, manifest);
+        var artifacts = TopologyGenerator.Generate(topology, manifest, Directory.GetCurrentDirectory());
 
         // Assert
         var yaml = artifacts.Files.Single(f => f.RelativePath == "components/placeholder.yaml").Content;
@@ -222,7 +224,7 @@ public class TopologyGeneratorTests
 
     private static string Content(string relativePath)
     {
-        var artifacts = TopologyGenerator.Generate(s_topology, s_development);
+        var artifacts = TopologyGenerator.Generate(s_topology, s_development, Directory.GetCurrentDirectory());
         return artifacts.Files.Single(f => f.RelativePath == relativePath).Content;
     }
 }

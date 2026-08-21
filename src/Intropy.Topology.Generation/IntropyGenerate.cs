@@ -227,9 +227,10 @@ public static class IntropyGenerate
         try
         {
             var directory = positional.FirstOrDefault() ?? "./out";
+            var hostRoot = Directory.GetCurrentDirectory();
             var discovered = SystemDiscovery.Discover(assembly);
-            var development = DevelopmentDiscovery.Discover(assembly, discovered.Topology, Directory.GetCurrentDirectory());
-            var artifacts = TopologyGenerator.Generate(discovered.Topology, development);
+            var development = DevelopmentDiscovery.Discover(assembly, discovered.Topology, hostRoot);
+            var artifacts = TopologyGenerator.Generate(discovered.Topology, development, hostRoot);
             artifacts.WriteTo(directory);
 
             Console.WriteLine($"generated {artifacts.Files.Count} files to '{directory}':");
