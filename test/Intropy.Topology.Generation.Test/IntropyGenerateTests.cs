@@ -109,9 +109,9 @@ public class IntropyGenerateTests
         var files = development.GetProperty("files").EnumerateArray().ToArray();
         Assert.Equal(2, files.Length);
         var webshop = files.Single(file => file.GetProperty("port").GetString() == "webshop");
-        Assert.Equal(Path.GetFullPath("./test/webshop"), webshop.GetProperty("rootPath").GetString());
+        Assert.Equal(Path.Combine("test", "webshop"), webshop.GetProperty("rootPath").GetString());
         var erp = files.Single(file => file.GetProperty("port").GetString() == "erp");
-        Assert.Equal(Path.GetFullPath("./test/erp"), erp.GetProperty("rootPath").GetString());
+        Assert.Equal(Path.Combine("test", "erp"), erp.GetProperty("rootPath").GetString());
     }
 
     [Fact]

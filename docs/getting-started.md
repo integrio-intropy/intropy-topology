@@ -107,7 +107,7 @@ dotnet run -- graph              # print the SystemTopology JSON
 dotnet run -- generate ./out     # write Dapr YAML + per-component config
 ```
 
-`generate` emits `components/<pubsub>.yaml` (Redis-backed pub/sub), one `components/<port>.yaml` binding per port (root path absolutized), and `config/<component>.intropy.json` per component. A transactional integration additionally gets `components/internal-<component>.yaml` — the Redis pub/sub backing its internal receive-to-send hop, scoped to itself; the runner picks the names up from its `.intropy.json`, so no hand-maintained Dapr component is needed.
+`generate` emits `components/<pubsub>.yaml` (Redis-backed pub/sub), one `components/<port>.yaml` binding per port (root path relative to the SystemHost directory), and `config/<component>.intropy.json` per component. A transactional integration additionally gets `components/internal-<component>.yaml` — the Redis pub/sub backing its internal receive-to-send hop, scoped to itself; the runner picks the names up from its `.intropy.json`, so no hand-maintained Dapr component is needed.
 
 ## Next steps
 

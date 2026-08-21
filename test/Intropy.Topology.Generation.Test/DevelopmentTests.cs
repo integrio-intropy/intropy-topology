@@ -17,7 +17,7 @@ public class DevelopmentBuilderTests
     }
 
     [Fact]
-    public void Build_WithAllPortsResolved_ShouldProduceAbsoluteRootPaths()
+    public void Build_WithAllPortsResolved_ShouldProduceRelativeRootPaths()
     {
         // Arrange
         var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
@@ -29,7 +29,7 @@ public class DevelopmentBuilderTests
         // Assert
         var file = Assert.Single(manifest.Files);
         Assert.Equal("erp", file.PortName);
-        Assert.Equal(Path.GetFullPath("./test/erp"), file.RootPath);
+        Assert.Equal(Path.Combine("test", "erp"), file.RootPath);
         Assert.Empty(manifest.Mocks);
     }
 
@@ -119,7 +119,7 @@ public class DevelopmentBuilderTests
         var manifest = builder.Build();
 
         // Assert
-        Assert.Equal(Path.GetFullPath("."), Assert.Single(manifest.Files).RootPath);
+        Assert.Equal(".", Assert.Single(manifest.Files).RootPath);
     }
 
     [Fact]

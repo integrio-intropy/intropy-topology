@@ -59,14 +59,15 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Generate_WithFileResolution_ShouldAbsolutizeRootPath()
+    public void Generate_WithFileResolution_ShouldEmitRootPathRelativeToSystemHost()
     {
-        // Act — artifacts land in per-run temp dirs, so the development resolution is absolute.
+        // Act — the development resolution is relative to the SystemHost directory, so the
+        // generated binding works regardless of where the artifacts land.
         var yaml = Content("components/webshop.yaml");
 
         // Assert
         Assert.Contains("- name: \"rootPath\"", yaml, StringComparison.Ordinal);
-        Assert.Contains($"value: \"{Path.GetFullPath("./test/webshop")}\"", yaml, StringComparison.Ordinal);
+        Assert.Contains($"value: \"{Path.Combine("test", "webshop")}\"", yaml, StringComparison.Ordinal);
     }
 
     [Fact]

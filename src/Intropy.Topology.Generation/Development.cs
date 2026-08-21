@@ -157,6 +157,8 @@ public sealed class DevelopmentBuilder
 public sealed record DevelopmentManifest(IReadOnlyList<OpenApiMock> Mocks, IReadOnlyList<PortFileResolution> Files);
 
 /// <summary>One port's validated local file resolution.</summary>
+/// <param name="PortName">The resolved port.</param>
+/// <param name="RootPath">The folder path relative to the SystemHost directory.</param>
 public sealed record PortFileResolution(string PortName, string RootPath);
 
 /// <summary>One OpenAPI-backed platform-service mock with a verified Microcks identity.</summary>
