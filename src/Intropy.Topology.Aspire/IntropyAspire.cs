@@ -163,7 +163,8 @@ public static class IntropyAspire
             // every Kestrel binds the 5000 default) and gives the Dapr sidecar its app-port.
             project = project.WithHttpEndpoint();
 
-            Wire(project, component, stagedPath, configDir, redis, microcks);
+            Wire(project, component, stagedPath, configDir, redis, microcks,
+                PortRootPaths(builder.AppHostDirectory, component, development));
             resources[component.Name] = project;
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
@@ -330,7 +331,8 @@ public static class IntropyAspire
         string resourcesPath,
         string configDir,
         IResourceBuilder<ContainerResource> redis,
-        IResourceBuilder<ContainerResource>? microcks)
+        IResourceBuilder<ContainerResource>? microcks,
+        IReadOnlyDictionary<string, string> portRootPaths)
     {
         const string development = "Development";
         project
@@ -348,9 +350,42 @@ public static class IntropyAspire
             .WithEnvironment("DOTNET_ENVIRONMENT", development)
             .WithEnvironment("ASPNETCORE_ENVIRONMENT", development)
             .WaitFor(redis);
+        foreach (var (portName, rootPath) in portRootPaths)
+        {
+            project.WithEnvironment($"Ports__{portName}__RootPath", rootPath);
+        }
         if (microcks is not null && component.Uses.Count > 0)
         {
             project.WaitFor(microcks);
         }
+    }
+
+    /// <summary>
+    /// The absolute root path of each port the component reads from, keyed by port name. A
+    /// component that scans its inbound port directly (an extractor's local file adapter)
+    /// cannot reach the folder through the Dapr binding alone — the binding's
+    /// <c>rootPath</c> metadata is sidecar configuration, invisible to the component process.
+    /// The host resolves the same path it writes into the binding YAML and injects it as
+    /// <c>Ports__&lt;port-name&gt;__RootPath</c>, the convention the framework's
+    /// <c>AddKeyedLocalFilePort</c> reads. Outbound ports are reached only through the
+    /// binding, so they get no variable. Ports without a local file resolution are skipped —
+    /// <c>check</c>/<c>generate</c> already fail on those.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, string> PortRootPaths(
+        string hostRoot, ComponentModel component, DevelopmentManifest development)
+    {
+        var paths = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var port in component.Ports.Where(p => p.Direction is PortDirection.In))
+        {
+            var resolution = development.Files.SingleOrDefault(f => f.PortName == port.PortName);
+            if (resolution is null)
+            {
+                continue;
+            }
+
+            paths[port.PortName] = Path.GetFullPath(Path.Combine(hostRoot, resolution.RootPath));
+        }
+
+        return paths;
     }
 }

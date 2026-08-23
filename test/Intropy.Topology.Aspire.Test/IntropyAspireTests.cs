@@ -309,6 +309,47 @@ public sealed class IntropyAspireTests : IDisposable
     }
 
     [Fact]
+    public async Task Apply_WithFilePortResolution_ShouldInjectPortRootPathForInboundPorts()
+    {
+        // Arrange — the extractor reads webshop (In), the loader writes erp (Out); both ports
+        // resolve to local folders.
+        var development = new DevelopmentManifest(
+            [],
+            [new PortFileResolution("webshop", "./test/webshop"), new PortFileResolution("erp", "./test/erp")]);
+        var builder = CreateBuilder();
+        IntropyAspire.Apply(builder, Topology(), GeneratedRoot, development);
+
+        // Act
+        var extractor = builder.Resources.OfType<IResourceWithEnvironment>().Single(r => r.Name == "order-extractor");
+        var loader = builder.Resources.OfType<IResourceWithEnvironment>().Single(r => r.Name == "order-loader");
+        var extractorEnv = await extractor.GetEnvironmentVariableValuesAsync(DistributedApplicationOperation.Publish);
+        var loaderEnv = await loader.GetEnvironmentVariableValuesAsync(DistributedApplicationOperation.Publish);
+
+        // Assert — the inbound port gets the same absolute path the binding YAML carries; the
+        // outbound port gets nothing (it is reached only through the binding).
+        Assert.Equal(
+            Path.GetFullPath(Path.Combine(AppHostDir, "./test/webshop")),
+            extractorEnv["Ports__webshop__RootPath"]);
+        Assert.False(loaderEnv.ContainsKey("Ports__erp__RootPath"));
+    }
+
+    [Fact]
+    public async Task Apply_WithoutFilePortResolution_ShouldInjectNoPortRootPath()
+    {
+        // Arrange — no development manifest: check/generate fail on unresolved ports, Apply
+        // stays tolerant (the four-arg overload passes an empty manifest).
+        var builder = CreateBuilder();
+        IntropyAspire.Apply(builder, Topology(), GeneratedRoot);
+
+        // Act
+        var extractor = builder.Resources.OfType<IResourceWithEnvironment>().Single(r => r.Name == "order-extractor");
+        var env = await extractor.GetEnvironmentVariableValuesAsync(DistributedApplicationOperation.Publish);
+
+        // Assert
+        Assert.False(env.ContainsKey("Ports__webshop__RootPath"));
+    }
+
+    [Fact]
     public void Apply_WithComponentMissingItsProject_ShouldThrow()
     {
         // Arrange — order-loader has no project on disk.
