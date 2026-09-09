@@ -13,7 +13,7 @@ public class ComponentTests
         // Act
         ExtractorComponent component = s.AddExtractor("pim-extractor")
             .From(TestPorts.Pim)
-            .Publishes(TestTopics.Raw)
+            .Publishes(TestMessages.Raw)
             .Component;
 
         // Assert
@@ -26,7 +26,7 @@ public class ComponentTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        var builder = s.AddLoader("loader").Subscribes(TestTopics.Raw);
+        var builder = s.AddLoader("loader").Subscribes(TestMessages.Raw);
 
         // Act
         var beforeTo = builder.Component;
@@ -57,8 +57,8 @@ public class ComponentTests
         // Act
         List<Component> components =
         [
-            s.AddExtractor("a").Publishes(TestTopics.Raw).Component,
-            s.AddLoader("b").Subscribes(TestTopics.Raw).To(TestPorts.Erp).Component,
+            s.AddExtractor("a").Publishes(TestMessages.Raw).Component,
+            s.AddLoader("b").Subscribes(TestMessages.Raw).To(TestPorts.Erp).Component,
         ];
 
         // Assert
@@ -72,9 +72,9 @@ public class ComponentTests
         // Arrange
         var s = SystemBuilder.Create("test-system");
         var handle = s.AddExtractor("pim-extractor")
-            .Publishes(TestTopics.Raw)
+            .Publishes(TestMessages.Raw)
             .Component;
-        s.AddLoader("sink").Subscribes(TestTopics.Raw);
+        s.AddLoader("sink").Subscribes(TestMessages.Raw);
 
         // Act
         var topology = s.Build();

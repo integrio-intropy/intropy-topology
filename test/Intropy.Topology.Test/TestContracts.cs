@@ -4,13 +4,13 @@ public sealed record RawEvent;
 
 public sealed record EnrichedEvent;
 
-public static class TestTopics
+public static class TestMessages
 {
-    public static readonly TopicRef<RawEvent> Raw =
-        TopicRef<RawEvent>.Define("test-pubsub", "raw-events");
+    public static readonly MessageRef<RawEvent> Raw =
+        MessageRef<RawEvent>.Define("raw-events", "test-pubsub");
 
-    public static readonly TopicRef<EnrichedEvent> Enriched =
-        TopicRef<EnrichedEvent>.Define("test-pubsub", "enriched-events");
+    public static readonly MessageRef<EnrichedEvent> Enriched =
+        MessageRef<EnrichedEvent>.Define("enriched-events", "test-pubsub");
 }
 
 public static class TestPorts

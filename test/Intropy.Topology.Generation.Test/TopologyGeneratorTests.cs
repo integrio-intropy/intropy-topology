@@ -77,11 +77,11 @@ public class TopologyGeneratorTests
     {
         // Arrange — a port used by the topology but absent from the development manifest.
         // The manifest is the single validation boundary; the generator trusts it.
-        var topic = TopicRef<string>.Define("orders", "created");
+        var message = MessageRef<string>.Define("created", "orders");
         var port = PortRef.Define("erp");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").From(port).Publishes(topic);
-        builder.AddLoader("loader").Subscribes(topic);
+        builder.AddExtractor("extractor").From(port).Publishes(message);
+        builder.AddLoader("loader").Subscribes(message);
         var development = new DevelopmentBuilder(builder.Build(), Directory.GetCurrentDirectory());
 
         // Act & Assert
@@ -166,11 +166,11 @@ public class TopologyGeneratorTests
     public void Generate_WithOpenApiMock_ShouldEmitScopedHttpEndpoint()
     {
         // Arrange
-        var topic = TopicRef<string>.Define("orders", "created");
+        var message = MessageRef<string>.Define("created", "orders");
         var service = ServiceRef.Define("idempotency-service");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").Publishes(topic).Uses(service);
-        builder.AddLoader("loader").Subscribes(topic).Uses(service);
+        builder.AddExtractor("extractor").Publishes(message).Uses(service);
+        builder.AddLoader("loader").Subscribes(message).Uses(service);
         var manifest = new DevelopmentManifest(
             [new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency Service", "1.0/rc")],
             []);
@@ -204,11 +204,11 @@ public class TopologyGeneratorTests
     {
         // Arrange — local generation resolves every port to localstorage; the deployed
         // binding type is deployment-owned and never declared in the topology.
-        var topic = TopicRef<string>.Define("orders", "created");
+        var message = MessageRef<string>.Define("created", "orders");
         var port = PortRef.Define("placeholder");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").From(port).Publishes(topic);
-        builder.AddLoader("loader").Subscribes(topic);
+        builder.AddExtractor("extractor").From(port).Publishes(message);
+        builder.AddLoader("loader").Subscribes(message);
         var topology = builder.Build();
         var manifest = new DevelopmentManifest(
             [],

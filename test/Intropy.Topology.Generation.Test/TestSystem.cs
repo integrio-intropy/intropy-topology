@@ -10,8 +10,8 @@ public sealed record FulfillmentOrder(string OrderNumber);
 // locally to ./test folders via the development definition below.
 public sealed class OrderSystem : ISystemDefinition
 {
-    public static readonly TopicRef<RawOrder> Raw = TopicRef<RawOrder>.Define("pubsub-a", "order-raw");
-    public static readonly TopicRef<FulfillmentOrder> Fulfillment = TopicRef<FulfillmentOrder>.Define("pubsub-b", "order-fulfillment");
+    public static readonly MessageRef<RawOrder> Raw = MessageRef<RawOrder>.Define("order-raw", "pubsub-a");
+    public static readonly MessageRef<FulfillmentOrder> Fulfillment = MessageRef<FulfillmentOrder>.Define("order-fulfillment", "pubsub-b");
     public static readonly PortRef Webshop = PortRef.Define("webshop");
     public static readonly PortRef Erp = PortRef.Define("erp");
 

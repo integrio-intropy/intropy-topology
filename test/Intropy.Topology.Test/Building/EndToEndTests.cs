@@ -11,14 +11,14 @@ public class EndToEndTests
 {
     private static class ProductFlow
     {
-        public static readonly TopicRef<RawEvent> Raw =
-            TopicRef<RawEvent>.Define("product-distribution-pubsub", "product-raw");
+        public static readonly MessageRef<RawEvent> Raw =
+            MessageRef<RawEvent>.Define("product-raw", "product-distribution-pubsub");
     }
 
     private static class PriceFlow
     {
-        public static readonly TopicRef<RawEvent> Raw =
-            TopicRef<RawEvent>.Define("product-distribution-pubsub", "price-raw");
+        public static readonly MessageRef<RawEvent> Raw =
+            MessageRef<RawEvent>.Define("price-raw", "product-distribution-pubsub");
     }
 
     private static readonly PortRef s_pim = PortRef.Define("pim");
@@ -85,6 +85,19 @@ public class EndToEndTests
         Assert.Equal(["price-extractor"], priceRaw.Publishers);
         Assert.Equal(["price-loader"], priceRaw.Subscribers);
 
+        // Assert: messages materialize one group per system, messages sorted by name
+        var group = Assert.Single(topology.MessageGroups);
+        Assert.Equal("product-distribution", group.Name);
+        Assert.Equal(["price-raw", "product-raw"], group.Messages.Select(m => m.Name));
+        var productMessage = group.Messages.Single(m => m.Name == "product-raw");
+        Assert.Equal("product-distribution-pubsub", productMessage.Channel.PubSubName);
+        Assert.Equal("product-raw", productMessage.Channel.TopicName);
+        Assert.Equal(["pim-extractor"], productMessage.Publishers);
+        Assert.Equal(["product-loader"], productMessage.Subscribers);
+        var priceMessage = group.Messages.Single(m => m.Name == "price-raw");
+        Assert.Equal(["price-extractor"], priceMessage.Publishers);
+        Assert.Equal(["price-loader"], priceMessage.Subscribers);
+
         Assert.Equal(["erp", "pim"], topology.Ports.Select(c => c.Name));
         var erp = topology.Ports[0];
         Assert.Equal("erp", erp.DaprComponentName);
@@ -107,7 +120,7 @@ public class EndToEndTests
         // Byte-exact snapshot of the sample system's serialized model: guards materializer
         // output against unintentional change. Regenerate only on intentional model changes.
         const string expected =
-            """{"SystemName":"product-distribution","Components":[{"Name":"pim-extractor","Kind":0,"Subscribes":[],"Publishes":[{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Ports":[{"PortName":"pim","Direction":0}],"Uses":[],"InternalQueue":null},{"Name":"pricing-service","Kind":2,"Subscribes":[],"Publishes":[],"Ports":[{"PortName":"pim","Direction":0},{"PortName":"erp","Direction":1}],"Uses":[],"InternalQueue":{"PubSubName":"internal-pricing-service","TopicName":"hop"}},{"Name":"product-loader","Kind":1,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Publishes":[],"Ports":[{"PortName":"erp","Direction":1}],"Uses":[],"InternalQueue":null},{"Name":"price-extractor","Kind":0,"Subscribes":[],"Publishes":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Ports":[],"Uses":[],"InternalQueue":null},{"Name":"price-loader","Kind":1,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Publishes":[],"Ports":[],"Uses":[],"InternalQueue":null}],"Topics":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["price-extractor"],"Subscribers":["price-loader"]},{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["pim-extractor"],"Subscribers":["product-loader"]}],"Ports":[{"Name":"erp","DaprComponentName":"erp","Directions":[1],"UsedBy":["pricing-service","product-loader"]},{"Name":"pim","DaprComponentName":"pim","Directions":[0],"UsedBy":["pim-extractor","pricing-service"]}],"Services":[]}""";
+            """{"SystemName":"product-distribution","Components":[{"Name":"pim-extractor","Kind":0,"Subscribes":[],"Publishes":[{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Ports":[{"PortName":"pim","Direction":0}],"Uses":[],"InternalQueue":null},{"Name":"pricing-service","Kind":2,"Subscribes":[],"Publishes":[],"Ports":[{"PortName":"pim","Direction":0},{"PortName":"erp","Direction":1}],"Uses":[],"InternalQueue":{"PubSubName":"internal-pricing-service","TopicName":"hop"}},{"Name":"product-loader","Kind":1,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw"}],"Publishes":[],"Ports":[{"PortName":"erp","Direction":1}],"Uses":[],"InternalQueue":null},{"Name":"price-extractor","Kind":0,"Subscribes":[],"Publishes":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Ports":[],"Uses":[],"InternalQueue":null},{"Name":"price-loader","Kind":1,"Subscribes":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw"}],"Publishes":[],"Ports":[],"Uses":[],"InternalQueue":null}],"Topics":[{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["price-extractor"],"Subscribers":["price-loader"]},{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Publishers":["pim-extractor"],"Subscribers":["product-loader"]}],"MessageGroups":[{"Name":"product-distribution","Messages":[{"Name":"price-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Channel":{"PubSubName":"product-distribution-pubsub","TopicName":"price-raw"},"Publishers":["price-extractor"],"Subscribers":["price-loader"]},{"Name":"product-raw","ContractTypeName":"Intropy.Topology.Test.RawEvent","Channel":{"PubSubName":"product-distribution-pubsub","TopicName":"product-raw"},"Publishers":["pim-extractor"],"Subscribers":["product-loader"]}]}],"Ports":[{"Name":"erp","DaprComponentName":"erp","Directions":[1],"UsedBy":["pricing-service","product-loader"]},{"Name":"pim","DaprComponentName":"pim","Directions":[0],"UsedBy":["pim-extractor","pricing-service"]}],"Services":[]}""";
         // Act
         var json = JsonSerializer.Serialize(DeclareSystem().Build());
 

@@ -33,7 +33,7 @@ public abstract class ComponentBuilder<TSelf, TComponent>
 }
 
 /// <summary>Fluent builder for an extractor: an edge block that pulls or receives data
-/// from an external system and publishes it to at least one topic.</summary>
+/// from an external system and publishes it to at least one message.</summary>
 public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, ExtractorComponent>
 {
     internal ExtractorBuilder(ExtractorComponent component) : base(component) { }
@@ -48,16 +48,16 @@ public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, Extrac
         return this;
     }
 
-    /// <summary>Declares that the extractor publishes to a topic.</summary>
-    /// <param name="topic">The topic to publish to.</param>
-    public ExtractorBuilder Publishes(TopicRef topic)
+    /// <summary>Declares that the extractor publishes a message.</summary>
+    /// <param name="message">The message the extractor publishes.</param>
+    public ExtractorBuilder Publishes(MessageRef message)
     {
-        Component.AddPublish(topic);
+        Component.AddPublish(message);
         return this;
     }
 }
 
-/// <summary>Fluent builder for a loader: an edge block that subscribes to exactly one topic
+/// <summary>Fluent builder for a loader: an edge block that subscribes to exactly one message
 /// and writes to an external system through a port; loaders publish nothing.</summary>
 public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderComponent>
 {
@@ -65,11 +65,11 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
 
     private protected override LoaderBuilder Self => this;
 
-    /// <summary>Declares the single topic the loader subscribes to.</summary>
-    /// <param name="topic">The topic whose events the loader consumes.</param>
-    public LoaderBuilder Subscribes(TopicRef topic)
+    /// <summary>Declares the single message the loader subscribes to.</summary>
+    /// <param name="message">The message whose events the loader consumes.</param>
+    public LoaderBuilder Subscribes(MessageRef message)
     {
-        Component.AddSubscribe(topic);
+        Component.AddSubscribe(message);
         return this;
     }
 
@@ -83,7 +83,7 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
 }
 
 /// <summary>Fluent builder for a transactional integration: a synchronous block that
-/// reads/writes external systems through ports; it publishes no topics. Its internal
+/// reads/writes external systems through ports; it publishes nothing. Its internal
 /// receive-to-send queue is minted at materialization (<see cref="ComponentModel.InternalQueue"/>),
 /// never declared here.</summary>
 public sealed class TransactionalIntegrationBuilder

@@ -9,10 +9,10 @@ public class DevelopmentBuilderTests
 
     private static SystemTopology TopologyWithPort()
     {
-        var topic = TopicRef<string>.Define("orders", "created");
+        var message = MessageRef<string>.Define("created", "orders");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").From(s_port).Publishes(topic);
-        builder.AddLoader("loader").Subscribes(topic);
+        builder.AddExtractor("extractor").From(s_port).Publishes(message);
+        builder.AddLoader("loader").Subscribes(message);
         return builder.Build();
     }
 

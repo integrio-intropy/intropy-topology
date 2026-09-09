@@ -25,21 +25,21 @@ var s = SystemBuilder.Create("order-flow");
 
 s.AddExtractor("order-extractor")
     .From(Ports.OrderExtractorSource)
-    .Publishes(Topics.Orders);
+    .Publishes(Messages.Orders);
 
 s.AddLoader("order-loader")
-    .Subscribes(Topics.Orders)
+    .Subscribes(Messages.Orders)
     .To(Ports.OrderLoaderDestination);
 
 SystemTopology topology = s.Build();   // throws TopologyValidationException with all violations
 ```
 
-Topics and ports are declared as static fields in a scaffolded `Topics.cs` / `Ports.cs`; resources materialize from usage — there is no `AddTopic`.
+Messages and ports are declared as static fields in a scaffolded `Messages.cs` / `Ports.cs`; resources materialize from usage — there is no `AddTopic`.
 
 ## Key features
 
 - **Compile-time legality** — block builders make illegal topology uncompilable. [Learn more](concepts/components.md)
-- **Typed refs** — `TopicRef<T>` carries an async event contract; `PortRef` names the port an edge block reaches the outside world through. [Learn more](concepts/topics.md)
+- **Typed refs** — `MessageRef<T>` names a message's identity, channel, and event contract; `PortRef` names the port an edge block reaches the outside world through. [Learn more](concepts/messages.md)
 - **Port-named Dapr bindings** — every port materializes as exactly one Dapr binding component named after the port; local runs resolve it to a host folder. [Learn more](concepts/ports.md)
 - **Collect-all validation** — `Build()` reports every violation at once, never just the first. [Learn more](concepts/validation.md)
 - **Deterministic materialization** — the output model is immutable, sorted, and byte-stable across runs. [Learn more](concepts/materialization.md)
@@ -50,7 +50,7 @@ Topics and ports are declared as static fields in a scaffolded `Topics.cs` / `Po
 |---------|-------------|
 | [Getting Started](getting-started.md) | Declare the complete order-flow topology from scratch |
 | [Components](concepts/components.md) | Component kinds, block builders, and their legal edges |
-| [Topics](concepts/topics.md) | Typed topic refs and the materialize-from-usage model |
+| [Messages](concepts/messages.md) | Typed message refs and the materialize-from-usage model |
 | [Ports](concepts/ports.md) | Ports and their Dapr bindings |
 | [Validation](concepts/validation.md) | The validation rules and the Build/TryBuild/Validate API |
 | [Materialization](concepts/materialization.md) | How declarations fold into the immutable model |

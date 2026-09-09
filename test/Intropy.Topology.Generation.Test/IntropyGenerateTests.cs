@@ -66,6 +66,26 @@ public class IntropyGenerateTests
     }
 
     [Fact]
+    public void Run_Graph_ShouldEmit_MessageGroupsAlongsideTopics()
+    {
+        // Act
+        var (_, output, _) = Capture(() => IntropyGenerate.Run(s_assembly, ["graph"]));
+        using var json = JsonDocument.Parse(output);
+        var root = json.RootElement;
+
+        // Assert — message groups are always emitted, even alongside an unchanged topics view
+        var group = Assert.Single(root.GetProperty("messagegroups").EnumerateArray());
+        Assert.Equal("order-fulfillment", group.GetProperty("name").GetString());
+        var message = group.GetProperty("messages").EnumerateArray()
+            .Single(message => message.GetProperty("name").GetString() == "order-raw");
+        Assert.Equal("Intropy.Topology.Generation.Test.RawOrder", message.GetProperty("contract").GetString());
+        Assert.Equal("pubsub-a", message.GetProperty("channel").GetProperty("pubsub").GetString());
+        Assert.Equal("order-raw", message.GetProperty("channel").GetProperty("topic").GetString());
+        Assert.Equal(["order-extractor"], message.GetProperty("publishers").EnumerateArray().Select(value => value.GetString()));
+        Assert.Equal(["order-loader", "raw-audit"], message.GetProperty("subscribers").EnumerateArray().Select(value => value.GetString()));
+    }
+
+    [Fact]
     public void Run_Graph_ShouldEmit_InternalQueueForTransactionalIntegrationsOnly()
     {
         // Act
@@ -205,10 +225,10 @@ public class IntropyGenerateTests
     {
         // Arrange: a manifest mock no topology service matches — a programming error,
         // not user input, so it must crash rather than surface as exit code 1.
-        var topic = TopicRef<string>.Define("orders", "created");
+        var message = MessageRef<string>.Define("created", "orders");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").Publishes(topic);
-        builder.AddLoader("loader").Subscribes(topic);
+        builder.AddExtractor("extractor").Publishes(message);
+        builder.AddLoader("loader").Subscribes(message);
         var manifest = new DevelopmentManifest(
             [new OpenApiMock("ghost-service", "/tmp/ghost.yaml", "Ghost", "1")],
             []);

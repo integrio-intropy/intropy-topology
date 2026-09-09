@@ -38,11 +38,13 @@ The system topology is invalid (2 error(s)):
 |----------|------|
 | Error | Every component needs a unique name |
 | Error | A system must declare at least one component |
-| Error | A component publishes at most one topic — more than one `Publishes` call is an error |
+| Error | A component must not publish to the same channel more than once |
 | Error | A component must not subscribe to the same topic more than once |
-| Error | One topic must not be used with two different event contract types |
+| Error | One message name must not resolve to two different channels |
+| Error | One message name must not carry two different event contract types |
+| Error | One channel must not be used with two different event contract types |
 | Error | Extractors must publish (a loader's destination may stay a private local component) |
-| Error | Loaders subscribe to exactly one topic |
+| Error | Loaders subscribe to exactly one message |
 | Error | Transactional integrations must declare at least one `From` and one `To` port |
 | Error | A published topic must have a subscriber |
 | Error | A subscribed topic must have a publisher |

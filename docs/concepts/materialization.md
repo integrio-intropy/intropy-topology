@@ -24,6 +24,7 @@ public sealed record SystemTopology
     public required string SystemName { get; init; }
     public required IReadOnlyList<ComponentModel> Components { get; init; }
     public required IReadOnlyList<TopicResource> Topics { get; init; }
+    public required IReadOnlyList<MessageGroupResource> MessageGroups { get; init; }
     public required IReadOnlyList<PortResource> Ports { get; init; }
 }
 ```
@@ -31,7 +32,8 @@ public sealed record SystemTopology
 | Model | Materialized from |
 |-------|-------------------|
 | `ComponentModel` | Each `Add*` call, in declaration order, with its edges (`Subscribes`, `Publishes`, `Ports`) |
-| `TopicResource` | Every topic published to or subscribed from, with `Publishers`/`Subscribers` precomputed |
+| `TopicResource` | Every message channel published to or subscribed from, with `Publishers`/`Subscribers` precomputed |
+| `MessageGroupResource` | One group named after the system, holding a `MessageResource` per declared message — identity, contract, channel, and both sides |
 | `PortResource` | Every port used, with the union of directions and `UsedBy` |
 
 A `PortResource` is `{ Name, DaprComponentName, Directions, UsedBy }` — the name is the whole identity, and `DaprComponentName` repeats it (the binding takes the port name unchanged).
@@ -62,4 +64,4 @@ The model round-trips through `System.Text.Json`:
 ## Related
 
 - [Validation](validation.md) — the rules that run over the materialized picture
-- [Topics](topics.md) and [Ports](ports.md) — the resource models
+- [Messages](messages.md) and [Ports](ports.md) — the resource models

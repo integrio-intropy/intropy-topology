@@ -9,8 +9,8 @@ internal static class ValidationTestHelper
     /// <summary>A publisher/subscriber pair that on its own violates nothing.</summary>
     public static SystemBuilder WithValidComponent(this SystemBuilder s)
     {
-        s.AddExtractor("valid-extractor").Publishes(TestTopics.Raw);
-        s.AddLoader("valid-sink").Subscribes(TestTopics.Raw);
+        s.AddExtractor("valid-extractor").Publishes(TestMessages.Raw);
+        s.AddLoader("valid-sink").Subscribes(TestMessages.Raw);
         return s;
     }
 
@@ -32,8 +32,8 @@ public class DuplicateComponentNameRuleTests
     {
         // Arrange: two components sharing one name
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("dup").Publishes(TestTopics.Raw);
-        s.AddLoader("dup").Subscribes(TestTopics.Raw);
+        s.AddExtractor("dup").Publishes(TestMessages.Raw);
+        s.AddLoader("dup").Subscribes(TestMessages.Raw);
 
         // Act
         var diagnostic = Assert.Single(s.DiagnosticsFor<DuplicateComponentNameRule>());
@@ -59,16 +59,16 @@ public class EmptySystemRuleTests
     }
 }
 
-public class MultiplePublishesRuleTests
+public class DuplicatePublishRuleTests
 {
     [Fact]
-    public void Validate_WithTwoPublishes_ShouldReportError()
+    public void Validate_WithDuplicateChannelPublish_ShouldReportError()
     {
-        // Arrange: a component publishes exactly one topic
+        // Arrange: the same channel declared twice — a redundant edge, not fan-out
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor")
-            .Publishes(TestTopics.Raw)
-            .Publishes(TestTopics.Enriched);
+            .Publishes(TestMessages.Raw)
+            .Publishes(TestMessages.Raw);
 
         // Act
         var diagnostic = Assert.Single(s.DiagnosticsFor<DuplicatePublishRule>());
@@ -77,7 +77,7 @@ public class MultiplePublishesRuleTests
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Equal("extractor", diagnostic.Target);
         Assert.Equal(
-            "The component declares 2 Publishes calls; a component publishes exactly one topic.",
+            "The topic 'raw-events' on pubsub 'test-pubsub' is published to more than once by the same component.",
             diagnostic.Message);
     }
 
@@ -86,6 +86,21 @@ public class MultiplePublishesRuleTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system").WithValidComponent();
+
+        // Act & Assert
+        Assert.Empty(s.DiagnosticsFor<DuplicatePublishRule>());
+    }
+
+    [Fact]
+    public void Validate_WithDistinctMessages_ShouldReportNothing()
+    {
+        // Arrange: several messages per extractor are legal — each on its own channel
+        var otherMessage = MessageRef<EnrichedEvent>.Define("other-topic", "test-pubsub");
+        var thirdMessage = MessageRef<RawEvent>.Define("third-topic", "test-pubsub");
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("extractor")
+            .Publishes(otherMessage)
+            .Publishes(thirdMessage);
 
         // Act & Assert
         Assert.Empty(s.DiagnosticsFor<DuplicatePublishRule>());
@@ -100,8 +115,8 @@ public class DuplicateSubscriptionRuleTests
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddLoader("loader")
-            .Subscribes(TestTopics.Raw)
-            .Subscribes(TestTopics.Raw);
+            .Subscribes(TestMessages.Raw)
+            .Subscribes(TestMessages.Raw);
 
         // Act
         var diagnostic = Assert.Single(s.DiagnosticsFor<DuplicateSubscriptionRule>());
@@ -214,17 +229,72 @@ public class TopicContractConflictRuleTests
     [Fact]
     public void Validate_WithSameTopicUnderTwoContracts_ShouldReportError()
     {
-        // Arrange: identical (pubsub, topic) declared with two contract types
+        // Arrange: two message names targeting one (pubsub, topic) with two contract types
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("first")
-            .Publishes(TopicRef<RawEvent>.Define("test-pubsub", "shared-topic"));
+            .Publishes(MessageRef<RawEvent>.Define("shared-raw", "test-pubsub", "shared-topic"));
         s.AddExtractor("second")
-            .Publishes(TopicRef<EnrichedEvent>.Define("test-pubsub", "shared-topic"));
+            .Publishes(MessageRef<EnrichedEvent>.Define("shared-enriched", "test-pubsub", "shared-topic"));
 
         // Act
         var diagnostic = Assert.Single(s.DeclarationDiagnosticsFor<TopicContractConflictRule>());
 
         // Assert
+        Assert.Contains(typeof(RawEvent).FullName!, diagnostic.Message);
+        Assert.Contains(typeof(EnrichedEvent).FullName!, diagnostic.Message);
+    }
+}
+
+public class MessageChannelConflictRuleTests
+{
+    [Fact]
+    public void Validate_WithSameMessageOnTwoChannels_ShouldReportError()
+    {
+        // Arrange: one message identity declared on two transport channels
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("first")
+            .Publishes(MessageRef<RawEvent>.Define("shared", "test-pubsub", "first-topic"));
+        s.AddLoader("second")
+            .Subscribes(MessageRef<RawEvent>.Define("shared", "test-pubsub", "second-topic"));
+
+        // Act
+        var diagnostic = Assert.Single(s.DeclarationDiagnosticsFor<MessageChannelConflictRule>());
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("shared", diagnostic.Target);
+        Assert.Contains("conflicting channels", diagnostic.Message);
+    }
+
+    [Fact]
+    public void Validate_WithDistinctMessageNames_ShouldReportNothing()
+    {
+        // Arrange: different names may live on different channels freely
+        var s = SystemBuilder.Create("test-system").WithValidComponent();
+
+        // Act & Assert
+        Assert.Empty(s.DeclarationDiagnosticsFor<MessageChannelConflictRule>());
+    }
+}
+
+public class MessageContractConflictRuleTests
+{
+    [Fact]
+    public void Validate_WithSameMessageUnderTwoContracts_ShouldReportError()
+    {
+        // Arrange: one message identity declared with two contract types
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("first")
+            .Publishes(MessageRef<RawEvent>.Define("shared", "test-pubsub"));
+        s.AddLoader("second")
+            .Subscribes(MessageRef<EnrichedEvent>.Define("shared", "test-pubsub"));
+
+        // Act
+        var diagnostic = Assert.Single(s.DeclarationDiagnosticsFor<MessageContractConflictRule>());
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("shared", diagnostic.Target);
         Assert.Contains(typeof(RawEvent).FullName!, diagnostic.Message);
         Assert.Contains(typeof(EnrichedEvent).FullName!, diagnostic.Message);
     }
@@ -240,7 +310,7 @@ public class PubSubPortNameCollisionRuleTests
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor")
             .From(PortRef.Define("shared"))
-            .Publishes(TopicRef<RawEvent>.Define("shared", "some-topic"));
+            .Publishes(MessageRef<RawEvent>.Define("some-topic", "shared", "some-topic"));
 
         // Act
         var diagnostic = Assert.Single(s.DiagnosticsFor<PubSubPortNameCollisionRule>());

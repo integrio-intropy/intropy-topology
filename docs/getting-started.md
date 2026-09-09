@@ -13,18 +13,18 @@ This guide walks you through declaring the order-flow topology — an extractor 
 dotnet add package Intropy.Topology
 ```
 
-## Declare your topics
+## Declare your messages
 
-Topics are declared as static fields — in a `Topics.cs` for system-internal topics, or in a shared contracts package for cross-system topics. `TopicRef<T>` carries the event contract type carried on the topic:
+Messages are declared as static fields — in a `Messages.cs` for system-internal messages, or in a shared contracts package for cross-system messages. A `MessageRef<T>` names the message's logical identity, its channel (pubsub + topic — the topic name defaults to the message name), and the event contract type `T` carried on it:
 
 ```csharp
-public static class Topics
+public static class Messages
 {
-    public static readonly TopicRef<Order> Orders = TopicRef<Order>.Define("pubsub", "orders");
+    public static readonly MessageRef<Order> Orders = MessageRef<Order>.Define("orders", "pubsub");
 }
 ```
 
-There is no `AddTopic` on the builder — publishing to or subscribing to a topic is what brings it (and its pubsub) into the model.
+There is no `AddTopic` on the builder — publishing or subscribing to a message is what brings its channel (topic and pubsub) into the model.
 
 ## Declare your ports
 
@@ -57,11 +57,11 @@ public sealed class OrderFlowSystem : ISystemDefinition
         // Extractor: edge block, pulls data out through a port and publishes it.
         builder.AddExtractor("order-extractor")
             .From(Ports.OrderExtractorSource)
-            .Publishes(Topics.Orders);
+            .Publishes(Messages.Orders);
 
-        // Loader: edge block, subscribes to exactly one topic and writes through a port.
+        // Loader: edge block, subscribes to exactly one message and writes through a port.
         builder.AddLoader("order-loader")
-            .Subscribes(Topics.Orders)
+            .Subscribes(Messages.Orders)
             .To(Ports.OrderLoaderDestination);
     }
 }
@@ -112,6 +112,6 @@ dotnet run -- generate ./out     # write Dapr YAML + per-component config
 ## Next steps
 
 - [Components](concepts/components.md) — the component kinds and their block builders
-- [Topics](concepts/topics.md) — the asynchronous edge between components
+- [Messages](concepts/messages.md) — the asynchronous edge between components
 - [Ports](concepts/ports.md) — port-named bindings and environment-owned deployment
 - [Validation](concepts/validation.md) — the validation rules

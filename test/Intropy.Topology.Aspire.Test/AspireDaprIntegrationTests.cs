@@ -29,7 +29,7 @@ public sealed class AspireDaprIntegrationTests : IAsyncDisposable
 {
     private sealed record RawOrder(string OrderNumber);
 
-    private static readonly TopicRef<RawOrder> s_raw = TopicRef<RawOrder>.Define("pubsub-a", "order-raw");
+    private static readonly MessageRef<RawOrder> s_raw = MessageRef<RawOrder>.Define("order-raw", "pubsub-a");
     private static readonly ServiceRef s_idempotency = ServiceRef.Define("idempotency-service");
     private readonly string _workspace = Directory.CreateTempSubdirectory("intropy-aspire-dapr-").FullName;
 

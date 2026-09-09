@@ -47,23 +47,24 @@ public sealed class OrderFlowSystem : ISystemDefinition
     {
         builder.AddExtractor("order-extractor")
             .From(Ports.OrderExtractorSource)
-            .Publishes(Topics.Orders);
+            .Publishes(Messages.Orders);
 
         builder.AddLoader("order-loader")
-            .Subscribes(Topics.Orders)
+            .Subscribes(Messages.Orders)
             .To(Ports.OrderLoaderDestination);
     }
 }
 ```
 
-Topics and ports are declared as static fields; the backing resources materialize from usage
-(there is no `AddTopic`). The Dapr binding component takes the port's name unchanged
-(`order-extractor-source`), never declared separately:
+Messages and ports are declared as static fields; the backing resources materialize from usage
+(there is no `AddTopic`). A message names its logical identity, its channel (pubsub + topic —
+the topic defaults to the message name), and its contract type. The Dapr binding component
+takes the port's name unchanged (`order-extractor-source`), never declared separately:
 
 ```csharp
-public static class Topics
+public static class Messages
 {
-    public static readonly TopicRef<Order> Orders = TopicRef<Order>.Define("pubsub", "orders");
+    public static readonly MessageRef<Order> Orders = MessageRef<Order>.Define("orders", "pubsub");
 }
 
 public static class Ports
@@ -124,10 +125,10 @@ builder.AddLoader("l").Subscribes(t).Publishes(t);   // loaders publish nothing
 builder.AddExtractor("e").Subscribes(t);             // extractors read ports, not topics
 ```
 
-Per block: extractors read a port (`From`) and publish one topic; loaders subscribe to one
-topic and may write through a port (a private local destination needs no declared edge);
-transactional integrations read/write ports. Every topic must have both sides: `Build()`
-rejects a published topic nobody subscribes to and a subscription nothing publishes.
+Per block: extractors read a port (`From`) and publish messages; loaders subscribe to one
+message and may write through a port (a private local destination needs no declared edge);
+transactional integrations read/write ports. Every message must have both sides: `Build()`
+rejects a published message nobody subscribes to and a subscription nothing publishes.
 
 ## Requirements
 
@@ -140,7 +141,7 @@ Full documentation lives in [`docs/`](docs/index.md):
 
 - [Getting Started](docs/getting-started.md) — declare a complete order-flow topology
 - [Components](docs/concepts/components.md) — component kinds and block builders
-- [Topics](docs/concepts/topics.md) and [Ports](docs/concepts/ports.md) — refs, materialize-from-usage
+- [Messages](docs/concepts/messages.md) and [Ports](docs/concepts/ports.md) — refs, materialize-from-usage
 - [Validation](docs/concepts/validation.md) — the validation rules and Build/TryBuild/Validate
 - [Materialization](docs/concepts/materialization.md) — the immutable, deterministic output model
 

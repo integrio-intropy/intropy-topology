@@ -4,50 +4,70 @@ using Intropy.Topology.Validation;
 namespace Intropy.Topology;
 
 /// <summary>
-/// Identifies a pub/sub topic by its Dapr component and topic names. The backing
-/// resource materializes only when a component uses the reference.
+/// Identifies a message by its logical name and the transport channel it moves over
+/// (the Dapr pubsub component and topic names). A single message identity implies all
+/// three: the name, the channel, and the payload contract type — the topic is a
+/// derivation of the message, never an independent declaration. The channel and
+/// contract materialize only when a component uses the reference.
 /// </summary>
-public abstract record TopicRef
+public abstract record MessageRef
 {
-    /// <summary>The Dapr pubsub component name (DNS-1123 subdomain).</summary>
+    /// <summary>The message's logical name (DNS-1123 subdomain).</summary>
+    public string Name { get; }
+
+    /// <summary>The Dapr pubsub component name carrying the message (DNS-1123 subdomain).</summary>
     public string PubSubName { get; }
 
-    /// <summary>The topic name within the pubsub (DNS-1123 subdomain).</summary>
+    /// <summary>The topic name the message flows over within the pubsub (DNS-1123 subdomain).</summary>
     public string TopicName { get; }
 
-    /// <summary>The event contract type carried on the topic.</summary>
+    /// <summary>The payload contract type transported by the message.</summary>
     public abstract Type ContractType { get; }
 
-    private protected TopicRef(string pubSubName, string topicName)
+    private protected MessageRef(string name, string pubSubName, string topicName)
     {
+        Name = NameRules.RequireSubdomain(name, nameof(name));
         PubSubName = NameRules.RequireSubdomain(pubSubName, nameof(pubSubName));
         TopicName = NameRules.RequireSubdomain(topicName, nameof(topicName));
     }
 }
 
 /// <summary>
-/// A <see cref="TopicRef"/> whose generic argument identifies the event contract. Topology
-/// wiring uses the topic names, while <see cref="TopicRef.ContractType"/> exposes the type.
+/// A <see cref="MessageRef"/> whose generic argument identifies the payload contract.
+/// Component wiring uses the message name and channel, while
+/// <see cref="MessageRef.ContractType"/> exposes the contract type.
 /// </summary>
-/// <typeparam name="T">The event contract type published on the topic.</typeparam>
-public sealed record TopicRef<T> : TopicRef
+/// <typeparam name="T">The payload contract type transported by the message.</typeparam>
+public sealed record MessageRef<T> : MessageRef
 {
     /// <inheritdoc />
     public override Type ContractType => typeof(T);
 
-    private TopicRef(string pubSubName, string topicName)
-        : base(pubSubName, topicName)
+    private MessageRef(string name, string pubSubName, string topicName)
+        : base(name, pubSubName, topicName)
     {
     }
 
-    /// <summary>Declares a topic on a pubsub component.</summary>
+    /// <summary>Declares a message on a pubsub component; the topic name defaults to the
+    /// message name — the common case declares one name.</summary>
+    /// <param name="name">The message's logical name (DNS-1123 subdomain).</param>
     /// <param name="pubSubName">The Dapr pubsub component name (DNS-1123 subdomain).</param>
-    /// <param name="topicName">The topic name (DNS-1123 subdomain).</param>
     /// <exception cref="ArgumentException">A name is not a valid DNS-1123 subdomain.</exception>
-    public static TopicRef<T> Define(
+    public static MessageRef<T> Define(
+        [ConstantExpected] string name,
+        [ConstantExpected] string pubSubName) =>
+        new(name, pubSubName, name);
+
+    /// <summary>Declares a message whose transport topic differs from its logical name.</summary>
+    /// <param name="name">The message's logical name (DNS-1123 subdomain).</param>
+    /// <param name="pubSubName">The Dapr pubsub component name (DNS-1123 subdomain).</param>
+    /// <param name="topicName">The topic name within the pubsub (DNS-1123 subdomain).</param>
+    /// <exception cref="ArgumentException">A name is not a valid DNS-1123 subdomain.</exception>
+    public static MessageRef<T> Define(
+        [ConstantExpected] string name,
         [ConstantExpected] string pubSubName,
         [ConstantExpected] string topicName) =>
-        new(pubSubName, topicName);
+        new(name, pubSubName, topicName);
 }
 
 /// <summary>

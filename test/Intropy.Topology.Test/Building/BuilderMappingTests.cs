@@ -10,8 +10,8 @@ public class BuilderMappingTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("a").Publishes(TestTopics.Raw);
-        s.AddLoader("d").Subscribes(TestTopics.Raw).To(TestPorts.Erp);
+        s.AddExtractor("a").Publishes(TestMessages.Raw);
+        s.AddLoader("d").Subscribes(TestMessages.Raw).To(TestPorts.Erp);
         s.AddTransactionalIntegration("e").From(TestPorts.Pim).To(TestPorts.Erp);
 
         // Act
@@ -33,8 +33,8 @@ public class BuilderMappingTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        s.AddLoader("loader").Subscribes(TestTopics.Raw).To(TestPorts.Erp);
-        s.AddExtractor("source").Publishes(TestTopics.Raw);
+        s.AddLoader("loader").Subscribes(TestMessages.Raw).To(TestPorts.Erp);
+        s.AddExtractor("source").Publishes(TestMessages.Raw);
 
         // Act
         var component = s.Build().Components[0];
@@ -50,8 +50,8 @@ public class BuilderMappingTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("extractor").From(TestPorts.Pim).Publishes(TestTopics.Raw);
-        s.AddLoader("sink").Subscribes(TestTopics.Raw);
+        s.AddExtractor("extractor").From(TestPorts.Pim).Publishes(TestMessages.Raw);
+        s.AddLoader("sink").Subscribes(TestMessages.Raw);
 
         // Act
         var component = s.Build().Components[0];
@@ -67,8 +67,8 @@ public class BuilderMappingTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("extractor").Publishes(TestTopics.Raw);
-        s.AddLoader("sink").Subscribes(TestTopics.Raw);
+        s.AddExtractor("extractor").Publishes(TestMessages.Raw);
+        s.AddLoader("sink").Subscribes(TestMessages.Raw);
 
         // Act
         var edge = s.Build().Components[0].Publishes.Single();
@@ -104,7 +104,7 @@ public class BuilderMappingTests
         var builder = s.AddExtractor("extractor");
 
         // Assert
-        Assert.Same(builder, builder.Publishes(TestTopics.Raw));
+        Assert.Same(builder, builder.Publishes(TestMessages.Raw));
         Assert.Same(builder, builder.From(TestPorts.Pim));
     }
 
@@ -116,8 +116,8 @@ public class BuilderMappingTests
         var s = SystemBuilder.Create("test-system");
 
         // Act
-        var extractor = s.AddExtractor("extractor").Uses(service).Publishes(TestTopics.Raw);
-        var loader = s.AddLoader("loader").Subscribes(TestTopics.Raw).Uses(service).To(TestPorts.Erp);
+        var extractor = s.AddExtractor("extractor").Uses(service).Publishes(TestMessages.Raw);
+        var loader = s.AddLoader("loader").Subscribes(TestMessages.Raw).Uses(service).To(TestPorts.Erp);
         var integration = s.AddTransactionalIntegration("ti").From(TestPorts.Pim).Uses(service).To(TestPorts.Erp);
         var topology = s.Build();
 
@@ -133,12 +133,12 @@ public class BuilderMappingTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("extractor").Publishes(TestTopics.Raw);
-        s.AddLoader("loader").Subscribes(TestTopics.Raw).To(TestPorts.Erp);
+        s.AddExtractor("extractor").Publishes(TestMessages.Raw);
+        s.AddLoader("loader").Subscribes(TestMessages.Raw).To(TestPorts.Erp);
         var first = s.Build();
 
         // Act
-        s.AddLoader("audit").Subscribes(TestTopics.Raw);
+        s.AddLoader("audit").Subscribes(TestMessages.Raw);
         var second = s.Build();
 
         // Assert

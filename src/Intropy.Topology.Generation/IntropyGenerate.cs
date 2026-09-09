@@ -87,6 +87,7 @@ public static class IntropyGenerate
         string System,
         IReadOnlyList<GraphComponent>? Components,
         IReadOnlyList<GraphTopic>? Topics,
+        [property: JsonPropertyName("messagegroups")] IReadOnlyList<GraphMessageGroup> MessageGroups,
         IReadOnlyList<GraphPort>? Ports,
         IReadOnlyList<GraphService>? Services,
         GraphDevelopment? Development)
@@ -97,6 +98,9 @@ public static class IntropyGenerate
             topology.SystemName,
             Optional(topology.Components.Select(GraphComponent.From)),
             Optional(topology.Topics.Select(GraphTopic.From)),
+            // Message groups are the message-level view of the same edges the topics carry,
+            // not an optional section: an empty topology still declares messagegroups: [].
+            [.. topology.MessageGroups.Select(GraphMessageGroup.From)],
             Optional(topology.Ports.Select(GraphPort.From)),
             Optional(topology.Services.Select(GraphService.From)),
             development is null ? null : GraphDevelopment.From(development));
@@ -183,6 +187,39 @@ public static class IntropyGenerate
             port.Name,
             Optional(port.Directions.Select(Direction)),
             Optional(port.UsedBy));
+    }
+
+    private sealed record GraphMessageGroup(
+        string Name,
+        IReadOnlyList<GraphMessage> Messages)
+    {
+        public static GraphMessageGroup From(MessageGroupResource group) => new(
+            group.Name,
+            [.. group.Messages.Select(GraphMessage.From)]);
+    }
+
+    private sealed record GraphMessage(
+        string Name,
+        string Contract,
+        GraphMessageChannel Channel,
+        IReadOnlyList<string>? Publishers,
+        IReadOnlyList<string>? Subscribers)
+    {
+        public static GraphMessage From(MessageResource message) => new(
+            message.Name,
+            message.ContractTypeName,
+            GraphMessageChannel.From(message.Channel),
+            Optional(message.Publishers),
+            Optional(message.Subscribers));
+    }
+
+    private sealed record GraphMessageChannel(
+        [property: JsonPropertyName("pubsub")] string PubSub,
+        string Topic)
+    {
+        public static GraphMessageChannel From(MessageChannel channel) => new(
+            channel.PubSubName,
+            channel.TopicName);
     }
 
     private sealed record GraphService(string AppId, IReadOnlyList<string>? Consumers)

@@ -2,7 +2,7 @@ namespace Intropy.Topology.Test;
 
 public sealed class ServiceTests
 {
-    private static readonly TopicRef<string> s_topic = TopicRef<string>.Define("orders", "created");
+    private static readonly MessageRef<string> s_message = MessageRef<string>.Define("created", "orders");
     private static readonly ServiceRef s_idempotency = ServiceRef.Define("idempotency-service");
 
     [Fact]
@@ -10,8 +10,8 @@ public sealed class ServiceTests
     {
         // Arrange
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").Publishes(s_topic).Uses(s_idempotency);
-        builder.AddLoader("loader").Subscribes(s_topic).Uses(s_idempotency);
+        builder.AddExtractor("extractor").Publishes(s_message).Uses(s_idempotency);
+        builder.AddLoader("loader").Subscribes(s_message).Uses(s_idempotency);
 
         // Act
         var topology = builder.Build();
@@ -28,8 +28,8 @@ public sealed class ServiceTests
     {
         // Arrange
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").Publishes(s_topic).Uses(s_idempotency).Uses(s_idempotency);
-        builder.AddLoader("loader").Subscribes(s_topic);
+        builder.AddExtractor("extractor").Publishes(s_message).Uses(s_idempotency).Uses(s_idempotency);
+        builder.AddLoader("loader").Subscribes(s_message);
 
         // Act
         var diagnostics = builder.Validate();
@@ -43,8 +43,8 @@ public sealed class ServiceTests
     {
         // Arrange: the duplicate-usage and collision halves are separate rules that must compose
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("idempotency-service").Publishes(s_topic).Uses(s_idempotency).Uses(s_idempotency);
-        builder.AddLoader("loader").Subscribes(s_topic);
+        builder.AddExtractor("idempotency-service").Publishes(s_message).Uses(s_idempotency).Uses(s_idempotency);
+        builder.AddLoader("loader").Subscribes(s_message);
 
         // Act
         var diagnostics = builder.Validate();
@@ -59,8 +59,8 @@ public sealed class ServiceTests
     {
         // Arrange
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("idempotency-service").Publishes(s_topic).Uses(s_idempotency);
-        builder.AddLoader("loader").Subscribes(s_topic);
+        builder.AddExtractor("idempotency-service").Publishes(s_message).Uses(s_idempotency);
+        builder.AddLoader("loader").Subscribes(s_message);
 
         // Act
         var diagnostics = builder.Validate();

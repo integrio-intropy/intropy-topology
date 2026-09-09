@@ -17,7 +17,7 @@ Underneath, every declaration is a **`Component`** — the shared substance each
 ```csharp
 ExtractorComponent orders = s.AddExtractor("order-extractor")
     .From(Ports.OrderExtractorSource)
-    .Publishes(Topics.Orders)
+    .Publishes(Messages.Orders)
     .Component;                       // optional typed handle — Name, Kind
 ```
 
@@ -29,11 +29,11 @@ Each kind exposes only its own legal edges:
 
 | Kind | Subscribes | Publishes | Port | Required |
 |------|-----------|-----------|-----------|----------|
-| Extractor | — | one topic | `From(port)` | `Publishes` |
-| Loader | exactly 1 topic | — | `To(port)` | `Subscribes` |
+| Extractor | — | messages | `From(port)` | `Publishes` |
+| Loader | exactly 1 message | — | `To(port)` | `Subscribes` |
 | Transactional integration | — | — | `From` / `To(port)` | `From` and `To` |
 
-`Subscribes`/`Publishes` are the asynchronous (topic) edges; `From`/`To` are the edges out through ports. A component publishes at most one topic — a second `Publishes` call is rejected at `Build()`. See [Topics](topics.md) and [Ports](ports.md).
+`Subscribes`/`Publishes` are the asynchronous (message) edges; `From`/`To` are the edges out through ports. A component may publish several distinct messages — repeating one channel is rejected at `Build()`. See [Messages](messages.md) and [Ports](ports.md).
 
 ## Declaring components
 
@@ -42,7 +42,7 @@ var s = SystemBuilder.Create("order-flow");
 
 s.AddExtractor("order-extractor")
     .From(Ports.OrderExtractorSource)
-    .Publishes(Topics.Orders);
+    .Publishes(Messages.Orders);
 ```
 
 Component names are DNS-1123 labels, validated at the call site with an `ArgumentException` — they become Kubernetes resource names and Dapr app-ids.
@@ -66,6 +66,6 @@ Only what types cannot check is validated at `Build()`: completeness (a required
 
 ## Related
 
-- [Topics](topics.md) — the asynchronous `Subscribes` / `Publishes` edges
+- [Messages](messages.md) — the asynchronous `Subscribes` / `Publishes` edges
 - [Ports](ports.md) — the `From` / `To` edges out of the system
 - [Validation](validation.md) — what remains for Build-time rules

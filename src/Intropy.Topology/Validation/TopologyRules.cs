@@ -23,6 +23,8 @@ internal static class TopologyRules
 
     private static readonly IDeclarationRule[] DeclarationRules =
     [
+        new Rules.MessageChannelConflictRule(),
+        new Rules.MessageContractConflictRule(),
         new Rules.TopicContractConflictRule(),
         new Rules.DuplicateServiceUsageRule(),
     ];

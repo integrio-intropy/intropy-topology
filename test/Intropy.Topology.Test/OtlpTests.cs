@@ -22,8 +22,8 @@ public class OtlpTests
     {
         public sealed record Payload(string Id);
 
-        public static readonly TopicRef<Payload> Events =
-            TopicRef<Payload>.Define("telemetry-pubsub", "telemetry-events");
+        public static readonly MessageRef<Payload> Events =
+            MessageRef<Payload>.Define("telemetry-events", "telemetry-pubsub");
     }
 
     [Fact]

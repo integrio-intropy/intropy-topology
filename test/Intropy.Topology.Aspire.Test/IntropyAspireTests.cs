@@ -15,7 +15,7 @@ public sealed class IntropyAspireTests : IDisposable
 {
     private sealed record RawOrder(string OrderNumber);
 
-    private static readonly TopicRef<RawOrder> s_raw = TopicRef<RawOrder>.Define("pubsub-a", "order-raw");
+    private static readonly MessageRef<RawOrder> s_raw = MessageRef<RawOrder>.Define("order-raw", "pubsub-a");
     private static readonly PortRef s_webshop = PortRef.Define("webshop");
     private static readonly PortRef s_erp = PortRef.Define("erp");
 

@@ -14,12 +14,13 @@ internal static class TopologyMaterializer
     {
         var components = new List<ComponentModel>();
         var topics = new Dictionary<(string PubSub, string Topic), TopicAccumulator>();
+        var messages = new Dictionary<string, MessageAccumulator>(StringComparer.Ordinal);
         var ports = new Dictionary<string, PortAccumulator>();
         var services = new Dictionary<string, ServiceAccumulator>(StringComparer.Ordinal);
 
         foreach (var component in builder.Components)
         {
-            components.Add(MaterializeComponent(component, topics, ports, services));
+            components.Add(MaterializeComponent(component, topics, messages, ports, services));
         }
 
         return new SystemTopology
@@ -38,6 +39,28 @@ internal static class TopologyMaterializer
                     Subscribers = [.. t.Value.Subscribers],
                 })
                 .ToArray(),
+            MessageGroups =
+            [
+                new MessageGroupResource
+                {
+                    Name = builder.SystemName,
+                    Messages = messages
+                        .OrderBy(m => m.Key, StringComparer.Ordinal)
+                        .Select(m => new MessageResource
+                        {
+                            Name = m.Key,
+                            ContractTypeName = m.Value.ContractTypeName,
+                            Channel = new MessageChannel
+                            {
+                                PubSubName = m.Value.PubSubName,
+                                TopicName = m.Value.TopicName,
+                            },
+                            Publishers = [.. m.Value.Publishers],
+                            Subscribers = [.. m.Value.Subscribers],
+                        })
+                        .ToArray(),
+                },
+            ],
             Ports = ports
                 .OrderBy(c => c.Key, StringComparer.Ordinal)
                 .Select(c => new PortResource
@@ -58,29 +81,32 @@ internal static class TopologyMaterializer
     private static ComponentModel MaterializeComponent(
         Component component,
         Dictionary<(string PubSub, string Topic), TopicAccumulator> topics,
+        Dictionary<string, MessageAccumulator> messages,
         Dictionary<string, PortAccumulator> ports,
         Dictionary<string, ServiceAccumulator> services)
     {
         var subscribes = new List<TopicSubscription>();
-        foreach (var topic in component.SubscribeCalls)
+        foreach (var message in component.SubscribeCalls)
         {
             subscribes.Add(new TopicSubscription
             {
-                PubSubName = topic.PubSubName,
-                TopicName = topic.TopicName,
+                PubSubName = message.PubSubName,
+                TopicName = message.TopicName,
             });
-            AccumulateTopic(topics, topic).Subscribers.Add(component.Name);
+            AccumulateTopic(topics, message).Subscribers.Add(component.Name);
+            AccumulateMessage(messages, message).Subscribers.Add(component.Name);
         }
 
         var publishes = new List<PublishEdge>();
-        foreach (var topic in component.PublishCalls)
+        foreach (var message in component.PublishCalls)
         {
             publishes.Add(new PublishEdge
             {
-                PubSubName = topic.PubSubName,
-                TopicName = topic.TopicName,
+                PubSubName = message.PubSubName,
+                TopicName = message.TopicName,
             });
-            AccumulateTopic(topics, topic).Publishers.Add(component.Name);
+            AccumulateTopic(topics, message).Publishers.Add(component.Name);
+            AccumulateMessage(messages, message).Publishers.Add(component.Name);
         }
 
         var portEdges = new List<PortEdge>();
@@ -130,13 +156,31 @@ internal static class TopologyMaterializer
 
     private static TopicAccumulator AccumulateTopic(
         Dictionary<(string PubSub, string Topic), TopicAccumulator> topics,
-        TopicRef topic)
+        MessageRef message)
     {
-        var key = (topic.PubSubName, topic.TopicName);
+        var key = (message.PubSubName, message.TopicName);
         if (!topics.TryGetValue(key, out var accumulator))
         {
-            accumulator = new TopicAccumulator(topic.ContractType.FullName ?? topic.ContractType.Name);
+            accumulator = new TopicAccumulator(message.ContractType.FullName ?? message.ContractType.Name);
             topics[key] = accumulator;
+        }
+
+        return accumulator;
+    }
+
+    // First-seen-wins on channel/contract conflicts: materialization never fails, and
+    // the declaration rules report the conflicts against the raw MessageRef usages.
+    private static MessageAccumulator AccumulateMessage(
+        Dictionary<string, MessageAccumulator> messages,
+        MessageRef message)
+    {
+        if (!messages.TryGetValue(message.Name, out var accumulator))
+        {
+            accumulator = new MessageAccumulator(
+                message.ContractType.FullName ?? message.ContractType.Name,
+                message.PubSubName,
+                message.TopicName);
+            messages[message.Name] = accumulator;
         }
 
         return accumulator;
@@ -160,6 +204,15 @@ internal static class TopologyMaterializer
     private sealed class TopicAccumulator(string contractTypeName)
     {
         public string ContractTypeName { get; } = contractTypeName;
+        public SortedSet<string> Publishers { get; } = new(StringComparer.Ordinal);
+        public SortedSet<string> Subscribers { get; } = new(StringComparer.Ordinal);
+    }
+
+    private sealed class MessageAccumulator(string contractTypeName, string pubSubName, string topicName)
+    {
+        public string ContractTypeName { get; } = contractTypeName;
+        public string PubSubName { get; } = pubSubName;
+        public string TopicName { get; } = topicName;
         public SortedSet<string> Publishers { get; } = new(StringComparer.Ordinal);
         public SortedSet<string> Subscribers { get; } = new(StringComparer.Ordinal);
     }

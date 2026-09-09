@@ -18,6 +18,14 @@ public sealed record SystemTopology
     /// <summary>Topics materialized from publish and subscribe edges.</summary>
     public required IReadOnlyList<TopicResource> Topics { get; init; }
 
+    /// <summary>
+    /// The message identities materialized from message declarations — one group named
+    /// after the system, always present (even empty). Topics materialize exclusively from
+    /// messages, so this is the derived-from view of the same edges; a topology property
+    /// that always appears is kept unconditionally, unlike the optional <see cref="Otlp"/>.
+    /// </summary>
+    public required IReadOnlyList<MessageGroupResource> MessageGroups { get; init; }
+
     /// <summary>Ports materialized from port usage.</summary>
     public required IReadOnlyList<PortResource> Ports { get; init; }
 

@@ -91,6 +91,7 @@ public class StartupOrderingTests
                     Subscribers = t.Subscribers,
                 }),
             ],
+            MessageGroups = [],
             Ports = [],
             Services = [],
         };

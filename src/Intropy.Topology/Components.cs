@@ -9,8 +9,8 @@ namespace Intropy.Topology;
 /// </summary>
 public abstract class Component
 {
-    private readonly List<TopicRef> _subscribes = [];
-    private readonly List<TopicRef> _publishes = [];
+    private readonly List<MessageRef> _subscribes = [];
+    private readonly List<MessageRef> _publishes = [];
     private readonly List<(PortRef Port, PortDirection Direction)> _ports = [];
     private readonly List<ServiceRef> _services = [];
 
@@ -26,24 +26,24 @@ public abstract class Component
     /// <summary>The component's block kind.</summary>
     public ComponentKind Kind { get; }
 
-    internal IReadOnlyList<TopicRef> SubscribeCalls => _subscribes;
+    internal IReadOnlyList<MessageRef> SubscribeCalls => _subscribes;
 
-    internal IReadOnlyList<TopicRef> PublishCalls => _publishes;
+    internal IReadOnlyList<MessageRef> PublishCalls => _publishes;
 
     internal IReadOnlyList<(PortRef Port, PortDirection Direction)> PortCalls => _ports;
 
     internal IReadOnlyList<ServiceRef> ServiceCalls => _services;
 
-    internal void AddSubscribe(TopicRef topic)
+    internal void AddSubscribe(MessageRef message)
     {
-        ArgumentNullException.ThrowIfNull(topic);
-        _subscribes.Add(topic);
+        ArgumentNullException.ThrowIfNull(message);
+        _subscribes.Add(message);
     }
 
-    internal void AddPublish(TopicRef topic)
+    internal void AddPublish(MessageRef message)
     {
-        ArgumentNullException.ThrowIfNull(topic);
-        _publishes.Add(topic);
+        ArgumentNullException.ThrowIfNull(message);
+        _publishes.Add(message);
     }
 
     internal void AddPort(PortRef port, PortDirection direction)
@@ -67,7 +67,7 @@ public sealed class ExtractorComponent : Component
     internal ExtractorComponent(string name) : base(name, ComponentKind.Extractor) { }
 }
 
-/// <summary>The declared loader: an edge block that consumes exactly one topic and writes
+/// <summary>The declared loader: an edge block that subscribes to events and writes
 /// to an external system. Obtained from the loader builder's <c>Component</c> property.</summary>
 public sealed class LoaderComponent : Component
 {
