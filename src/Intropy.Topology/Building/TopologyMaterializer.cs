@@ -51,6 +51,7 @@ internal static class TopologyMaterializer
                 .OrderBy(s => s.Key, StringComparer.Ordinal)
                 .Select(s => new ServiceResource { AppId = s.Key, Consumers = [.. s.Value.Consumers] })
                 .ToArray(),
+            Otlp = builder.OtlpDeclaration,
         };
     }
 
