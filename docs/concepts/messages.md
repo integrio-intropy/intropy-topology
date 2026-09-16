@@ -18,7 +18,7 @@ A `MessageRef<T>` is the asynchronous interface between components. One declarat
 
 Publishing (`Publishes`) or subscribing (`Subscribes`) to a message is what brings its channel — the topic and its pubsub — into the model.
 
-A component may publish several distinct messages. Repeating one channel — a second `Publishes` resolving to the same pubsub and topic — is rejected at `Build()` as a redundant edge. Every message needs both sides: a published message nobody subscribes to is an error, and so is a subscription nothing publishes.
+A component may publish several distinct messages. Repeating one channel — a second `Publishes` resolving to the same pubsub and topic — is rejected at `Build()` as a redundant edge. The core model warns when a message has only one side — published with no subscriber, or subscribed with no publisher — so partial systems can still run locally; deployment validation can treat those warnings as errors.
 
 ## Declaring messages
 
@@ -74,4 +74,4 @@ public sealed record TopicResource
 
 - [Components](components.md) — `Publishes` and `Subscribes` per block kind
 - [Materialization](materialization.md) — how usage folds into resources
-- [Validation](validation.md) — message completeness, channel and contract conflicts, and name collisions
+- [Validation](validation.md) — message completeness warnings, channel and contract conflicts, and name collisions

@@ -43,6 +43,17 @@ public static class Ports
 
 The name is the port's whole identity; the deployed binding's type and credentials are environment-owned deployment configuration. Locally, the development definition resolves every port to a folder on the host, so the system runs with zero external configuration. Ports are system-owned and never shared across systems. Direction is not part of the identity — it follows from usage (`From` reads, `To` writes).
 
+## Declare platform services
+
+A service is a Dapr app ID that components invoke. The topology records the dependency and its consumers; the service implementation is supplied by the platform or a local development substitute:
+
+```csharp
+public static class Services
+{
+    public static readonly ServiceRef Idempotency = ServiceRef.Define("idempotency-service");
+}
+```
+
 ## Declare the system
 
 A system is a class implementing `ISystemDefinition`. Each `Add*` call returns the block's builder directly, exposing only the edges legal for that block:
@@ -57,12 +68,14 @@ public sealed class OrderFlowSystem : ISystemDefinition
         // Extractor: edge block, pulls data out through a port and publishes it.
         builder.AddExtractor("order-extractor")
             .From(Ports.OrderExtractorSource)
-            .Publishes(Messages.Orders);
+            .Publishes(Messages.Orders)
+            .Uses(Services.Idempotency);
 
         // Loader: edge block, subscribes to exactly one message and writes through a port.
         builder.AddLoader("order-loader")
             .Subscribes(Messages.Orders)
-            .To(Ports.OrderLoaderDestination);
+            .To(Ports.OrderLoaderDestination)
+            .Uses(Services.Idempotency);
     }
 }
 ```
@@ -88,6 +101,27 @@ catch (TopologyValidationException ex)
 
 Use `TryBuild(out var topology, out var diagnostics)` to inspect diagnostics (including warnings) without throwing, or `Validate()` to run the rules without building.
 
+## Declare local development substitutions
+
+When the SystemHost uses `Intropy.Topology.Generation`, an optional `IDevelopmentDefinition` resolves topology facts for local runs and generation. It cannot introduce new ports or services; every reference must already be used by the topology:
+
+```csharp
+public sealed class OrderFlowDevelopment : IDevelopmentDefinition
+{
+    public void Define(DevelopmentBuilder development)
+    {
+        development.Mock(Services.Idempotency)
+            .FromOpenApi("mocks/idempotency-service.openapi.yaml");
+
+        development.Files(Ports.OrderExtractorSource)
+            .RootPath("./test/order-extractor-source");
+
+        development.Files(Ports.OrderLoaderDestination)
+            .RootPath("./test/order-loader-destination");
+    }
+}
+```
+
 ## Wire up the entry point
 
 The SystemHost's `Program.cs` routes one entry point to two backends of the same discovered topology:
@@ -111,6 +145,7 @@ dotnet run -- generate ./out     # write Dapr YAML + per-component config
 
 ## Next steps
 
+- [Model and DSL Reference](concepts/model.md) — the full declaration grammar and `SystemTopology` shape
 - [Components](concepts/components.md) — the component kinds and their block builders
 - [Messages](concepts/messages.md) — the asynchronous edge between components
 - [Ports](concepts/ports.md) — port-named bindings and environment-owned deployment

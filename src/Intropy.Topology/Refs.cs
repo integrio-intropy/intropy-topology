@@ -48,8 +48,14 @@ public sealed record MessageRef<T> : MessageRef
     {
     }
 
+    /// <summary>Declares a message; the channel defaults to pubsub/topic <c>pubsub/{name}</c>.</summary>
+    /// <param name="name">The message's logical name (DNS-1123 subdomain).</param>
+    /// <exception cref="ArgumentException">The name is not a valid DNS-1123 subdomain.</exception>
+    public static MessageRef<T> Define([ConstantExpected] string name) =>
+        new(name, "pubsub", name);
+
     /// <summary>Declares a message on a pubsub component; the topic name defaults to the
-    /// message name — the common case declares one name.</summary>
+    /// message name.</summary>
     /// <param name="name">The message's logical name (DNS-1123 subdomain).</param>
     /// <param name="pubSubName">The Dapr pubsub component name (DNS-1123 subdomain).</param>
     /// <exception cref="ArgumentException">A name is not a valid DNS-1123 subdomain.</exception>

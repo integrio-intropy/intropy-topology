@@ -29,7 +29,7 @@ Most illegality never reaches validation: the block builders make it uncompilabl
 ```text
 The system topology is invalid (2 error(s)):
   [Error] order-extractor: Extractor components must publish to at least one topic; add a Publishes call.
-  [Error] orders: The topic 'orders' on pubsub 'pubsub' is subscribed to but no component publishes it.
+  [Error] order-loader: Loader components must subscribe to exactly one topic.
 ```
 
 ## Rules
@@ -46,16 +46,21 @@ The system topology is invalid (2 error(s)):
 | Error | Extractors must publish (a loader's destination may stay a private local component) |
 | Error | Loaders subscribe to exactly one message |
 | Error | Transactional integrations must declare at least one `From` and one `To` port |
-| Error | A published topic must have a subscriber |
-| Error | A subscribed topic must have a publisher |
+| Warning | A published topic has no subscriber |
+| Warning | A subscribed topic has no publisher |
 | Warning | A component with no edges (no subscriptions, publishes, or ports) is likely unfinished |
 | Error | A pubsub name must not equal a port's derived Dapr component name |
+| Error | A component must not use the same service more than once |
+| Error | A service app ID must not collide with a topology component app ID |
 
 ## Argument validation
 
-Name and argument invariants are enforced eagerly at the call site, not collected: component, topic, and port names are DNS-1123 labels/subdomains and throw `ArgumentException` immediately when invalid. Only *semantic* topology validation is deferred to `Build()` so all diagnostics report at once.
+Name and argument invariants are enforced eagerly at the call site, not collected: system, component, port, and service app ID names are DNS-1123 labels; message, pubsub, and topic names are DNS-1123 subdomains; invalid values throw `ArgumentException` immediately. OTLP endpoint and header shape are also validated at the call site. Only *semantic* topology validation is deferred to `Build()` so all diagnostics report at once.
+
+Published topics without subscribers and subscribed topics without publishers are warnings in the core model so partially built systems can still run locally and be inspected. Deployment validation can choose to treat them as errors.
 
 ## Related
 
+- [Model and DSL Reference](model.md) — the full DSL grammar and model shape
 - [Components](components.md) — what the compiler rejects instead
 - [Materialization](materialization.md) — why materialization never fails

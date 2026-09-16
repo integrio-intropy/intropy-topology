@@ -4,8 +4,9 @@ A typed, fluent DSL for declaring integration-system topologies in .NET, and two
 a declaration into something you can run or deploy.
 
 A system is a class implementing `ISystemDefinition`: it declares components (extractors, loaders,
-transactional integrations) and the edges between them (topics, ports). `Build()` validates the
-declaration and produces an immutable, serializable `SystemTopology`. From that one validated model,
+transactional integrations), the edges between them (topics, ports), the platform services they invoke,
+and optional system-wide telemetry export. `Build()` validates the declaration and produces an immutable,
+serializable `SystemTopology`. From that one validated model,
 the backends generate Dapr components / runtime config, or translate it into a live .NET Aspire
 application for local F5.
 
@@ -127,8 +128,9 @@ builder.AddExtractor("e").Subscribes(t);             // extractors read ports, n
 
 Per block: extractors read a port (`From`) and publish messages; loaders subscribe to one
 message and may write through a port (a private local destination needs no declared edge);
-transactional integrations read/write ports. Every message must have both sides: `Build()`
-rejects a published message nobody subscribes to and a subscription nothing publishes.
+transactional integrations read/write ports. Every message should have both sides: `Build()`
+warns when a published message has no subscriber or a subscription has no publisher, while
+deployment validation can treat those incomplete channels as errors.
 
 ## Requirements
 
@@ -140,6 +142,9 @@ rejects a published message nobody subscribes to and a subscription nothing publ
 Full documentation lives in [`docs/`](docs/index.md):
 
 - [Getting Started](docs/getting-started.md) — declare a complete order-flow topology
+- [System Model](docs/concepts/system-model.md) — concepts and relationships, with a diagram
+- [Topology Declaration Language](docs/concepts/declaration-language.md) — allowed statements and rules, independent of implementation
+- [Model and DSL Reference](docs/concepts/model.md) — C# implementation, runtime mappings, and output model
 - [Components](docs/concepts/components.md) — component kinds and block builders
 - [Messages](docs/concepts/messages.md) and [Ports](docs/concepts/ports.md) — refs, materialize-from-usage
 - [Validation](docs/concepts/validation.md) — the validation rules and Build/TryBuild/Validate
