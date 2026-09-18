@@ -422,44 +422,23 @@ public sealed class IntropyAspireTests : IDisposable
     }
 
     [Fact]
-    public async Task Apply_WithOtlpDeclaration_ShouldExportComponentTelemetryToTheDeclaredSink()
+    public async Task Apply_WithOtlpDeclaration_ShouldInjectNoTelemetryVariables()
     {
-        // Arrange
+        // Arrange — even with a declared sink, this host routes no OTEL_EXPORTER_OTLP_* values:
+        // the declaration is materialized by the Kubernetes generation; local telemetry stays on
+        // Aspire's own wiring with sidecar telemetry disabled.
         var builder = CreateBuilder();
         IntropyAspire.Apply(builder, OtlpTopology(), GeneratedRoot);
         var resource = builder.Resources.OfType<IResourceWithEnvironment>().Single(r => r.Name == "order-extractor");
 
-        // Act — publish-mode evaluation: the variables are plain strings (see the runtime config
-        // test above for why run-mode evaluation cannot run outside DCP).
+        // Act
         var env = await resource.GetEnvironmentVariableValuesAsync(DistributedApplicationOperation.Publish);
 
-        // Assert — the declaration wins over Aspire's injected dashboard endpoint.
-        Assert.Equal("http://collector:4317", env["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-        Assert.Equal("http/protobuf", env["OTEL_EXPORTER_OTLP_PROTOCOL"]);
-        Assert.Equal("x-api-key=${OTLP_API_KEY}", env["OTEL_EXPORTER_OTLP_HEADERS"]);
-    }
-
-    [Fact]
-    public async Task Apply_WithOtlpDeclaration_ShouldExportSidecarTelemetryToTheDeclaredSink()
-    {
-        // Arrange — the sidecar resource is not an IResourceWithEnvironment; its environment is
-        // carried by the environment-callback annotation the Dapr toolkit copies onto the
-        // <component>-dapr-cli executable. The declared declaration must attach exactly one.
-        var builder = CreateBuilder();
-        IntropyAspire.Apply(builder, OtlpTopology(), GeneratedRoot);
-
-        // Act
-        var sidecar = SidecarResource(builder, "order-extractor");
-        var callback = Assert.Single(sidecar.Annotations.OfType<EnvironmentCallbackAnnotation>());
-        var variables = new Dictionary<string, object>();
-        await callback.Callback(new EnvironmentCallbackContext(
-            new DistributedApplicationExecutionContext(DistributedApplicationOperation.Publish),
-            variables,
-            CancellationToken.None));
-
         // Assert
-        Assert.Equal("http://collector:4317", variables["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-        Assert.Equal("http/protobuf", variables["OTEL_EXPORTER_OTLP_PROTOCOL"]);
+        Assert.False(env.ContainsKey("OTEL_EXPORTER_OTLP_ENDPOINT"));
+        Assert.False(env.ContainsKey("OTEL_EXPORTER_OTLP_PROTOCOL"));
+        Assert.False(env.ContainsKey("OTEL_EXPORTER_OTLP_HEADERS"));
+        Assert.Empty(SidecarResource(builder, "order-extractor").Annotations.OfType<EnvironmentCallbackAnnotation>());
     }
 
     [Fact]
@@ -488,38 +467,6 @@ public sealed class IntropyAspireTests : IDisposable
         return builder.Build();
     }
 
-    [Fact]
-    public async Task OtlpVariables_ShouldComposeTheDeclaredVariables()
-    {
-        // Arrange
-        var otlp = OtlpTopology().Otlp!;
-
-        // Act — the exact callback Wire attaches to the sidecar, evaluated via the same
-        // annotation type the Dapr toolkit propagates to the sidecar executable.
-        var variables = new Dictionary<string, object>();
-        await IntropyAspire.OtlpVariables(otlp).Callback(new EnvironmentCallbackContext(
-            new DistributedApplicationExecutionContext(DistributedApplicationOperation.Publish),
-            variables,
-            CancellationToken.None));
-
-        // Assert
-        Assert.Equal("http://collector:4317", variables["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-        Assert.Equal("http/protobuf", variables["OTEL_EXPORTER_OTLP_PROTOCOL"]);
-        Assert.Equal("x-api-key=${OTLP_API_KEY}", variables["OTEL_EXPORTER_OTLP_HEADERS"]);
-    }
-
-    [Fact]
-    public void OtlpEnvironment_WithNoHeaders_ShouldEmitNoHeadersVariable()
-    {
-        // Arrange
-        var otlp = OtlpTopology().Otlp! with { Headers = new Dictionary<string, string>() };
-
-        // Act
-        var env = OtlpEnvironment.For(otlp);
-
-        // Assert
-        Assert.False(env.ContainsKey("OTEL_EXPORTER_OTLP_HEADERS"));
-    }
     private static DaprSidecarOptions SidecarOptions(IDistributedApplicationBuilder builder, string componentName)
     {
         var resource = builder.Resources.Single(r => r.Name == componentName);

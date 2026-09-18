@@ -50,6 +50,9 @@ public static class IntropyAspire
         {
             var discovered = SystemDiscovery.Discover(assembly);
             var builder = DistributedApplication.CreateBuilder(args);
+            // The toolkit otherwise injects dashboard OTLP variables onto every <component>-dapr-cli
+            // executable; local test runs do not consume sidecar telemetry, so it stays off.
+            builder.AddDapr(dapr => dapr.EnableTelemetry = false);
             var development = DevelopmentDiscovery.Discover(assembly, discovered.Topology, builder.AppHostDirectory);
 
             var generatedRoot = Path.Combine(
@@ -164,7 +167,7 @@ public static class IntropyAspire
             project = project.WithHttpEndpoint();
 
             Wire(project, component, stagedPath, configDir, redis, microcks,
-                PortRootPaths(builder.AppHostDirectory, component, development), topology.Otlp);
+                PortRootPaths(builder.AppHostDirectory, component, development));
             resources[component.Name] = project;
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
@@ -324,11 +327,9 @@ public static class IntropyAspire
     /// environment as part of that contract — not left to per-AppHost launch profiles. Both
     /// variable names are set: generic-host services read DOTNET_ENVIRONMENT, web projects read
     /// ASPNETCORE_ENVIRONMENT, and the component model does not distinguish them.
-    /// When the topology declares an OTLP sink, the component process and its sidecar both get
-    /// the standard OTEL_EXPORTER_OTLP_* variables — daprd emits its own signals, so routing
-    /// only the component would split the system's telemetry across two sinks. Without the
-    /// declaration nothing is written: Aspire's own dashboard wiring remains the default, and
-    /// these calls are the sole source of OTEL_EXPORTER_OTLP_* values this host injects.
+    /// This host injects no OTEL_EXPORTER_OTLP_* values: the declared sink is materialized by the
+    /// Kubernetes generation, and locally the dashboard wiring is intentionally left as the
+    /// toolkit configures it (sidecar telemetry disabled, see <see cref="RunAsync"/>).
     /// </summary>
     private static void Wire(
         IResourceBuilder<ProjectResource> project,
@@ -337,8 +338,7 @@ public static class IntropyAspire
         string configDir,
         IResourceBuilder<ContainerResource> redis,
         IResourceBuilder<ContainerResource>? microcks,
-        IReadOnlyDictionary<string, string> portRootPaths,
-        OtlpSettings? otlp)
+        IReadOnlyDictionary<string, string> portRootPaths)
     {
         const string development = "Development";
         project
@@ -350,23 +350,12 @@ public static class IntropyAspire
                     ResourcesPaths = [resourcesPath],
                 });
                 sidecar.WaitFor(redis);
-                if (otlp is not null)
-                {
-                    sidecar.WithAnnotation(OtlpVariables(otlp));
-                }
             })
             .WithEnvironment("INTROPY__COMPONENT", component.Name)
             .WithEnvironment("INTROPY__CONFIG", Path.Combine(configDir, $"{component.Name}.intropy.json"))
             .WithEnvironment("DOTNET_ENVIRONMENT", development)
             .WithEnvironment("ASPNETCORE_ENVIRONMENT", development)
             .WaitFor(redis);
-        if (otlp is not null)
-        {
-            foreach (var (name, value) in OtlpEnvironment.For(otlp))
-            {
-                project.WithEnvironment(name, value);
-            }
-        }
         foreach (var (portName, rootPath) in portRootPaths)
         {
             project.WithEnvironment($"Ports__{portName}__RootPath", rootPath);
@@ -376,21 +365,6 @@ public static class IntropyAspire
             project.WaitFor(microcks);
         }
     }
-
-    /// <summary>
-    /// The environment callback carrying the declared OTLP variables for the Dapr sidecar. The
-    /// sidecar resource is not an <c>IResourceWithEnvironment</c>; this annotation is how the
-    /// Dapr toolkit propagates environment onto the <c>&lt;component&gt;-dapr-cli</c> executable
-    /// that actually runs with the variables.
-    /// </summary>
-    internal static EnvironmentCallbackAnnotation OtlpVariables(OtlpSettings otlp) =>
-        new(context =>
-        {
-            foreach (var (name, value) in OtlpEnvironment.For(otlp))
-            {
-                context.EnvironmentVariables[name] = value;
-            }
-        });
 
     /// <summary>
     /// The absolute root path of each port the component reads from, keyed by port name. A
