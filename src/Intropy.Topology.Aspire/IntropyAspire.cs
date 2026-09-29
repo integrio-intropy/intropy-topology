@@ -72,10 +72,9 @@ public static class IntropyAspire
     /// <summary>
     /// Whether a component kind runs to completion (one sweep, then exit) rather than as a
     /// resident service. Sound because each kind has exactly one legitimate host — the
-    /// framework's <c>RunToCompletionRunner</c> for extractors and
-    /// <c>TransactionalIntegrationRunner</c> for transactional integrations, both of which shut
-    /// the Dapr sidecar down in a <c>finally</c> so the project/sidecar pair reaches its terminal
-    /// state together. Deliberately derived from kind rather than modeled: the topology records
+    /// framework's unified <c>JobRunner</c> (<c>RunToCompletionAsync</c>), which shuts the Dapr
+    /// sidecar down in a <c>finally</c> so the project/sidecar pair reaches its terminal state
+    /// together. Deliberately derived from kind rather than modeled: the topology records
     /// edges, not workload shape. If a kind ever gains a lifetime its edges do not imply, this
     /// derivation must become an explicit model fact.
     /// </summary>
@@ -169,7 +168,7 @@ public static class IntropyAspire
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
 
-        RegisterDaprSidecarRecovery(builder, redisReadiness, RunToCompletionSidecarsFor(topology));
+        RegisterHostServices(builder, redisReadiness, RunToCompletionSidecarsFor(topology), RunToCompletionComponentsFor(topology));
 
         if (unresolved.Count > 0)
         {
@@ -225,22 +224,38 @@ public static class IntropyAspire
             .ToHashSet(StringComparer.Ordinal));
 
     /// <summary>
-    /// Registers recovery for components' Dapr sidecars. The normal pre-start gate
-    /// prevents the common race; recovery covers the remaining interval where a backend passes
-    /// TCP readiness but daprd's component initialization still fails.
+    /// The components whose projects are re-run on a fixed interval by the host's scheduler
+    /// (see <see cref="IsRunToCompletion"/>): the same kind derivation as the sidecar
+    /// exemption, observed from the project resource instead of the sidecar executable.
     /// </summary>
-    private static void RegisterDaprSidecarRecovery(
+    internal static RunToCompletionComponents RunToCompletionComponentsFor(SystemTopology topology) =>
+        new(topology.Components
+            .Where(c => IsRunToCompletion(c.Kind))
+            .Select(c => c.Name)
+            .ToHashSet(StringComparer.Ordinal));
+
+    /// <summary>
+    /// Registers the host's background services and their shared seams. Sidecar repair covers
+    /// the interval where a backend passes TCP readiness but daprd's component initialization
+    /// still fails; the run-to-completion scheduler re-runs extractors and transactional
+    /// integrations on a fixed interval so file-driven integrations keep sweeping.
+    /// </summary>
+    private static void RegisterHostServices(
         IDistributedApplicationBuilder builder,
         IBackendReadiness backendReadiness,
-        RunToCompletionSidecars runToCompletionSidecars)
+        RunToCompletionSidecars runToCompletionSidecars,
+        RunToCompletionComponents runToCompletionComponents)
     {
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<IResourceLifecycle, AspireResourceLifecycle>();
         builder.Services.AddSingleton<IResourceStateMonitor, AspireResourceStateMonitor>();
         builder.Services.AddSingleton<IBackendReadiness>(backendReadiness);
         builder.Services.AddSingleton(runToCompletionSidecars);
+        builder.Services.AddSingleton(runToCompletionComponents);
         builder.Services.AddSingleton<DaprSidecarRecovery>();
+        builder.Services.AddSingleton<RunToCompletionScheduler>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<DaprSidecarRecovery>());
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<RunToCompletionScheduler>());
     }
 
     /// <summary>
