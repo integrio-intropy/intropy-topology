@@ -80,6 +80,14 @@ public static class IntropyAspire
     internal static bool IsRunToCompletion(ComponentKind kind) =>
         ComponentKinds.IsRunToCompletion(kind);
 
+    /// <summary>The endpoint a batch-receiving loader serves the Dapr gRPC app callback on.</summary>
+    internal const string GrpcAppEndpoint = "grpc";
+
+    /// <summary>Whether the component receives its topic in batches (Dapr bulk subscribe): its
+    /// sidecar then delivers over a gRPC app channel instead of the app streaming from it.</summary>
+    internal static bool ReceivesInBatches(ComponentModel component) =>
+        component.Subscribes.Any(s => s.Bulk is not null);
+
     /// <summary>
     /// Translates the topology into Aspire resources on <paramref name="builder"/>. Separated from
     /// <see cref="RunAsync"/> so the built model can be inspected in tests without running DCP.
@@ -158,8 +166,12 @@ public static class IntropyAspire
 
             var project = builder.AddProject(component.Name, projectPath);
             // The endpoint makes Aspire allocate a port and inject ASPNETCORE_URLS (without it
-            // every Kestrel binds the 5000 default) and gives the Dapr sidecar its app-port.
-            project = project.WithHttpEndpoint();
+            // every Kestrel binds the 5000 default) and gives the Dapr sidecar its app-port. A
+            // loader that receives in batches serves the Dapr gRPC app callback instead: its
+            // endpoint's port reaches the app as APP_PORT, where the framework listens.
+            project = ReceivesInBatches(component)
+                ? project.WithHttpEndpoint(name: GrpcAppEndpoint, env: "APP_PORT")
+                : project.WithHttpEndpoint();
 
             Wire(project, component, stagedPath, configDir, redis, microcks,
                 PortRootPaths(builder.AppHostDirectory, component, development), topology.Otlp);
@@ -366,10 +378,13 @@ public static class IntropyAspire
         project
             .WithDaprSidecar(sidecar =>
             {
+                var batches = ReceivesInBatches(component);
                 sidecar.WithOptions(new DaprSidecarOptions
                 {
                     AppId = component.Name,
                     ResourcesPaths = [resourcesPath],
+                    AppProtocol = batches ? "grpc" : null,
+                    AppEndpoint = batches ? GrpcAppEndpoint : null,
                 });
                 sidecar.WaitFor(redis);
                 if (otlp is not null)

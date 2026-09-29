@@ -551,6 +551,51 @@ public sealed class IntropyAspireTests : IDisposable
         // Assert
         Assert.False(env.ContainsKey("OTEL_EXPORTER_OTLP_HEADERS"));
     }
+    [Fact]
+    public async Task Apply_WithABatchingLoader_ShouldGiveItsSidecarAGrpcAppChannel()
+    {
+        // Arrange
+        var system = SystemBuilder.Create("order-flow");
+        system.AddExtractor("order-extractor").From(s_webshop).Publishes(s_raw);
+        system.AddLoader("order-loader").Subscribes(s_raw).To(s_erp).InBatches(100, TimeSpan.FromSeconds(1));
+        var builder = CreateBuilder();
+
+        // Act
+        IntropyAspire.Apply(builder, system.Build(), GeneratedRoot);
+
+        // Assert — the sidecar delivers bulk batches to the loader's gRPC callback, whose port
+        // the loader reads from APP_PORT.
+        var options = SidecarOptions(builder, "order-loader");
+        Assert.Equal("grpc", options.AppProtocol);
+        Assert.Equal(IntropyAspire.GrpcAppEndpoint, options.AppEndpoint);
+        var loader = builder.Resources.Single(r => r.Name == "order-loader");
+        Assert.Equal(IntropyAspire.GrpcAppEndpoint, Assert.Single(loader.Annotations.OfType<EndpointAnnotation>()).Name);
+        var variables = new Dictionary<string, object>();
+        var context = new EnvironmentCallbackContext(
+            new DistributedApplicationExecutionContext(DistributedApplicationOperation.Publish), variables,
+            CancellationToken.None);
+        foreach (var callback in loader.Annotations.OfType<EnvironmentCallbackAnnotation>())
+            await callback.Callback(context);
+        Assert.Contains("APP_PORT", variables.Keys);
+    }
+
+    [Fact]
+    public void Apply_WithAStreamingLoader_ShouldKeepTheDefaultAppChannel()
+    {
+        // Arrange
+        var builder = CreateBuilder();
+
+        // Act
+        IntropyAspire.Apply(builder, Topology(), GeneratedRoot);
+
+        // Assert
+        var options = SidecarOptions(builder, "order-loader");
+        Assert.Null(options.AppProtocol);
+        Assert.Null(options.AppEndpoint);
+        Assert.Equal("http", Assert.Single(builder.Resources.Single(r => r.Name == "order-loader")
+            .Annotations.OfType<EndpointAnnotation>()).Name);
+    }
+
     private static DaprSidecarOptions SidecarOptions(IDistributedApplicationBuilder builder, string componentName)
     {
         var resource = builder.Resources.Single(r => r.Name == componentName);

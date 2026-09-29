@@ -80,6 +80,29 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
         Component.AddPort(port, PortDirection.Out);
         return this;
     }
+
+    /// <summary>
+    /// Declares that the loader receives its topic in batches (Dapr bulk subscribe) — for a
+    /// loader whose pipeline runs a batch at once. The loader then serves a gRPC app callback
+    /// the sidecar delivers to, instead of opening a streaming subscription; hosts give it a
+    /// gRPC app channel.
+    /// </summary>
+    /// <param name="maxMessages">The most messages the sidecar collects into one delivery.</param>
+    /// <param name="maxWait">How long the sidecar waits to fill a delivery before sending what it has.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxMessages"/> is below 1, or
+    /// <paramref name="maxWait"/> is not positive or not a whole number of milliseconds.</exception>
+    /// <exception cref="InvalidOperationException">The loader already declares its batching.</exception>
+    public LoaderBuilder InBatches(int maxMessages, TimeSpan maxWait)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxMessages, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(maxWait, TimeSpan.Zero);
+        if (maxWait.Ticks % TimeSpan.TicksPerMillisecond != 0)
+            throw new ArgumentOutOfRangeException(nameof(maxWait), maxWait,
+                "The sidecar batches in whole milliseconds.");
+
+        Component.SetBulk(new BulkSubscription { MaxMessages = maxMessages, MaxWait = maxWait });
+        return this;
+    }
 }
 
 /// <summary>Fluent builder for a transactional integration: a synchronous block that

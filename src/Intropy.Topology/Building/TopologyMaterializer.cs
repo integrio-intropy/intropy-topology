@@ -68,6 +68,7 @@ internal static class TopologyMaterializer
             {
                 PubSubName = topic.PubSubName,
                 TopicName = topic.TopicName,
+                Bulk = (component as LoaderComponent)?.Bulk,
             });
             AccumulateTopic(topics, topic).Subscribers.Add(component.Name);
         }

@@ -72,6 +72,17 @@ public sealed class ExtractorComponent : Component
 public sealed class LoaderComponent : Component
 {
     internal LoaderComponent(string name) : base(name, ComponentKind.Loader) { }
+
+    /// <summary>The batching declared with <c>InBatches</c>; null when the loader consumes one
+    /// message at a time.</summary>
+    internal BulkSubscription? Bulk { get; private set; }
+
+    internal void SetBulk(BulkSubscription bulk)
+    {
+        if (Bulk is not null)
+            throw new InvalidOperationException($"Loader '{Name}' already declares how it batches its messages.");
+        Bulk = bulk;
+    }
 }
 
 /// <summary>The declared transactional integration: a synchronous block that reads/writes

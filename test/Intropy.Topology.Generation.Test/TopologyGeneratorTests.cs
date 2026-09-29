@@ -188,6 +188,35 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
+    public void Generate_WithABatchingLoader_ShouldEmitItsBulkSettingsInTheRuntimeConfig()
+    {
+        // Arrange
+        var topic = TopicRef<string>.Define("catalog", "product-changed");
+        var builder = SystemBuilder.Create("catalog");
+        builder.AddExtractor("extractor").Publishes(topic);
+        builder.AddLoader("loader").Subscribes(topic).InBatches(200, TimeSpan.FromSeconds(2));
+        var manifest = new DevelopmentManifest([], [], []);
+
+        // Act
+        var json = TopologyGenerator.Generate(builder.Build(), manifest, Directory.GetCurrentDirectory()).Files
+            .Single(file => file.RelativePath == "config/loader.intropy.json").Content;
+
+        // Assert
+        Assert.Contains("\"MaxMessages\": 200", json, StringComparison.Ordinal);
+        Assert.Contains("\"MaxWaitMilliseconds\": 2000", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generate_WithAStreamingLoader_ShouldEmitNoBulkSettings()
+    {
+        // Act
+        var json = Content("config/order-loader.intropy.json");
+
+        // Assert
+        Assert.DoesNotContain("Bulk", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Generate_ShouldBeDeterministic()
     {
         // Act
