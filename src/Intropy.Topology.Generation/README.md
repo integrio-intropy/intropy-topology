@@ -13,6 +13,9 @@ It produces, deterministically:
   app-id so service invocation resolves to the mock,
 - a per-component `*.intropy.json` describing that component's identity and edges.
 
+The development manifest's re-run cadences are deliberately absent from this list: they are
+local host mechanism (see ADR 0012) and are never emitted into generated artifacts.
+
 ```csharp
 var discovered = SystemDiscovery.Discover(assembly);
 var development = DevelopmentDiscovery.Discover(assembly, discovered.Topology, root);

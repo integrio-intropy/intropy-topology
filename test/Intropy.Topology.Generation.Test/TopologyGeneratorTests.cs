@@ -173,6 +173,7 @@ public class TopologyGeneratorTests
         builder.AddLoader("loader").Subscribes(topic).Uses(service);
         var manifest = new DevelopmentManifest(
             [new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency Service", "1.0/rc")],
+            [],
             []);
 
         // Act
@@ -212,7 +213,8 @@ public class TopologyGeneratorTests
         var topology = builder.Build();
         var manifest = new DevelopmentManifest(
             [],
-            [new PortFileResolution("placeholder", "./test/placeholder")]);
+            [new PortFileResolution("placeholder", "./test/placeholder")],
+            []);
 
         // Act
         var artifacts = TopologyGenerator.Generate(topology, manifest, Directory.GetCurrentDirectory());

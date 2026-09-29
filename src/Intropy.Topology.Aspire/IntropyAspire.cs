@@ -74,12 +74,11 @@ public static class IntropyAspire
     /// resident service. Sound because each kind has exactly one legitimate host — the
     /// framework's unified <c>JobRunner</c> (<c>RunToCompletionAsync</c>), which shuts the Dapr
     /// sidecar down in a <c>finally</c> so the project/sidecar pair reaches its terminal state
-    /// together. Deliberately derived from kind rather than modeled: the topology records
-    /// edges, not workload shape. If a kind ever gains a lifetime its edges do not imply, this
-    /// derivation must become an explicit model fact.
+    /// together. The derivation is shared with development-manifest validation so the DSL and
+    /// this host cannot disagree about which kinds may be re-run.
     /// </summary>
     internal static bool IsRunToCompletion(ComponentKind kind) =>
-        kind is ComponentKind.Extractor or ComponentKind.TransactionalIntegration;
+        ComponentKinds.IsRunToCompletion(kind);
 
     /// <summary>
     /// Translates the topology into Aspire resources on <paramref name="builder"/>. Separated from
@@ -87,7 +86,7 @@ public static class IntropyAspire
     /// </summary>
     internal static void Apply(
         IDistributedApplicationBuilder builder, SystemTopology topology, string generatedRoot) =>
-        Apply(builder, topology, generatedRoot, new DevelopmentManifest([], []));
+        Apply(builder, topology, generatedRoot, new DevelopmentManifest([], [], []));
 
     internal static void Apply(
         IDistributedApplicationBuilder builder, SystemTopology topology, string generatedRoot, DevelopmentManifest development)
@@ -168,7 +167,7 @@ public static class IntropyAspire
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
 
-        RegisterHostServices(builder, redisReadiness, RunToCompletionSidecarsFor(topology), RunToCompletionComponentsFor(topology));
+        RegisterHostServices(builder, redisReadiness, RunToCompletionSidecarsFor(topology), RunToCompletionComponentsFor(topology, development));
 
         if (unresolved.Count > 0)
         {
@@ -224,21 +223,29 @@ public static class IntropyAspire
             .ToHashSet(StringComparer.Ordinal));
 
     /// <summary>
-    /// The components whose projects are re-run on a fixed interval by the host's scheduler
-    /// (see <see cref="IsRunToCompletion"/>): the same kind derivation as the sidecar
-    /// exemption, observed from the project resource instead of the sidecar executable.
+    /// The components whose projects are re-run by the host's scheduler (see
+    /// <see cref="IsRunToCompletion"/>), each with its re-run delay: the cadence declared in
+    /// the development manifest where one exists, the host default otherwise. The manifest
+    /// cadence is local host mechanism and never leaves this process — the deployed schedule
+    /// stays in deployment configuration. The kind derivation is the same one the sidecar
+    /// exemption uses, observed from the project resource instead of the sidecar executable.
     /// </summary>
-    internal static RunToCompletionComponents RunToCompletionComponentsFor(SystemTopology topology) =>
-        new(topology.Components
+    internal static RunToCompletionComponents RunToCompletionComponentsFor(SystemTopology topology, DevelopmentManifest development)
+    {
+        var declared = development.Reruns.ToDictionary(rerun => rerun.ComponentName, rerun => rerun.Delay, StringComparer.Ordinal);
+        return new(topology.Components
             .Where(c => IsRunToCompletion(c.Kind))
-            .Select(c => c.Name)
-            .ToHashSet(StringComparer.Ordinal));
+            .ToDictionary(
+                c => c.Name,
+                c => declared.TryGetValue(c.Name, out var delay) ? delay : RunToCompletionComponents.DefaultRestartDelay,
+                StringComparer.Ordinal));
+    }
 
     /// <summary>
     /// Registers the host's background services and their shared seams. Sidecar repair covers
     /// the interval where a backend passes TCP readiness but daprd's component initialization
     /// still fails; the run-to-completion scheduler re-runs extractors and transactional
-    /// integrations on a fixed interval so file-driven integrations keep sweeping.
+    /// integrations on their configured cadence so file-driven integrations keep sweeping.
     /// </summary>
     private static void RegisterHostServices(
         IDistributedApplicationBuilder builder,

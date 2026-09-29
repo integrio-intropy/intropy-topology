@@ -16,13 +16,14 @@ public interface IDevelopmentDefinition
     void Define(DevelopmentBuilder development);
 }
 
-/// <summary>Records OpenAPI-backed local service mocks. Not thread-safe.</summary>
+/// <summary>Records local development substitutions: service mocks, port file resolutions, and re-run cadences. Not thread-safe.</summary>
 public sealed class DevelopmentBuilder
 {
     private readonly SystemTopology _topology;
     private readonly string _root;
     private readonly List<MockDeclaration> _mocks = [];
     private readonly List<FileDeclaration> _files = [];
+    private readonly List<RerunDeclaration> _reruns = [];
 
     internal DevelopmentBuilder(SystemTopology topology, string root)
     {
@@ -70,6 +71,33 @@ public sealed class DevelopmentBuilder
         return new FileBuilder(declaration);
     }
 
+    /// <summary>Declares how often a run-to-completion component is re-run locally.</summary>
+    /// <param name="componentName">The name of an extractor or transactional integration in the topology.</param>
+    public RerunBuilder Rerun(string componentName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(componentName);
+        var component = _topology.Components.SingleOrDefault(candidate => candidate.Name == componentName);
+        if (component is null)
+        {
+            throw new DevelopmentValidationException($"Component '{componentName}' is not declared by the system topology.");
+        }
+
+        if (!component.Kind.IsRunToCompletion())
+        {
+            throw new DevelopmentValidationException(
+                $"Component '{componentName}' is a {component.Kind} and stays resident; only run-to-completion components (extractors and transactional integrations) can be re-run.");
+        }
+
+        if (_reruns.Any(candidate => candidate.ComponentName == componentName))
+        {
+            throw new DevelopmentValidationException($"Component '{componentName}' has more than one re-run declaration.");
+        }
+
+        var declaration = new RerunDeclaration(componentName);
+        _reruns.Add(declaration);
+        return new RerunBuilder(declaration);
+    }
+
     internal DevelopmentManifest Build()
     {
         var mocks = _mocks.Select(mock => OpenApiArtifact.Inspect(_root, mock)).ToArray();
@@ -93,9 +121,22 @@ public sealed class DevelopmentBuilder
         }
 
         var files = _files.Select(file => FileRootPath.Inspect(_root, file)).ToArray();
+        var undeclared = _reruns
+            .Where(rerun => rerun.Delay is null)
+            .Select(rerun => rerun.ComponentName)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+        if (undeclared.Length > 0)
+        {
+            throw new DevelopmentValidationException(
+                $"Re-run declarations for components '{string.Join("', '", undeclared)}' do not declare a delay.");
+        }
+
         return new DevelopmentManifest(
             mocks.OrderBy(mock => mock.AppId, StringComparer.Ordinal).ToArray(),
-            files.OrderBy(file => file.PortName, StringComparer.Ordinal).ToArray());
+            files.OrderBy(file => file.PortName, StringComparer.Ordinal).ToArray(),
+            _reruns.Select(rerun => new ComponentRerun(rerun.ComponentName, rerun.Delay!.Value))
+                .OrderBy(rerun => rerun.ComponentName, StringComparer.Ordinal).ToArray());
     }
 
     /// <summary>Configures the OpenAPI artifact for one service mock.</summary>
@@ -146,15 +187,60 @@ public sealed class DevelopmentBuilder
         public string? Path { get; set; }
     }
 
+    /// <summary>Configures the local re-run cadence for one run-to-completion component.</summary>
+    public sealed class RerunBuilder
+    {
+        private readonly RerunDeclaration _declaration;
+        internal RerunBuilder(RerunDeclaration declaration) => _declaration = declaration;
+
+        /// <summary>Re-runs the component again once <paramref name="delay"/> has passed after each local run completes.</summary>
+        /// <param name="delay">The wait between a run's completion and its next start; must be positive.</param>
+        public RerunBuilder Every(TimeSpan delay)
+        {
+            if (delay <= TimeSpan.Zero)
+            {
+                throw new DevelopmentValidationException(
+                    $"Re-run delay for component '{_declaration.ComponentName}' must be positive.");
+            }
+
+            if (_declaration.Delay is not null)
+            {
+                throw new DevelopmentValidationException(
+                    $"Component '{_declaration.ComponentName}' has more than one re-run delay.");
+            }
+
+            _declaration.Delay = delay;
+            return this;
+        }
+    }
+
     internal sealed class FileDeclaration(string portName)
     {
         public string PortName { get; } = portName;
         public string? Path { get; set; }
     }
+
+    internal sealed class RerunDeclaration(string componentName)
+    {
+        public string ComponentName { get; } = componentName;
+        public TimeSpan? Delay { get; set; }
+    }
 }
 
 /// <summary>Validated development substitutions consumed by generation and local runtime backends.</summary>
-public sealed record DevelopmentManifest(IReadOnlyList<OpenApiMock> Mocks, IReadOnlyList<PortFileResolution> Files);
+public sealed record DevelopmentManifest(
+    IReadOnlyList<OpenApiMock> Mocks,
+    IReadOnlyList<PortFileResolution> Files,
+    IReadOnlyList<ComponentRerun> Reruns);
+
+/// <summary>
+/// One run-to-completion component's local re-run cadence. Local-only host mechanism: it is
+/// never written into the generated artifacts, so it cannot drift with the deployed schedule
+/// that deployment configuration owns.
+/// </summary>
+/// <param name="ComponentName">The component to re-run.</param>
+/// <param name="Delay">The wait between a local run's completion and its next start.</param>
+public sealed record ComponentRerun(string ComponentName, TimeSpan Delay);
 
 /// <summary>One port's validated local file resolution.</summary>
 /// <param name="PortName">The resolved port.</param>
@@ -192,7 +278,7 @@ public static class DevelopmentDiscovery
 
         if (result.Instance is null)
         {
-            return new DevelopmentManifest([], []);
+            return new DevelopmentManifest([], [], []);
         }
 
         var builder = new DevelopmentBuilder(topology, root);

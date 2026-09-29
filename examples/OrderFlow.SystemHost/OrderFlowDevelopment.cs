@@ -10,5 +10,8 @@ public sealed class OrderFlowDevelopment : IDevelopmentDefinition
         development.Mock(Services.BusinessIncidents).FromOpenApi("mocks/business-incident-service.openapi.yaml");
         development.Files(Ports.OrderExtractorSource).RootPath("./test/order-extractor-source");
         development.Files(Ports.OrderLoaderDestination).RootPath("./test/order-loader-destination");
+        // Local-only re-run cadence: how long the host waits after a sweep before starting
+        // the next one. It never travels — the deployed schedule lives in deployment configuration.
+        development.Rerun("order-extractor").Every(TimeSpan.FromSeconds(30));
     }
 }

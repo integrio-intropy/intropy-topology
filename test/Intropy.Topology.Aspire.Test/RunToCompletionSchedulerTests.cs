@@ -48,7 +48,10 @@ public sealed class RunToCompletionSchedulerTests
     }
 
     private static readonly RunToCompletionComponents s_oneExtractor =
-        new(new HashSet<string>(StringComparer.Ordinal) { "order-extractor" });
+        new(new Dictionary<string, TimeSpan>(StringComparer.Ordinal)
+        {
+            ["order-extractor"] = RunToCompletionComponents.DefaultRestartDelay,
+        });
 
     private static RunToCompletionScheduler NewScheduler(
         FakeLifecycle lifecycle, TimeProvider time) =>
@@ -77,6 +80,32 @@ public sealed class RunToCompletionSchedulerTests
                 ("order-extractor-dapr-cli", KnownResourceCommands.StartCommand),
             ],
             lifecycle.Commands);
+    }
+
+    [Fact]
+    public async Task HandleStateUpdateAsync_WithDeclaredCadence_ShouldRestartAfterThatDelay()
+    {
+        // Arrange — the development manifest declared a ten-second cadence for this component.
+        var lifecycle = new FakeLifecycle();
+        var time = new FakeTimeProvider();
+        var scheduler = new RunToCompletionScheduler(
+            new FakeStateMonitor(), lifecycle,
+            new RunToCompletionComponents(new Dictionary<string, TimeSpan>(StringComparer.Ordinal)
+            {
+                ["order-extractor"] = TimeSpan.FromSeconds(10),
+            }),
+            time, new RecordingLogger());
+
+        // Act
+        var task = scheduler.HandleStateUpdateAsync(
+            new ResourceStateUpdate("order-extractor", KnownResourceStates.Finished), CancellationToken.None);
+        time.Advance(TimeSpan.FromSeconds(9));
+        Assert.Empty(lifecycle.Commands);
+        time.Advance(TimeSpan.FromSeconds(1));
+        await task;
+
+        // Assert
+        Assert.Equal(2, lifecycle.Commands.Count);
     }
 
     [Fact]

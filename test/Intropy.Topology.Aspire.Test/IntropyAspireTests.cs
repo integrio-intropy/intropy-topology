@@ -139,6 +139,35 @@ public sealed class IntropyAspireTests : IDisposable
     }
 
     [Fact]
+    public void RunToCompletionComponentsFor_ShouldUseManifestCadenceAndDefaultOtherwise()
+    {
+        // Arrange — the extractor gets a declared cadence; nothing else does.
+        var development = new DevelopmentManifest(
+            [], [], [new ComponentRerun("order-extractor", TimeSpan.FromSeconds(30))]);
+
+        // Act
+        var scheduled = IntropyAspire.RunToCompletionComponentsFor(Topology(), development);
+
+        // Assert — the resident loader is never scheduled; an undeclared run-to-completion
+        // component would get the host default (covered by the scheduler tests' fixture).
+        Assert.Equal(
+            new Dictionary<string, TimeSpan> { ["order-extractor"] = TimeSpan.FromSeconds(30) },
+            scheduled.RestartDelays);
+    }
+
+    [Fact]
+    public void RunToCompletionComponentsFor_WithoutManifestCadence_ShouldUseTheHostDefault()
+    {
+        // Act
+        var scheduled = IntropyAspire.RunToCompletionComponentsFor(Topology(), new DevelopmentManifest([], [], []));
+
+        // Assert
+        Assert.Equal(
+            RunToCompletionComponents.DefaultRestartDelay,
+            scheduled.RestartDelays["order-extractor"]);
+    }
+
+    [Fact]
     public void Apply_ShouldAddRedisBackend()
     {
         // Arrange
@@ -166,6 +195,7 @@ public sealed class IntropyAspireTests : IDisposable
         var builder = CreateBuilder();
         var development = new DevelopmentManifest(
             [new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency", "1")],
+            [],
             []);
 
         // Act
@@ -315,7 +345,8 @@ public sealed class IntropyAspireTests : IDisposable
         // resolve to local folders.
         var development = new DevelopmentManifest(
             [],
-            [new PortFileResolution("webshop", "./test/webshop"), new PortFileResolution("erp", "./test/erp")]);
+            [new PortFileResolution("webshop", "./test/webshop"), new PortFileResolution("erp", "./test/erp")],
+            []);
         var builder = CreateBuilder();
         IntropyAspire.Apply(builder, Topology(), GeneratedRoot, development);
 
