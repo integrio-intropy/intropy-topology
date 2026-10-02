@@ -62,9 +62,9 @@ public class EmptySystemRuleTests
 public class DuplicatePublishRuleTests
 {
     [Fact]
-    public void Validate_WithDuplicateChannelPublish_ShouldReportError()
+    public void Validate_WithDuplicateMessagePublish_ShouldReportError()
     {
-        // Arrange: the same channel declared twice — a redundant edge, not fan-out
+        // Arrange: the same message declared twice — a redundant edge, not fan-out
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor")
             .Publishes(TestMessages.Raw)
@@ -77,7 +77,7 @@ public class DuplicatePublishRuleTests
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Equal("extractor", diagnostic.Target);
         Assert.Equal(
-            "The topic 'raw-events' on pubsub 'test-pubsub' is published to more than once by the same component.",
+            "The message 'raw-events' is published more than once by the same component.",
             diagnostic.Message);
     }
 
@@ -86,6 +86,19 @@ public class DuplicatePublishRuleTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system").WithValidComponent();
+
+        // Act & Assert
+        Assert.Empty(s.DiagnosticsFor<DuplicatePublishRule>());
+    }
+
+    [Fact]
+    public void Validate_WithTwoMessagesOnOneChannel_ShouldReportNothing()
+    {
+        // Arrange: a channel carries several messages; one extractor may publish them all
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("extractor")
+            .Publishes(MessageRef<RawEvent>.Define("raw-created", "test-pubsub", "shared"))
+            .Publishes(MessageRef<EnrichedEvent>.Define("raw-cancelled", "test-pubsub", "shared"));
 
         // Act & Assert
         Assert.Empty(s.DiagnosticsFor<DuplicatePublishRule>());
@@ -224,24 +237,25 @@ public class MissingRequiredPortRuleTests
     }
 }
 
-public class TopicContractConflictRuleTests
+public class TopicCarryingSeveralContractsTests
 {
     [Fact]
-    public void Validate_WithSameTopicUnderTwoContracts_ShouldReportError()
+    public void Build_WithOneTopicCarryingTwoMessagesWithTheirOwnContracts_ShouldSucceed()
     {
-        // Arrange: two message names targeting one (pubsub, topic) with two contract types
+        // Arrange: a channel carries several messages, each with its own contract
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("first")
-            .Publishes(MessageRef<RawEvent>.Define("shared-raw", "test-pubsub", "shared-topic"));
-        s.AddExtractor("second")
-            .Publishes(MessageRef<EnrichedEvent>.Define("shared-enriched", "test-pubsub", "shared-topic"));
+        var raw = MessageRef<RawEvent>.Define("shared-raw", "test-pubsub", "shared-topic");
+        var enriched = MessageRef<EnrichedEvent>.Define("shared-enriched", "test-pubsub", "shared-topic");
+        s.AddExtractor("first").Publishes(raw);
+        s.AddExtractor("second").Publishes(enriched);
+        s.AddLoader("consumer").Subscribes(sub => sub.Handles(raw).Handles(enriched));
 
         // Act
-        var diagnostic = Assert.Single(s.DeclarationDiagnosticsFor<TopicContractConflictRule>());
+        var topology = s.Build();
 
         // Assert
-        Assert.Contains(typeof(RawEvent).FullName!, diagnostic.Message);
-        Assert.Contains(typeof(EnrichedEvent).FullName!, diagnostic.Message);
+        var topic = Assert.Single(topology.Topics);
+        Assert.Equal(["shared-enriched", "shared-raw"], topic.Messages);
     }
 }
 

@@ -9,7 +9,7 @@ namespace Intropy.Topology;
 /// </summary>
 public abstract class Component
 {
-    private readonly List<MessageRef> _subscribes = [];
+    private readonly List<SubscriptionDeclaration> _subscriptions = [];
     private readonly List<MessageRef> _publishes = [];
     private readonly List<(PortRef Port, PortDirection Direction)> _ports = [];
     private readonly List<ServiceRef> _services = [];
@@ -26,7 +26,11 @@ public abstract class Component
     /// <summary>The component's block kind.</summary>
     public ComponentKind Kind { get; }
 
-    internal IReadOnlyList<MessageRef> SubscribeCalls => _subscribes;
+    /// <summary>The declared subscriptions, each with the messages it handles.</summary>
+    internal IReadOnlyList<SubscriptionDeclaration> SubscriptionCalls => _subscriptions;
+
+    /// <summary>Every message the component handles, across its subscriptions.</summary>
+    internal IEnumerable<MessageRef> SubscribeCalls => _subscriptions.SelectMany(s => s.Messages);
 
     internal IReadOnlyList<MessageRef> PublishCalls => _publishes;
 
@@ -34,10 +38,11 @@ public abstract class Component
 
     internal IReadOnlyList<ServiceRef> ServiceCalls => _services;
 
-    internal void AddSubscribe(MessageRef message)
+    internal SubscriptionDeclaration AddSubscription()
     {
-        ArgumentNullException.ThrowIfNull(message);
-        _subscribes.Add(message);
+        var subscription = new SubscriptionDeclaration();
+        _subscriptions.Add(subscription);
+        return subscription;
     }
 
     internal void AddPublish(MessageRef message)
@@ -92,4 +97,32 @@ public sealed class TransactionalIntegrationComponent : Component
 {
     internal TransactionalIntegrationComponent(string name)
         : base(name, ComponentKind.TransactionalIntegration) { }
+}
+
+/// <summary>One declared subscription: the messages a component handles from one channel, and
+/// what happens to the channel's other messages. Mutable during declaration.</summary>
+internal sealed class SubscriptionDeclaration
+{
+    private readonly List<MessageRef> _messages = [];
+    private readonly Dictionary<string, string> _conditions = new(StringComparer.Ordinal);
+
+    /// <summary>The messages the subscription handles, in declaration order.</summary>
+    public IReadOnlyList<MessageRef> Messages => _messages;
+
+    /// <summary>The content filter (a CEL expression) of each handled message that has one, by
+    /// message name.</summary>
+    public IReadOnlyDictionary<string, string> Conditions => _conditions;
+
+    /// <summary>What happens to the channel's messages the subscription does not handle.</summary>
+    public UnhandledMessages Unhandled { get; set; } = UnhandledMessages.DeadLetter;
+
+    public void Add(MessageRef message, string? condition)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        _messages.Add(message);
+        if (condition is not null)
+        {
+            _conditions.TryAdd(message.Name, condition);
+        }
+    }
 }

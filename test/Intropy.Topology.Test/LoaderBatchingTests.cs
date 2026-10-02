@@ -2,7 +2,7 @@ namespace Intropy.Topology.Test;
 
 public sealed class LoaderBatchingTests
 {
-    private static readonly TopicRef<string> s_topic = TopicRef<string>.Define("catalog", "product-changed");
+    private static readonly MessageRef<string> s_topic = MessageRef<string>.Define("product-changed", "catalog");
 
     [Fact]
     public void Build_WithInBatches_ShouldMaterializeABulkSubscription()
@@ -23,7 +23,7 @@ public sealed class LoaderBatchingTests
     }
 
     [Fact]
-    public void Build_WithoutInBatches_ShouldMaterializeAStreamingSubscription()
+    public void Build_WithoutInBatches_ShouldMaterializeOneMessageAtATime()
     {
         // Arrange
         var builder = SystemBuilder.Create("catalog");

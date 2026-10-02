@@ -138,9 +138,10 @@ public static class IntropyGenerate
         public static GraphComponent From(ComponentModel component) => new(
             component.Name,
             KebabCase(component.Kind.ToString()),
-            Optional(component.Subscribes.Select(t => new GraphTopicReference(t.PubSubName, t.TopicName))),
+            Optional(component.Subscribes.Select(t => new GraphTopicReference(t.PubSubName, t.TopicName,
+                Optional(t.Messages), t.Conditions, KebabCase(t.Unhandled.ToString())))),
             Optional(component.Publishes.Select(p => new GraphPublication(
-                p.PubSubName, p.TopicName))),
+                p.PubSubName, p.TopicName, string.IsNullOrEmpty(p.Message) ? null : p.Message))),
             Optional(component.Ports.Select(c => new GraphPortUse(
                 c.PortName, Direction(c.Direction)))),
             Optional(component.Uses),
@@ -153,13 +154,19 @@ public static class IntropyGenerate
         [property: JsonPropertyName("pubsub")] string PubSub,
         string Topic);
 
+    /// <summary>A subscription: its channel, the messages it handles (each one's name is its
+    /// CloudEvent type) and what happens to the channel's other messages.</summary>
     private sealed record GraphTopicReference(
         [property: JsonPropertyName("pubsub")] string PubSub,
-        string Topic);
+        string Topic,
+        IReadOnlyList<string>? Messages,
+        IReadOnlyDictionary<string, string>? Conditions,
+        string Unhandled);
 
     private sealed record GraphPublication(
         [property: JsonPropertyName("pubsub")] string PubSub,
-        string Topic);
+        string Topic,
+        string? Message);
 
     private sealed record GraphPortUse(string Port, string Direction);
 

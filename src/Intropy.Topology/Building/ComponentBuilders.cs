@@ -57,19 +57,35 @@ public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, Extrac
     }
 }
 
-/// <summary>Fluent builder for a loader: an edge block that subscribes to exactly one message
-/// and writes to an external system through a port; loaders publish nothing.</summary>
+/// <summary>Fluent builder for a loader: an edge block that subscribes to exactly one channel —
+/// handling one or more of the messages on it — and writes to an external system through a port;
+/// loaders publish nothing.</summary>
 public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderComponent>
 {
     internal LoaderBuilder(LoaderComponent component) : base(component) { }
 
     private protected override LoaderBuilder Self => this;
 
-    /// <summary>Declares the single message the loader subscribes to.</summary>
+    /// <summary>Declares the loader's subscription when it handles a single message: shorthand
+    /// for <c>Subscribes(sub =&gt; sub.Handles(message))</c>.</summary>
     /// <param name="message">The message whose events the loader consumes.</param>
     public LoaderBuilder Subscribes(MessageRef message)
     {
-        Component.AddSubscribe(message);
+        ArgumentNullException.ThrowIfNull(message);
+        return Subscribes(sub => sub.Handles(message));
+    }
+
+    /// <summary>
+    /// Declares the loader's subscription: the messages it handles from one channel, and what
+    /// happens to the channel's other messages. The channel is the handled messages' own, so they
+    /// must all travel on the same one. Rendered as a declarative Dapr <c>Subscription</c> with one
+    /// routing rule per message.
+    /// </summary>
+    /// <param name="configure">Declares the handled messages (<see cref="SubscriptionBuilder.Handles"/>).</param>
+    public LoaderBuilder Subscribes(Action<SubscriptionBuilder> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        configure(new SubscriptionBuilder(Component, Component.AddSubscription()));
         return this;
     }
 
@@ -82,10 +98,8 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
     }
 
     /// <summary>
-    /// Declares that the loader receives its topic in batches (Dapr bulk subscribe) — for a
-    /// loader whose pipeline runs a batch at once. The loader then serves a gRPC app callback
-    /// the sidecar delivers to, instead of opening a streaming subscription; hosts give it a
-    /// gRPC app channel.
+    /// Declares that the loader receives its subscription in batches (Dapr bulk subscribe) — for
+    /// a loader whose pipeline runs a batch at once. Same as <see cref="SubscriptionBuilder.InBatches"/>.
     /// </summary>
     /// <param name="maxMessages">The most messages the sidecar collects into one delivery.</param>
     /// <param name="maxWait">How long the sidecar waits to fill a delivery before sending what it has.</param>
@@ -94,14 +108,81 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
     /// <exception cref="InvalidOperationException">The loader already declares its batching.</exception>
     public LoaderBuilder InBatches(int maxMessages, TimeSpan maxWait)
     {
+        Component.SetBulk(BulkSubscriptions.Create(maxMessages, maxWait));
+        return this;
+    }
+}
+
+/// <summary>
+/// Fluent builder for one subscription: the messages a component handles from a channel, and what
+/// happens to the channel's other messages. A message's name is its CloudEvent type; each handled
+/// message becomes a routing rule on the rendered Dapr <c>Subscription</c>. Not thread-safe.
+/// </summary>
+public sealed class SubscriptionBuilder
+{
+    private readonly LoaderComponent _component;
+    private readonly SubscriptionDeclaration _subscription;
+
+    internal SubscriptionBuilder(LoaderComponent component, SubscriptionDeclaration subscription)
+    {
+        _component = component;
+        _subscription = subscription;
+    }
+
+    /// <summary>Declares a message the subscription handles. All handled messages must travel on
+    /// the same channel.</summary>
+    /// <param name="message">The message to handle.</param>
+    /// <param name="when">A content filter: a Dapr CEL expression over the event the message must
+    /// also match, such as <c>event.data.reason == 'customer-request'</c>. Payload properties are
+    /// camelCase. The sidecar treats the message's events it leaves out as unhandled. Null handles
+    /// all of the message's events.</param>
+    /// <exception cref="ArgumentException"><paramref name="when"/> is empty or whitespace.</exception>
+    public SubscriptionBuilder Handles(MessageRef message, string? when = null)
+    {
+        if (when is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(when);
+        }
+
+        _subscription.Add(message, when?.Trim());
+        return this;
+    }
+
+    /// <summary>Acknowledges and drops the channel's messages this subscription does not handle,
+    /// instead of leaving them for the broker to dead-letter: for a channel that carries messages
+    /// meant for other components.</summary>
+    public SubscriptionBuilder IgnoreOthers()
+    {
+        _subscription.Unhandled = UnhandledMessages.Ignore;
+        return this;
+    }
+
+    /// <summary>Delivers the subscription's messages in batches (Dapr bulk subscribe), for a
+    /// component whose pipeline runs a batch at once.</summary>
+    /// <param name="maxMessages">The most messages the sidecar collects into one delivery.</param>
+    /// <param name="maxWait">How long the sidecar waits to fill a delivery before sending what it has.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxMessages"/> is below 1, or
+    /// <paramref name="maxWait"/> is not positive or not a whole number of milliseconds.</exception>
+    /// <exception cref="InvalidOperationException">The component already declares its batching.</exception>
+    public SubscriptionBuilder InBatches(int maxMessages, TimeSpan maxWait)
+    {
+        _component.SetBulk(BulkSubscriptions.Create(maxMessages, maxWait));
+        return this;
+    }
+}
+
+/// <summary>Validates and creates a <see cref="BulkSubscription"/>.</summary>
+file static class BulkSubscriptions
+{
+    public static BulkSubscription Create(int maxMessages, TimeSpan maxWait)
+    {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxMessages, 1);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(maxWait, TimeSpan.Zero);
         if (maxWait.Ticks % TimeSpan.TicksPerMillisecond != 0)
             throw new ArgumentOutOfRangeException(nameof(maxWait), maxWait,
                 "The sidecar batches in whole milliseconds.");
 
-        Component.SetBulk(new BulkSubscription { MaxMessages = maxMessages, MaxWait = maxWait });
-        return this;
+        return new BulkSubscription { MaxMessages = maxMessages, MaxWait = maxWait };
     }
 }
 

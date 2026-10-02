@@ -33,7 +33,7 @@ Each kind exposes only its own legal edges:
 | Loader | exactly 1 message | — | `To(port)` | `Uses(service)` | `Subscribes` |
 | Transactional integration | — | — | `From` / `To(port)` | `Uses(service)` | `From` and `To` |
 
-`Subscribes`/`Publishes` are the asynchronous (message) edges; `From`/`To` are the edges out through ports; `Uses` records Dapr service app IDs the component invokes. A component may publish several distinct messages — repeating one channel is rejected at `Build()`. See [Messages](messages.md), [Ports](ports.md), and the [Model and DSL Reference](model.md).
+`Subscribes`/`Publishes` are the asynchronous (message) edges; `From`/`To` are the edges out through ports; `Uses` records Dapr service app IDs the component invokes. A component may publish several distinct messages, to one channel or several — repeating one message is rejected at `Build()`. See [Messages](messages.md), [Ports](ports.md), and the [Model and DSL Reference](model.md).
 
 ## Declaring components
 

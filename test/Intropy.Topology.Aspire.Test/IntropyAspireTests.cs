@@ -552,19 +552,16 @@ public sealed class IntropyAspireTests : IDisposable
         Assert.False(env.ContainsKey("OTEL_EXPORTER_OTLP_HEADERS"));
     }
     [Fact]
-    public async Task Apply_WithABatchingLoader_ShouldGiveItsSidecarAGrpcAppChannel()
+    public async Task Apply_WithALoader_ShouldGiveItsSidecarAGrpcAppChannel()
     {
         // Arrange
-        var system = SystemBuilder.Create("order-flow");
-        system.AddExtractor("order-extractor").From(s_webshop).Publishes(s_raw);
-        system.AddLoader("order-loader").Subscribes(s_raw).To(s_erp).InBatches(100, TimeSpan.FromSeconds(1));
         var builder = CreateBuilder();
 
         // Act
-        IntropyAspire.Apply(builder, system.Build(), GeneratedRoot);
+        IntropyAspire.Apply(builder, Topology(), GeneratedRoot);
 
-        // Assert — the sidecar delivers bulk batches to the loader's gRPC callback, whose port
-        // the loader reads from APP_PORT.
+        // Assert — the sidecar pushes the loader's messages to its gRPC callback, whose port the
+        // loader reads from APP_PORT.
         var options = SidecarOptions(builder, "order-loader");
         Assert.Equal("grpc", options.AppProtocol);
         Assert.Equal(IntropyAspire.GrpcAppEndpoint, options.AppEndpoint);
@@ -580,19 +577,37 @@ public sealed class IntropyAspireTests : IDisposable
     }
 
     [Fact]
-    public void Apply_WithAStreamingLoader_ShouldKeepTheDefaultAppChannel()
+    public void Apply_WithATransactionalIntegration_ShouldGiveItsSidecarAGrpcAppChannel()
     {
-        // Arrange
+        // Arrange — the integration's sidecar pushes its internal hop to its callback
+        var system = SystemBuilder.Create("order-flow");
+        system.AddTransactionalIntegration("order-sync").From(s_webshop).To(s_erp);
+        WriteProject("order-sync");
+        var builder = CreateBuilder();
+
+        // Act
+        IntropyAspire.Apply(builder, system.Build(), GeneratedRoot);
+
+        // Assert
+        var options = SidecarOptions(builder, "order-sync");
+        Assert.Equal("grpc", options.AppProtocol);
+        Assert.Equal(IntropyAspire.GrpcAppEndpoint, options.AppEndpoint);
+    }
+
+    [Fact]
+    public void Apply_WithAnExtractor_ShouldKeepTheDefaultAppChannel()
+    {
+        // Arrange — an extractor receives no messages
         var builder = CreateBuilder();
 
         // Act
         IntropyAspire.Apply(builder, Topology(), GeneratedRoot);
 
         // Assert
-        var options = SidecarOptions(builder, "order-loader");
+        var options = SidecarOptions(builder, "order-extractor");
         Assert.Null(options.AppProtocol);
         Assert.Null(options.AppEndpoint);
-        Assert.Equal("http", Assert.Single(builder.Resources.Single(r => r.Name == "order-loader")
+        Assert.Equal("http", Assert.Single(builder.Resources.Single(r => r.Name == "order-extractor")
             .Annotations.OfType<EndpointAnnotation>()).Name);
     }
 

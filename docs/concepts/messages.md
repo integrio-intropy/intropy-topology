@@ -38,7 +38,7 @@ These names describe the *inter-component* vocabulary. The one pubsub a componen
 
 ## The contract type
 
-The type parameter is the message's event contract. It flows into the materialized model as `ContractTypeName` (the type's full name) and pins both halves of the declaration: one message name carrying two different contract types is rejected at `Build()`, and so is one channel targeted by different contracts under different message names.
+The type parameter is the message's event contract. It flows into the materialized model as `ContractTypeName` (the type's full name) and pins both halves of the declaration: one message name carrying two different contract types is rejected at `Build()`. A channel may carry several messages, each with its own contract — a consumer handles the ones it needs (see [Subscriptions](subscriptions.md)).
 
 ## Materialized messages and topics
 

@@ -193,7 +193,8 @@ The service materializes when a component calls `Uses(service)`. The topology re
 | Entry point | Builder | Legal methods | Build-time requirements |
 |-------------|---------|---------------|-------------------------|
 | `AddExtractor(name)` | `ExtractorBuilder` | `From(port)`, `Publishes(message)`, `Uses(service)` | must publish at least one message |
-| `AddLoader(name)` | `LoaderBuilder` | `Subscribes(message)`, `To(port)`, `Uses(service)` | must subscribe to exactly one message; `To` is optional |
+| `AddLoader(name)` | `LoaderBuilder` | `Subscribes(sub => …)`, `Subscribes(message)`, `InBatches(…)`, `To(port)`, `Uses(service)` | must subscribe to exactly one channel; `To` is optional |
+| `Subscribes(sub => …)` | `SubscriptionBuilder` | `Handles(message, when?)`, `IgnoreOthers()`, `InBatches(maxMessages, maxWait)` | handles at least one message, all on one channel; see [Subscriptions](subscriptions.md) |
 | `AddTransactionalIntegration(name)` | `TransactionalIntegrationBuilder` | `From(port)`, `To(port)`, `Uses(service)` | must have at least one `From` and at least one `To` |
 | `Otlp(endpoint)` | `OtlpBuilder` | `WithProtocol(protocol)`, `WithHeader(name, value)` | only one OTLP declaration per system |
 
@@ -382,13 +383,15 @@ Materialization is deterministic so serialized topology JSON is stable across ru
 |----------|------|
 | Error | Component names must be unique. |
 | Error | A system must declare at least one component. |
-| Error | A component must not publish the same `(pubsub, topic)` channel more than once. |
+| Error | A component must not publish the same message more than once. |
 | Error | A component must not subscribe to the same `(pubsub, topic)` channel more than once. |
 | Error | One message name must not resolve to multiple channels. |
 | Error | One message name must not carry multiple payload contract types. |
-| Error | One channel must not carry multiple payload contract types. |
+| Error | A subscription's messages must all travel on one channel. |
+| Error | A subscription must handle at least one message. |
+| Error | A component must not handle the same message more than once. |
 | Error | Extractors must publish at least one message. |
-| Error | Loaders must subscribe to exactly one message. |
+| Error | Loaders must subscribe to exactly one channel. |
 | Error | Transactional integrations must declare at least one `From` and one `To` port. |
 | Error | A pubsub name must not equal a port's Dapr component name. |
 | Error | A component must not use the same service more than once. |

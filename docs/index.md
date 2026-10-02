@@ -54,6 +54,7 @@ Messages and ports are declared as static fields in a scaffolded `Messages.cs` /
 | [Model and DSL Reference](concepts/model.md) | C# implementation, runtime mappings, and output model |
 | [Components](concepts/components.md) | Component kinds, block builders, and their legal edges |
 | [Messages](concepts/messages.md) | Typed message refs and the materialize-from-usage model |
+| [Subscriptions](concepts/subscriptions.md) | The messages a component handles from a channel, and the Dapr Subscription they render |
 | [Ports](concepts/ports.md) | Ports and their Dapr bindings |
 | [Validation](concepts/validation.md) | The validation rules and the Build/TryBuild/Validate API |
 | [Materialization](concepts/materialization.md) | How declarations fold into the immutable model |

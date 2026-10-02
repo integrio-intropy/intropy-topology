@@ -80,13 +80,14 @@ public static class IntropyAspire
     internal static bool IsRunToCompletion(ComponentKind kind) =>
         ComponentKinds.IsRunToCompletion(kind);
 
-    /// <summary>The endpoint a batch-receiving loader serves the Dapr gRPC app callback on.</summary>
+    /// <summary>The endpoint a message-receiving component serves the Dapr gRPC app callback on.</summary>
     internal const string GrpcAppEndpoint = "grpc";
 
-    /// <summary>Whether the component receives its topic in batches (Dapr bulk subscribe): its
-    /// sidecar then delivers over a gRPC app channel instead of the app streaming from it.</summary>
-    internal static bool ReceivesInBatches(ComponentModel component) =>
-        component.Subscribes.Any(s => s.Bulk is not null);
+    /// <summary>Whether the component receives messages: it subscribes to a topic, or (a
+    /// transactional integration) to its internal hop. Its sidecar then pushes them over a gRPC
+    /// app channel to the callback the framework serves.</summary>
+    internal static bool ReceivesMessages(ComponentModel component) =>
+        component.Subscribes.Count > 0 || component.InternalQueue is not null;
 
     /// <summary>
     /// Translates the topology into Aspire resources on <paramref name="builder"/>. Separated from
@@ -167,9 +168,9 @@ public static class IntropyAspire
             var project = builder.AddProject(component.Name, projectPath);
             // The endpoint makes Aspire allocate a port and inject ASPNETCORE_URLS (without it
             // every Kestrel binds the 5000 default) and gives the Dapr sidecar its app-port. A
-            // loader that receives in batches serves the Dapr gRPC app callback instead: its
-            // endpoint's port reaches the app as APP_PORT, where the framework listens.
-            project = ReceivesInBatches(component)
+            // component that receives messages serves the Dapr gRPC app callback: its endpoint's
+            // port reaches the app as APP_PORT, where the framework listens.
+            project = ReceivesMessages(component)
                 ? project.WithHttpEndpoint(name: GrpcAppEndpoint, env: "APP_PORT")
                 : project.WithHttpEndpoint();
 
@@ -378,13 +379,13 @@ public static class IntropyAspire
         project
             .WithDaprSidecar(sidecar =>
             {
-                var batches = ReceivesInBatches(component);
+                var receives = ReceivesMessages(component);
                 sidecar.WithOptions(new DaprSidecarOptions
                 {
                     AppId = component.Name,
                     ResourcesPaths = [resourcesPath],
-                    AppProtocol = batches ? "grpc" : null,
-                    AppEndpoint = batches ? GrpcAppEndpoint : null,
+                    AppProtocol = receives ? "grpc" : null,
+                    AppEndpoint = receives ? GrpcAppEndpoint : null,
                 });
                 sidecar.WaitFor(redis);
                 if (otlp is not null)

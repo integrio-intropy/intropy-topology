@@ -14,8 +14,13 @@ public sealed record TopicResource
     /// <summary>The topic name.</summary>
     public required string TopicName { get; init; }
 
-    /// <summary>Full name of the event contract type carried on the topic.</summary>
+    /// <summary>Full name of the contract of the first message declared on the topic. A topic may
+    /// carry several messages, each with its own contract: see <see cref="Messages"/> and
+    /// <see cref="SystemTopology.MessageGroups"/>.</summary>
     public required string ContractTypeName { get; init; }
+
+    /// <summary>Names of the messages carried on the topic (sorted).</summary>
+    public IReadOnlyList<string> Messages { get; init; } = [];
 
     /// <summary>Names of components publishing to the topic (sorted).</summary>
     public required IReadOnlyList<string> Publishers { get; init; }

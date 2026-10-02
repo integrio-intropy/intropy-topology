@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace Intropy.Topology.Model;
 
-/// <summary>A topic a component subscribes to.</summary>
+/// <summary>A topic a component subscribes to, and the messages it handles from it.</summary>
 public sealed record TopicSubscription
 {
     /// <summary>The Dapr pubsub component name.</summary>
@@ -11,9 +11,25 @@ public sealed record TopicSubscription
     /// <summary>The topic name.</summary>
     public required string TopicName { get; init; }
 
-    /// <summary>Set when the subscription delivers in batches (Dapr bulk subscribe): the
-    /// component then receives through a gRPC app callback instead of a streaming
-    /// subscription. Null for one message at a time.</summary>
+    /// <summary>The names of the messages the component handles from the topic, in declaration
+    /// order. A message's name is its CloudEvent type.</summary>
+    public IReadOnlyList<string> Messages { get; init; } = [];
+
+    /// <summary>The content filter of each handled message that has one, by message name: a Dapr
+    /// CEL expression its events must also match. The message's events it leaves out are unhandled.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public IReadOnlyDictionary<string, string>? Conditions { get; init; }
+
+    /// <summary>The content filter for <paramref name="messageName"/>, if it has one.</summary>
+    public string? ConditionFor(string messageName) =>
+        Conditions is not null && Conditions.TryGetValue(messageName, out var condition) ? condition : null;
+
+    /// <summary>What happens to the topic's messages the component does not handle — including a
+    /// handled message's events its content filter leaves out.</summary>
+    public UnhandledMessages Unhandled { get; init; } = UnhandledMessages.DeadLetter;
+
+    /// <summary>Set when the subscription delivers in batches (Dapr bulk subscribe). Null for one
+    /// message at a time.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public BulkSubscription? Bulk { get; init; }
 }
@@ -28,7 +44,7 @@ public sealed record BulkSubscription
     public required TimeSpan MaxWait { get; init; }
 }
 
-/// <summary>A component publishing to a topic.</summary>
+/// <summary>A component publishing a message to a topic.</summary>
 public sealed record PublishEdge
 {
     /// <summary>The Dapr pubsub component name.</summary>
@@ -36,6 +52,10 @@ public sealed record PublishEdge
 
     /// <summary>The topic name.</summary>
     public required string TopicName { get; init; }
+
+    /// <summary>The name of the message published — its CloudEvent type. A component may publish
+    /// several messages to one topic.</summary>
+    public string Message { get; init; } = "";
 }
 
 /// <summary>A component using a port in one direction.</summary>
@@ -60,4 +80,28 @@ public sealed record InternalQueue
 
     /// <summary>The topic the receive pipeline publishes and the send pipeline subscribes to.</summary>
     public required string TopicName { get; init; }
+}
+
+/// <summary>
+/// The names a component's Dapr <c>Subscription</c> is rendered with — the single derivation site,
+/// so every backend (local generation, Aspire, deployment tooling) and the framework agree.
+/// </summary>
+public static class SubscriptionRouting
+{
+    /// <summary>The route the sidecar sends a channel's unhandled messages to; the component's
+    /// <see cref="UnhandledMessages"/> decides whether it acknowledges them.</summary>
+    public const string UnhandledPath = "/unhandled";
+
+    /// <summary>The <c>Subscription</c> resource's name for <paramref name="componentName"/>.</summary>
+    public static string ResourceNameFor(string componentName) => $"{componentName}-subscription";
+
+    /// <summary>The route a handled message is delivered on: its name — its CloudEvent type — as a path.</summary>
+    public static string PathFor(string messageName) => $"/{messageName}";
+
+    /// <summary>The CEL rule that selects <paramref name="messageName"/>'s events: by type, and by
+    /// <paramref name="condition"/>, the message's content filter, when it has one.</summary>
+    public static string MatchFor(string messageName, string? condition = null) =>
+        condition is null
+            ? $"event.type == '{messageName}'"
+            : $"event.type == '{messageName}' && ({condition})";
 }

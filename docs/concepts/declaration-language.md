@@ -56,9 +56,10 @@ A declaration must satisfy these rules:
 
 - A system contains at least one component, and component names are unique within it.
 - Each component satisfies the relationship counts for its kind.
-- One message name identifies one payload contract and one channel within the system.
-- Messages sharing a channel use the same payload contract.
-- A component does not declare publication or subscription to the same channel twice.
+- One message name identifies one payload contract and one channel within the system. A message's name is its CloudEvent type.
+- A channel may carry several messages, each with its own payload contract.
+- A subscription is to one channel: the messages it handles all travel on it, and it handles at least one.
+- A component does not publish the same message twice, handle the same message twice, or subscribe to the same channel twice.
 - A component does not declare use of the same service twice.
 - Repeating a read or write relationship to the same port adds no new relationship. Reading and writing remain distinct.
 - An external service identity does not identify a component in the same system.

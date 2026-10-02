@@ -3,9 +3,9 @@ using Intropy.Topology.Model;
 namespace Intropy.Topology.Validation.Rules;
 
 /// <summary>
-/// A component must not declare the same channel (pubsub, topic) twice on the
-/// publish side. Publishing several distinct messages is legal; repeating one is
-/// a redundant edge and almost certainly a declaration slip.
+/// A component must not publish the same message twice. Publishing several distinct messages —
+/// to one topic or several — is legal; repeating one is a redundant edge and almost certainly a
+/// declaration slip.
 /// </summary>
 internal sealed class DuplicatePublishRule : IModelRule
 {
@@ -14,14 +14,14 @@ internal sealed class DuplicatePublishRule : IModelRule
         foreach (var component in topology.Components)
         {
             var duplicates = component.Publishes
-                .GroupBy(t => (t.PubSubName, t.TopicName))
+                .GroupBy(p => p.Message, StringComparer.Ordinal)
                 .Where(g => g.Count() > 1);
 
             foreach (var group in duplicates)
             {
                 yield return new TopologyDiagnostic(
                     DiagnosticSeverity.Error,
-                    $"The topic '{group.Key.TopicName}' on pubsub '{group.Key.PubSubName}' is published to more than once by the same component.",
+                    $"The message '{group.Key}' is published more than once by the same component.",
                     component.Name);
             }
         }
@@ -107,30 +107,77 @@ internal sealed class MessageContractConflictRule : IDeclarationRule
 }
 
 /// <summary>
-/// One transport channel must not be used with two different payload contract types
-/// under different message names. The model carries only the contract's name and
-/// materialization is first-seen-wins, so the conflict is visible only in the raw
-/// <see cref="MessageRef"/> declarations.
+/// A subscription's messages must travel on one channel: the subscription is the component's
+/// subscription to that channel. Materialization takes the first message's channel, so the
+/// conflict is visible only in the raw declarations.
 /// </summary>
-internal sealed class TopicContractConflictRule : IDeclarationRule
+internal sealed class SubscriptionChannelConflictRule : IDeclarationRule
 {
     public IEnumerable<TopologyDiagnostic> Evaluate(SystemBuilder builder)
     {
-        var usages = builder.Components.SelectMany(MessageDeclarationUsages.Of);
-
-        var conflicts = usages
-            .GroupBy(m => (m.PubSubName, m.TopicName))
-            .Where(g => g.Select(m => m.ContractType).Distinct().Count() > 1);
-
-        foreach (var group in conflicts)
+        foreach (var component in builder.Components)
         {
-            var contracts = string.Join(
-                ", ",
-                group.Select(m => m.ContractType.FullName ?? m.ContractType.Name).Distinct().Order(StringComparer.Ordinal));
-            yield return new TopologyDiagnostic(
-                DiagnosticSeverity.Error,
-                $"The topic '{group.Key.TopicName}' on pubsub '{group.Key.PubSubName}' is declared with conflicting contract types: {contracts}.",
-                group.Key.TopicName);
+            foreach (var subscription in component.SubscriptionCalls)
+            {
+                var channels = subscription.Messages
+                    .Select(m => (m.PubSubName, m.TopicName))
+                    .Distinct()
+                    .ToList();
+                if (channels.Count <= 1)
+                {
+                    continue;
+                }
+
+                var described = string.Join(", ", channels
+                    .Select(c => $"'{c.TopicName}' on pubsub '{c.PubSubName}'")
+                    .Order(StringComparer.Ordinal));
+                yield return new TopologyDiagnostic(
+                    DiagnosticSeverity.Error,
+                    $"A subscription handles messages from different channels ({described}); a subscription is to one channel, so all of its messages must travel on it.",
+                    component.Name);
+            }
+        }
+    }
+}
+
+/// <summary>A subscription must handle at least one message: an empty one has no channel.</summary>
+internal sealed class EmptySubscriptionRule : IDeclarationRule
+{
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemBuilder builder)
+    {
+        foreach (var component in builder.Components)
+        {
+            if (component.SubscriptionCalls.Any(s => s.Messages.Count == 0))
+            {
+                yield return new TopologyDiagnostic(
+                    DiagnosticSeverity.Error,
+                    "A subscription handles no message; add a Handles call.",
+                    component.Name);
+            }
+        }
+    }
+}
+
+/// <summary>A component must not handle the same message twice: each message is one route.</summary>
+internal sealed class DuplicateHandledMessageRule : IDeclarationRule
+{
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemBuilder builder)
+    {
+        foreach (var component in builder.Components)
+        {
+            var duplicates = component.SubscribeCalls
+                .GroupBy(m => m.Name, StringComparer.Ordinal)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .Order(StringComparer.Ordinal);
+
+            foreach (var message in duplicates)
+            {
+                yield return new TopologyDiagnostic(
+                    DiagnosticSeverity.Error,
+                    $"The message '{message}' is handled more than once by the same component.",
+                    component.Name);
+            }
         }
     }
 }

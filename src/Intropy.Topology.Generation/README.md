@@ -11,7 +11,13 @@ It produces, deterministically:
   development-manifest folder, `scopes` from `UsedBy`),
 - one Dapr **HTTPEndpoint** per development-mocked platform service, named after the service's
   app-id so service invocation resolves to the mock,
-- a per-component `*.intropy.json` describing that component's identity and edges.
+- one declarative Dapr **Subscription** per subscribing component (`<component>-subscription`):
+  one routing rule per handled message (`event.type == '<message>'` to `/<message>`), a default
+  route (`/unhandled`) for the channel's other messages, `bulkSubscribe` when the subscription
+  batches, scoped to the component; a transactional integration's subscribes to its internal hop
+  with the default route only,
+- a per-component `*.intropy.json` describing that component's identity and edges, including each
+  subscription's handled messages and what happens to the others (`Unhandled`).
 
 The development manifest's re-run cadences are deliberately absent from this list: they are
 local host mechanism (see ADR 0012) and are never emitted into generated artifacts.

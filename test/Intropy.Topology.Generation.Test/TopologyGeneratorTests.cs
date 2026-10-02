@@ -191,7 +191,7 @@ public class TopologyGeneratorTests
     public void Generate_WithABatchingLoader_ShouldEmitItsBulkSettingsInTheRuntimeConfig()
     {
         // Arrange
-        var topic = TopicRef<string>.Define("catalog", "product-changed");
+        var topic = MessageRef<string>.Define("product-changed", "catalog");
         var builder = SystemBuilder.Create("catalog");
         builder.AddExtractor("extractor").Publishes(topic);
         builder.AddLoader("loader").Subscribes(topic).InBatches(200, TimeSpan.FromSeconds(2));
@@ -207,7 +207,7 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Generate_WithAStreamingLoader_ShouldEmitNoBulkSettings()
+    public void Generate_WithALoaderReceivingOneMessageAtATime_ShouldEmitNoBulkSettings()
     {
         // Act
         var json = Content("config/order-loader.intropy.json");
