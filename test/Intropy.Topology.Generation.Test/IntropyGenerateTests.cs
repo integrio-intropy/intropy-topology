@@ -231,6 +231,7 @@ public class IntropyGenerateTests
         builder.AddLoader("loader").Subscribes(message);
         var manifest = new DevelopmentManifest(
             [new OpenApiMock("ghost-service", "/tmp/ghost.yaml", "Ghost", "1")],
+            [],
             []);
 
         // Act & Assert

@@ -35,6 +35,7 @@ internal static class TopologyMaterializer
                     PubSubName = t.Key.PubSub,
                     TopicName = t.Key.Topic,
                     ContractTypeName = t.Value.ContractTypeName,
+                    Messages = [.. t.Value.Messages],
                     Publishers = [.. t.Value.Publishers],
                     Subscribers = [.. t.Value.Subscribers],
                 })
@@ -86,15 +87,34 @@ internal static class TopologyMaterializer
         Dictionary<string, ServiceAccumulator> services)
     {
         var subscribes = new List<TopicSubscription>();
-        foreach (var message in component.SubscribeCalls)
+        foreach (var subscription in component.SubscriptionCalls)
         {
+            // An empty subscription has no channel to materialize; a declaration rule reports it.
+            // A subscription whose messages travel on different channels materializes on the
+            // first one's (first-seen wins); a declaration rule reports the mismatch.
+            if (subscription.Messages.Count == 0)
+            {
+                continue;
+            }
+
+            var channel = subscription.Messages[0];
             subscribes.Add(new TopicSubscription
             {
-                PubSubName = message.PubSubName,
-                TopicName = message.TopicName,
+                PubSubName = channel.PubSubName,
+                TopicName = channel.TopicName,
+                Messages = [.. subscription.Messages.Select(m => m.Name).Distinct(StringComparer.Ordinal)],
+                Conditions = subscription.Conditions.Count == 0
+                    ? null
+                    : new Dictionary<string, string>(subscription.Conditions, StringComparer.Ordinal),
+                Unhandled = subscription.Unhandled,
+                Bulk = (component as LoaderComponent)?.Bulk,
             });
-            AccumulateTopic(topics, message).Subscribers.Add(component.Name);
-            AccumulateMessage(messages, message).Subscribers.Add(component.Name);
+
+            foreach (var message in subscription.Messages)
+            {
+                AccumulateTopic(topics, message).Subscribers.Add(component.Name);
+                AccumulateMessage(messages, message).Subscribers.Add(component.Name);
+            }
         }
 
         var publishes = new List<PublishEdge>();
@@ -104,6 +124,7 @@ internal static class TopologyMaterializer
             {
                 PubSubName = message.PubSubName,
                 TopicName = message.TopicName,
+                Message = message.Name,
             });
             AccumulateTopic(topics, message).Publishers.Add(component.Name);
             AccumulateMessage(messages, message).Publishers.Add(component.Name);
@@ -165,6 +186,7 @@ internal static class TopologyMaterializer
             topics[key] = accumulator;
         }
 
+        accumulator.Messages.Add(message.Name);
         return accumulator;
     }
 
@@ -204,6 +226,7 @@ internal static class TopologyMaterializer
     private sealed class TopicAccumulator(string contractTypeName)
     {
         public string ContractTypeName { get; } = contractTypeName;
+        public SortedSet<string> Messages { get; } = new(StringComparer.Ordinal);
         public SortedSet<string> Publishers { get; } = new(StringComparer.Ordinal);
         public SortedSet<string> Subscribers { get; } = new(StringComparer.Ordinal);
     }

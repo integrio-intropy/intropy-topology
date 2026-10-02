@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Intropy.Topology.Model;
 
 /// <summary>A topic a component subscribes to.</summary>
@@ -8,6 +10,22 @@ public sealed record TopicSubscription
 
     /// <summary>The topic name.</summary>
     public required string TopicName { get; init; }
+
+    /// <summary>Set when the subscription delivers in batches (Dapr bulk subscribe): the
+    /// component then receives through a gRPC app callback instead of a streaming
+    /// subscription. Null for one message at a time.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public BulkSubscription? Bulk { get; init; }
+}
+
+/// <summary>How a bulk subscription batches its messages.</summary>
+public sealed record BulkSubscription
+{
+    /// <summary>The most messages the sidecar collects into one delivery.</summary>
+    public required int MaxMessages { get; init; }
+
+    /// <summary>How long the sidecar waits to fill a delivery before sending what it has.</summary>
+    public required TimeSpan MaxWait { get; init; }
 }
 
 /// <summary>A component publishing to a topic.</summary>

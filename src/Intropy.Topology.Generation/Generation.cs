@@ -170,7 +170,14 @@ public static class TopologyGenerator
                 System = systemName,
                 Component = component.Name,
                 Kind = component.Kind.ToString(),
-                Subscribes = component.Subscribes.Select(s => new { s.PubSubName, s.TopicName }),
+                Subscribes = component.Subscribes.Select(s => new
+                {
+                    s.PubSubName,
+                    s.TopicName,
+                    Bulk = s.Bulk is null
+                        ? null
+                        : new { s.Bulk.MaxMessages, MaxWaitMilliseconds = (long)s.Bulk.MaxWait.TotalMilliseconds },
+                }),
                 Publishes = component.Publishes.Select(p => new { p.PubSubName, p.TopicName }),
                 Ports = component.Ports.Select(c => new
                 {
