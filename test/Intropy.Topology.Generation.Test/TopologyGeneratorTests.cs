@@ -194,7 +194,7 @@ public class TopologyGeneratorTests
         var topic = MessageRef<string>.Define("product-changed", "catalog");
         var builder = SystemBuilder.Create("catalog");
         builder.AddExtractor("extractor").Publishes(topic);
-        builder.AddLoader("loader").Subscribes(sub => sub.Handles(topic).InBatches(200, TimeSpan.FromSeconds(2)));
+        builder.AddLoader("loader").Subscribes(topic, configure: sub => sub.InBatches(200, TimeSpan.FromSeconds(2)));
         var manifest = new DevelopmentManifest([], [], []);
 
         // Act

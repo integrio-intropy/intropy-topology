@@ -11,8 +11,8 @@ public sealed record OrderPlaced;
 public sealed record OrderCancelled;
 
 /// <summary>
-/// A subscription: the messages a component handles from one channel, and what happens to the
-/// channel's other messages.
+/// A subscription: at least the message <c>Subscribes</c> requires, the channel's other messages
+/// <c>AlsoHandles</c> adds, and what happens to the channel's other messages.
 /// </summary>
 public sealed class SubscriptionTests
 {
@@ -37,7 +37,7 @@ public sealed class SubscriptionTests
     public void Build_WithASubscriptionHandlingTwoMessages_ShouldMaterializeOneSubscriptionToTheirChannel()
     {
         // Arrange
-        var builder = System(l => l.Subscribes(sub => sub.Handles(s_placed).Handles(s_cancelled)));
+        var builder = System(l => l.Subscribes(s_placed, configure: sub => sub.AlsoHandles(s_cancelled)));
 
         // Act
         var topology = builder.Build();
@@ -51,12 +51,11 @@ public sealed class SubscriptionTests
     }
 
     [Fact]
-    public void Build_WithAContentFilter_ShouldMaterializeItForItsMessageOnly()
+    public void Build_WithAContentFilterOnTheAddedMessage_ShouldMaterializeItForItsMessageOnly()
     {
         // Arrange
-        var builder = System(l => l.Subscribes(sub => sub
-            .Handles(s_placed)
-            .Handles(s_cancelled, when: "  event.data.reason == 'customer-request'  ")));
+        var builder = System(l => l.Subscribes(s_placed, configure: sub => sub
+            .AlsoHandles(s_cancelled, when: "  event.data.reason == 'customer-request'  ")));
 
         // Act
         var subscription = Assert.Single(Loader(builder.Build()).Subscribes);
@@ -64,6 +63,34 @@ public sealed class SubscriptionTests
         // Assert
         Assert.Equal("event.data.reason == 'customer-request'", subscription.ConditionFor(s_cancelled.Name));
         Assert.Null(subscription.ConditionFor(s_placed.Name));
+    }
+
+    [Fact]
+    public void Build_WithAContentFilterOnTheFirstMessage_ShouldMaterializeItForItsMessageOnly()
+    {
+        // Arrange
+        var builder = System(l => l.Subscribes(s_placed, when: "  event.data.priority == 'high'  ",
+            sub => sub.AlsoHandles(s_cancelled)));
+
+        // Act
+        var subscription = Assert.Single(Loader(builder.Build()).Subscribes);
+
+        // Assert
+        Assert.Equal("event.data.priority == 'high'", subscription.ConditionFor(s_placed.Name));
+        Assert.Null(subscription.ConditionFor(s_cancelled.Name));
+    }
+
+    [Fact]
+    public void Build_WithASingleMessage_ShouldMaterializeASubscriptionHandlingIt()
+    {
+        // Arrange
+        var builder = System(l => l.Subscribes(s_placed));
+
+        // Act
+        var topology = builder.Build();
+
+        // Assert
+        Assert.Equal(["fluxia.orders.order-placed"], Assert.Single(Loader(topology).Subscribes).Messages);
     }
 
     [Fact]
@@ -79,17 +106,27 @@ public sealed class SubscriptionTests
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public void Handles_WithABlankContentFilter_ShouldThrow(string when)
+    public void Subscribes_WithABlankContentFilter_ShouldThrow(string when)
     {
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => System(l => l.Subscribes(sub => sub.Handles(s_placed, when))));
+        Assert.Throws<ArgumentException>(() => System(l => l.Subscribes(s_placed, when)));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AlsoHandles_WithABlankContentFilter_ShouldThrow(string when)
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() =>
+            System(l => l.Subscribes(s_placed, configure: sub => sub.AlsoHandles(s_cancelled, when))));
     }
 
     [Fact]
     public void Build_WithIgnoreOthers_ShouldMaterializeTheChoice()
     {
         // Arrange
-        var builder = System(l => l.Subscribes(sub => sub.Handles(s_placed).IgnoreOthers()));
+        var builder = System(l => l.Subscribes(s_placed, configure: sub => sub.IgnoreOthers()));
 
         // Act
         var topology = builder.Build();
@@ -99,23 +136,10 @@ public sealed class SubscriptionTests
     }
 
     [Fact]
-    public void Build_WithTheSingleMessageShorthand_ShouldMaterializeASubscriptionHandlingIt()
-    {
-        // Arrange
-        var builder = System(l => l.Subscribes(s_placed));
-
-        // Act
-        var topology = builder.Build();
-
-        // Assert
-        Assert.Equal(["fluxia.orders.order-placed"], Assert.Single(Loader(topology).Subscribes).Messages);
-    }
-
-    [Fact]
     public void Build_WithInBatchesOnTheSubscription_ShouldMaterializeABulkSubscription()
     {
         // Arrange
-        var builder = System(l => l.Subscribes(sub => sub.Handles(s_placed).InBatches(50, TimeSpan.FromMilliseconds(500))));
+        var builder = System(l => l.Subscribes(s_placed, configure: sub => sub.InBatches(50, TimeSpan.FromMilliseconds(500))));
 
         // Act
         var topology = builder.Build();
@@ -143,8 +167,8 @@ public sealed class SubscriptionTests
     {
         // Act & Assert
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            System(l => l.Subscribes(sub => sub.Handles(s_placed)
-                .InBatches(maxMessages, TimeSpan.FromMilliseconds(maxWaitMilliseconds)))));
+            System(l => l.Subscribes(s_placed, configure: sub =>
+                sub.InBatches(maxMessages, TimeSpan.FromMilliseconds(maxWaitMilliseconds)))));
     }
 
     [Fact]
@@ -152,15 +176,14 @@ public sealed class SubscriptionTests
     {
         // Act & Assert — the sidecar's bulk wait is a whole number of milliseconds.
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            System(l => l.Subscribes(sub => sub.Handles(s_placed).InBatches(10, TimeSpan.FromTicks(15_000)))));
+            System(l => l.Subscribes(s_placed, configure: sub => sub.InBatches(10, TimeSpan.FromTicks(15_000)))));
     }
 
     [Fact]
     public void InBatches_DeclaredTwice_ShouldThrow()
     {
         // Act & Assert
-        Assert.Throws<InvalidOperationException>(() => System(l => l.Subscribes(sub => sub
-            .Handles(s_placed)
+        Assert.Throws<InvalidOperationException>(() => System(l => l.Subscribes(s_placed, configure: sub => sub
             .InBatches(10, TimeSpan.FromSeconds(1))
             .InBatches(20, TimeSpan.FromSeconds(1)))));
     }
@@ -169,7 +192,7 @@ public sealed class SubscriptionTests
     public void Build_ShouldRecordEachHandledMessagesSubscriber()
     {
         // Arrange: the loader handles one of the channel's two messages
-        var builder = System(l => l.Subscribes(sub => sub.Handles(s_placed).IgnoreOthers()));
+        var builder = System(l => l.Subscribes(s_placed, configure: sub => sub.IgnoreOthers()));
 
         // Act
         var messages = builder.Build().MessageGroups.Single().Messages;
@@ -184,7 +207,7 @@ public sealed class SubscriptionTests
     {
         // Arrange
         var elsewhere = MessageRef<OrderCancelled>.Define("fluxia.returns.order-cancelled", "pubsub", "returns");
-        var builder = System(l => l.Subscribes(sub => sub.Handles(s_placed).Handles(elsewhere)));
+        var builder = System(l => l.Subscribes(s_placed, configure: sub => sub.AlsoHandles(elsewhere)));
 
         // Act
         var diagnostic = Assert.Single(builder.DeclarationDiagnosticsFor<SubscriptionChannelConflictRule>());
@@ -197,24 +220,10 @@ public sealed class SubscriptionTests
     }
 
     [Fact]
-    public void Validate_WithAnEmptySubscription_ShouldReportError()
-    {
-        // Arrange
-        var builder = System(l => l.Subscribes(_ => { }));
-
-        // Act
-        var diagnostic = Assert.Single(builder.DeclarationDiagnosticsFor<EmptySubscriptionRule>());
-
-        // Assert
-        Assert.Equal("fulfillment", diagnostic.Target);
-        Assert.Throws<TopologyValidationException>(() => builder.Build());
-    }
-
-    [Fact]
     public void Validate_WithAMessageHandledTwice_ShouldReportError()
     {
         // Arrange
-        var builder = System(l => l.Subscribes(sub => sub.Handles(s_placed).Handles(s_placed)));
+        var builder = System(l => l.Subscribes(s_placed, configure: sub => sub.AlsoHandles(s_placed)));
 
         // Act
         var diagnostic = Assert.Single(builder.DeclarationDiagnosticsFor<DuplicateHandledMessageRule>());

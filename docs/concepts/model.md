@@ -211,8 +211,8 @@ public static class Components
 | Entry point | Builder | Legal methods | Build-time requirements |
 |-------------|---------|---------------|-------------------------|
 | `AddExtractor(name)` | `ExtractorBuilder` | `From(port)`, `Publishes(message)`, `Uses(service)` | must publish at least one message |
-| `AddLoader(name)` | `LoaderBuilder` | `Subscribes(sub => …)`, `Subscribes(message)`, `To(port)`, `Uses(service)` | must subscribe to exactly one channel; `To` is optional |
-| `Subscribes(sub => …)` | `SubscriptionBuilder` | `Handles(message, when?)`, `IgnoreOthers()`, `InBatches(maxMessages, maxWait)` | handles at least one message, all on one channel; see [Subscriptions](subscriptions.md) |
+| `AddLoader(name)` | `LoaderBuilder` | `Subscribes(message, when?, configure: sub => …)`, `To(port)`, `Uses(service)` | must subscribe to exactly one channel; `To` is optional |
+| `Subscribes(message, when?, configure: sub => …)` | `SubscriptionBuilder` | `AlsoHandles(message, when?)`, `IgnoreOthers()`, `InBatches(maxMessages, maxWait)` | every handled message on one channel; see [Subscriptions](subscriptions.md) |
 | `AddTransactionalIntegration(name)` | `TransactionalIntegrationBuilder` | `From(port)`, `To(port)`, `Uses(service)` | must have at least one `From` and at least one `To` |
 | `Otlp(endpoint)` | `OtlpBuilder` | `WithProtocol(protocol)`, `WithHeader(name, value)` | only one OTLP declaration per system |
 
@@ -238,7 +238,8 @@ Rules:
 
 ### Loader
 
-A loader consumes one message and may write to an outside-world port.
+A loader subscribes to one channel — handling at least one of its messages — and may write to an
+outside-world port.
 
 ```csharp
 builder.AddLoader("order-loader")
@@ -406,7 +407,6 @@ Materialization is deterministic so serialized topology JSON is stable across ru
 | Error | One message name must not resolve to multiple channels. |
 | Error | One message name must not carry multiple payload contract types. |
 | Error | A subscription's messages must all travel on one channel. |
-| Error | A subscription must handle at least one message. |
 | Error | A component must not handle the same message more than once. |
 | Error | Extractors must publish at least one message. |
 | Error | Loaders must subscribe to exactly one channel. |

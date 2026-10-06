@@ -15,8 +15,9 @@ processed stays in the component's code.
 
 ## Decision
 
-- A subscription is declared as `Subscribes(sub => sub.Handles(message)…)`. Its channel is the
-  handled messages' own; they must share it.
+- A subscription is declared as `Subscribes(message, configure: sub => …)`; the required message
+  is a parameter of `Subscribes` itself and `configure` adds to it. The subscription's channel is
+  the handled messages' own; they must share it.
 - A message's name is its CloudEvent type. Routing rules match `event.type` against it.
 - Every subscribing component renders one `Subscription`: a rule per handled message to
   `/<message>`, and always a default route `/unhandled`. Without a default route the sidecar
@@ -25,7 +26,8 @@ processed stays in the component's code.
   acknowledge (`IgnoreOthers()`).
 - No Dapr `deadLetterTopic`: dead-lettering stays with the broker's own queue, where
   `message-resender` replays it.
-- A handled message may carry a content filter, `Handles(message, when: "<CEL>")`, rendered into
+- A handled message may carry a content filter, `AlsoHandles(message, when: "<CEL>")` (or the
+  `when:` parameter of `Subscribes`), rendered into
   its rule as `event.type == '<message>' && (<CEL>)`. Publishers send an object payload as a
   camelCase JSON object, so the rule reads `event.data.<property>` (verified against daprd 1.18).
   A filtered-out event takes the default route and is unhandled like any other: the framework

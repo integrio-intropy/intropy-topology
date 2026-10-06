@@ -248,7 +248,7 @@ public class TopicCarryingSeveralContractsTests
         var enriched = MessageRef<EnrichedEvent>.Define("shared-enriched", "test-pubsub", "shared-topic");
         s.AddExtractor("first").Publishes(raw);
         s.AddExtractor("second").Publishes(enriched);
-        s.AddLoader("consumer").Subscribes(sub => sub.Handles(raw).Handles(enriched));
+        s.AddLoader("consumer").Subscribes(raw, configure: sub => sub.AlsoHandles(enriched));
 
         // Act
         var topology = s.Build();

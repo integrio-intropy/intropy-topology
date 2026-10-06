@@ -88,14 +88,8 @@ internal static class TopologyMaterializer
         var subscribes = new List<TopicSubscription>();
         foreach (var subscription in component.SubscriptionCalls)
         {
-            // An empty subscription has no channel to materialize; a declaration rule reports it.
-            // A subscription whose messages travel on different channels materializes on the
-            // first one's (first-seen wins); a declaration rule reports the mismatch.
-            if (subscription.Messages.Count == 0)
-            {
-                continue;
-            }
-
+            // A subscription's channel is its first message's (first-seen wins); a subscription
+            // whose messages travel on different channels still materializes on the first one's.
             var channel = subscription.Messages[0];
             subscribes.Add(new TopicSubscription
             {

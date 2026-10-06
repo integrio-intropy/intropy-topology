@@ -84,7 +84,7 @@ public sealed class OrderFlowSystem : ISystemDefinition
             .Uses(Services.Idempotency);
 
         // Loader: edge block, subscribes to one channel — here handling one message on it —
-        // and writes through a port. Several: .Subscribes(sub => sub.Handles(a).Handles(b)).
+        // and writes through a port. More of the channel: .Subscribes(a, configure: sub => sub.AlsoHandles(b)).
         builder.AddLoader(Components.OrderLoader)
             .Subscribes(Messages.Orders)
             .To(Ports.OrderLoaderDestination)

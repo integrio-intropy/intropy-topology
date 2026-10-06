@@ -26,7 +26,6 @@ internal static class TopologyRules
         new Rules.MessageChannelConflictRule(),
         new Rules.MessageContractConflictRule(),
         new Rules.SubscriptionChannelConflictRule(),
-        new Rules.EmptySubscriptionRule(),
         new Rules.DuplicateHandledMessageRule(),
         new Rules.DuplicateServiceUsageRule(),
     ];

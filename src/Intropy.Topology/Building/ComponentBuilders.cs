@@ -66,26 +66,32 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
 
     private protected override LoaderBuilder Self => this;
 
-    /// <summary>Declares the loader's subscription when it handles a single message: shorthand
-    /// for <c>Subscribes(sub =&gt; sub.Handles(message))</c>.</summary>
-    /// <param name="message">The message whose events the loader consumes.</param>
-    public LoaderBuilder Subscribes(MessageRef message)
+    /// <summary>
+    /// Declares the loader's subscription, which handles at least the given message and may handle
+    /// more of the same channel's messages. All handled messages must travel on one channel — the
+    /// subscription's channel is the messages' own — and the subscription renders as one
+    /// declarative Dapr <c>Subscription</c> with one routing rule per handled message.
+    /// </summary>
+    /// <param name="message">The first message whose events the loader consumes; the channel the
+    /// message travels on is the subscription's channel.</param>
+    /// <param name="when">A content filter for <paramref name="message"/>: a Dapr CEL expression
+    /// over the event the message's events must also match, such as
+    /// <c>event.data.reason == 'customer-request'</c>. Payload properties are camelCase. Null
+    /// handles all of the message's events.</param>
+    /// <param name="configure">Declares the subscription's remaining behavior: the channel's other
+    /// messages it handles (<see cref="SubscriptionBuilder.AlsoHandles"/>), what happens to its
+    /// unhandled messages (<see cref="SubscriptionBuilder.IgnoreOthers"/>), and whether its
+    /// messages are delivered in batches (<see cref="SubscriptionBuilder.InBatches"/>).</param>
+    /// <exception cref="ArgumentException"><paramref name="when"/> is empty or whitespace.</exception>
+    public LoaderBuilder Subscribes(
+        MessageRef message,
+        string? when = null,
+        Action<SubscriptionBuilder>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(message);
-        return Subscribes(sub => sub.Handles(message));
-    }
-
-    /// <summary>
-    /// Declares the loader's subscription: the messages it handles from one channel, and what
-    /// happens to the channel's other messages. The channel is the handled messages' own, so they
-    /// must all travel on the same one. Rendered as a declarative Dapr <c>Subscription</c> with one
-    /// routing rule per message.
-    /// </summary>
-    /// <param name="configure">Declares the handled messages (<see cref="SubscriptionBuilder.Handles"/>).</param>
-    public LoaderBuilder Subscribes(Action<SubscriptionBuilder> configure)
-    {
-        ArgumentNullException.ThrowIfNull(configure);
-        configure(new SubscriptionBuilder(Component, Component.AddSubscription()));
+        var subscription = new SubscriptionBuilder(Component, Component.AddSubscription());
+        subscription.AlsoHandles(message, when);
+        configure?.Invoke(subscription);
         return this;
     }
 
@@ -114,22 +120,19 @@ public sealed class SubscriptionBuilder
         _subscription = subscription;
     }
 
-    /// <summary>Declares a message the subscription handles. All handled messages must travel on
-    /// the same channel.</summary>
-    /// <param name="message">The message to handle.</param>
+    /// <summary>Declares that the subscription also handles the given message, on top of the one
+    /// <c>Subscribes</c> requires. All handled messages must travel on the same channel.</summary>
+    /// <param name="message">The message to additionally handle.</param>
     /// <param name="when">A content filter: a Dapr CEL expression over the event the message must
     /// also match, such as <c>event.data.reason == 'customer-request'</c>. Payload properties are
     /// camelCase. The sidecar treats the message's events it leaves out as unhandled. Null handles
     /// all of the message's events.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="message"/> is null.</exception>
     /// <exception cref="ArgumentException"><paramref name="when"/> is empty or whitespace.</exception>
-    public SubscriptionBuilder Handles(MessageRef message, string? when = null)
+    public SubscriptionBuilder AlsoHandles(MessageRef message, string? when = null)
     {
-        if (when is not null)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(when);
-        }
-
-        _subscription.Add(message, when?.Trim());
+        ArgumentNullException.ThrowIfNull(message);
+        _subscription.Add(message, ContentFilters.Trimmed(when));
         return this;
     }
 
@@ -153,6 +156,22 @@ public sealed class SubscriptionBuilder
     {
         _component.SetBulk(BulkSubscriptions.Create(maxMessages, maxWait));
         return this;
+    }
+}
+
+/// <summary>Validates and trims a subscription's optional content filter. One definition serves
+/// the first handled message (<c>Subscribes</c>) and the added ones (<see cref="SubscriptionBuilder.AlsoHandles"/>)
+/// so both record the filter the same way.</summary>
+file static class ContentFilters
+{
+    public static string? Trimmed(string? when)
+    {
+        if (when is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(when);
+        }
+
+        return when?.Trim();
     }
 }
 

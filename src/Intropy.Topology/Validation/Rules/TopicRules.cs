@@ -140,24 +140,6 @@ internal sealed class SubscriptionChannelConflictRule : IDeclarationRule
     }
 }
 
-/// <summary>A subscription must handle at least one message: an empty one has no channel.</summary>
-internal sealed class EmptySubscriptionRule : IDeclarationRule
-{
-    public IEnumerable<TopologyDiagnostic> Evaluate(SystemBuilder builder)
-    {
-        foreach (var component in builder.Components)
-        {
-            if (component.SubscriptionCalls.Any(s => s.Messages.Count == 0))
-            {
-                yield return new TopologyDiagnostic(
-                    DiagnosticSeverity.Error,
-                    "A subscription handles no message; add a Handles call.",
-                    component.Name);
-            }
-        }
-    }
-}
-
 /// <summary>A component must not handle the same message twice: each message is one route.</summary>
 internal sealed class DuplicateHandledMessageRule : IDeclarationRule
 {

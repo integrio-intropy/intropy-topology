@@ -114,9 +114,8 @@ public class IntropyGenerateTests
         var cancelled = MessageRef<OrderCancelled>.Define("fluxia.orders.order-cancelled", "pubsub", "orders");
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("order-extractor").Publishes(placed).Publishes(cancelled);
-        builder.AddLoader("fulfillment").Subscribes(sub => sub
-            .Handles(placed)
-            .Handles(cancelled, when: "event.data.reason != 'fraud-review'")
+        builder.AddLoader("fulfillment").Subscribes(placed, configure: sub => sub
+            .AlsoHandles(cancelled, when: "event.data.reason != 'fraud-review'")
             .IgnoreOthers());
 
         // Act
@@ -330,7 +329,7 @@ public class IntropyGenerateTests
         var placed = MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", "pubsub", "orders");
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("order-extractor").Publishes(placed);
-        builder.AddLoader("fulfillment").Subscribes(sub => sub.Handles(placed).InBatches(100, TimeSpan.FromSeconds(2)));
+        builder.AddLoader("fulfillment").Subscribes(placed, configure: sub => sub.InBatches(100, TimeSpan.FromSeconds(2)));
 
         // Act
         using var json = JsonDocument.Parse(IntropyGenerate.GraphJson(builder.Build(), development: null));

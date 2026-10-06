@@ -26,11 +26,11 @@ public class SubscriptionGenerationTests
         TopologyGenerator.Generate(builder.Build(), s_noDevelopment, Directory.GetCurrentDirectory()).Files
             .Single(f => f.RelativePath == relativePath).Content;
 
-    private static SystemBuilder Orders(Action<Intropy.Topology.Building.SubscriptionBuilder> subscription)
+    private static SystemBuilder Orders(Action<Intropy.Topology.Building.SubscriptionBuilder>? subscription = null)
     {
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("order-extractor").Publishes(s_placed).Publishes(s_cancelled);
-        builder.AddLoader("fulfillment").Subscribes(subscription);
+        builder.AddLoader("fulfillment").Subscribes(s_placed, configure: subscription);
         return builder;
     }
 
@@ -38,7 +38,7 @@ public class SubscriptionGenerationTests
     public void Generate_ForALoader_ShouldEmitASubscriptionWithARulePerHandledMessage()
     {
         // Act
-        var yaml = Generate(Orders(sub => sub.Handles(s_placed).Handles(s_cancelled)),
+        var yaml = Generate(Orders(sub => sub.AlsoHandles(s_cancelled)),
             "components/fulfillment-subscription.yaml");
 
         // Assert
@@ -69,8 +69,7 @@ public class SubscriptionGenerationTests
     {
         // Act
         var yaml = Generate(Orders(sub => sub
-                .Handles(s_placed)
-                .Handles(s_cancelled, when: "event.data.reason == 'customer-request'")
+                .AlsoHandles(s_cancelled, when: "event.data.reason == 'customer-request'")
                 .IgnoreOthers()),
             "components/fulfillment-subscription.yaml");
 
@@ -89,7 +88,7 @@ public class SubscriptionGenerationTests
     public void Generate_ForABatchingLoader_ShouldEmitTheBulkSettingsOnTheSubscription()
     {
         // Act
-        var yaml = Generate(Orders(sub => sub.Handles(s_placed).InBatches(100, TimeSpan.FromMilliseconds(500))),
+        var yaml = Generate(Orders(sub => sub.InBatches(100, TimeSpan.FromMilliseconds(500))),
             "components/fulfillment-subscription.yaml");
 
         // Assert
@@ -126,7 +125,7 @@ public class SubscriptionGenerationTests
     public void Generate_ForAnExtractor_ShouldEmitNoSubscription()
     {
         // Act
-        var files = TopologyGenerator.Generate(Orders(sub => sub.Handles(s_placed)).Build(), s_noDevelopment,
+        var files = TopologyGenerator.Generate(Orders().Build(), s_noDevelopment,
             Directory.GetCurrentDirectory()).Files;
 
         // Assert
@@ -137,7 +136,7 @@ public class SubscriptionGenerationTests
     public void Generate_ShouldWriteTheHandledMessagesAndTheirPolicyIntoTheRuntimeConfig()
     {
         // Act
-        var json = Generate(Orders(sub => sub.Handles(s_placed).IgnoreOthers()), "config/fulfillment.intropy.json");
+        var json = Generate(Orders(sub => sub.IgnoreOthers()), "config/fulfillment.intropy.json");
 
         // Assert
         Assert.Contains("\"fluxia.orders.order-placed\"", json, StringComparison.Ordinal);
@@ -148,7 +147,7 @@ public class SubscriptionGenerationTests
     public void Generate_ShouldWriteEachPublishedMessageIntoThePublishersRuntimeConfig()
     {
         // Act
-        var json = Generate(Orders(sub => sub.Handles(s_placed)), "config/order-extractor.intropy.json");
+        var json = Generate(Orders(), "config/order-extractor.intropy.json");
 
         // Assert
         Assert.Contains("\"Message\": \"fluxia.orders.order-placed\"", json, StringComparison.Ordinal);

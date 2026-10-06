@@ -43,7 +43,6 @@ The system topology is invalid (2 error(s)):
 | Error | One message name must not resolve to two different channels |
 | Error | One message name must not carry two different event contract types |
 | Error | A subscription's messages must all travel on one channel |
-| Error | A subscription must handle at least one message |
 | Error | A component must not handle the same message more than once |
 | Error | Extractors must publish (a loader's destination may stay a private local component) |
 | Error | Loaders subscribe to exactly one channel (handling one or more of its messages) |
