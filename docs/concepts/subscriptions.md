@@ -25,7 +25,8 @@ builder.AddLoader("fulfillment")
   replayed. `IgnoreOthers()` acknowledges and drops them instead, for a channel that carries
   messages meant for other components.
 - **InBatches(maxMessages, maxWait)** — the sidecar delivers the subscription's messages in batches
-  (Dapr bulk subscribe).
+  (Dapr bulk subscribe). It is declared on the subscription because batching configures how the
+  sidecar delivers that subscription's messages.
 - `Subscribes(message)` is shorthand for a subscription handling that one message.
 
 The topology says *which* messages a component handles; the component's code says *how* — one

@@ -96,21 +96,6 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
         Component.AddPort(port, PortDirection.Out);
         return this;
     }
-
-    /// <summary>
-    /// Declares that the loader receives its subscription in batches (Dapr bulk subscribe) — for
-    /// a loader whose pipeline runs a batch at once. Same as <see cref="SubscriptionBuilder.InBatches"/>.
-    /// </summary>
-    /// <param name="maxMessages">The most messages the sidecar collects into one delivery.</param>
-    /// <param name="maxWait">How long the sidecar waits to fill a delivery before sending what it has.</param>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxMessages"/> is below 1, or
-    /// <paramref name="maxWait"/> is not positive or not a whole number of milliseconds.</exception>
-    /// <exception cref="InvalidOperationException">The loader already declares its batching.</exception>
-    public LoaderBuilder InBatches(int maxMessages, TimeSpan maxWait)
-    {
-        Component.SetBulk(BulkSubscriptions.Create(maxMessages, maxWait));
-        return this;
-    }
 }
 
 /// <summary>

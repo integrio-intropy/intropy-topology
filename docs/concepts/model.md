@@ -211,7 +211,7 @@ public static class Components
 | Entry point | Builder | Legal methods | Build-time requirements |
 |-------------|---------|---------------|-------------------------|
 | `AddExtractor(name)` | `ExtractorBuilder` | `From(port)`, `Publishes(message)`, `Uses(service)` | must publish at least one message |
-| `AddLoader(name)` | `LoaderBuilder` | `Subscribes(sub => …)`, `Subscribes(message)`, `InBatches(…)`, `To(port)`, `Uses(service)` | must subscribe to exactly one channel; `To` is optional |
+| `AddLoader(name)` | `LoaderBuilder` | `Subscribes(sub => …)`, `Subscribes(message)`, `To(port)`, `Uses(service)` | must subscribe to exactly one channel; `To` is optional |
 | `Subscribes(sub => …)` | `SubscriptionBuilder` | `Handles(message, when?)`, `IgnoreOthers()`, `InBatches(maxMessages, maxWait)` | handles at least one message, all on one channel; see [Subscriptions](subscriptions.md) |
 | `AddTransactionalIntegration(name)` | `TransactionalIntegrationBuilder` | `From(port)`, `To(port)`, `Uses(service)` | must have at least one `From` and at least one `To` |
 | `Otlp(endpoint)` | `OtlpBuilder` | `WithProtocol(protocol)`, `WithHeader(name, value)` | only one OTLP declaration per system |
