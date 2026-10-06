@@ -152,7 +152,7 @@ public class DevelopmentBuilderTests
         // Arrange
         var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
         builder.Files(s_port).RootPath("./test/erp");
-        builder.Rerun("extractor").Every(TimeSpan.FromSeconds(30));
+        builder.Rerun("extractor").AfterEachRun(TimeSpan.FromSeconds(30));
 
         // Act
         var manifest = builder.Build();
@@ -192,7 +192,7 @@ public class DevelopmentBuilderTests
     {
         // Arrange
         var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
-        builder.Rerun("extractor").Every(TimeSpan.FromSeconds(30));
+        builder.Rerun("extractor").AfterEachRun(TimeSpan.FromSeconds(30));
 
         // Act & Assert
         var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Rerun("extractor"));
@@ -200,36 +200,36 @@ public class DevelopmentBuilderTests
     }
 
     [Fact]
-    public void Every_WithSecondDelay_ShouldThrow()
+    public void AfterEachRun_WithSecondDelay_ShouldThrow()
     {
         // Arrange
         var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
         var rerun = builder.Rerun("extractor");
-        rerun.Every(TimeSpan.FromSeconds(30));
+        rerun.AfterEachRun(TimeSpan.FromSeconds(30));
 
         // Act & Assert
-        var exception = Assert.Throws<DevelopmentValidationException>(() => rerun.Every(TimeSpan.FromMinutes(5)));
+        var exception = Assert.Throws<DevelopmentValidationException>(() => rerun.AfterEachRun(TimeSpan.FromMinutes(5)));
         Assert.Contains("more than one re-run delay", exception.Message, StringComparison.Ordinal);
     }
 
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
-    public void Every_WithNonPositiveDelay_ShouldThrow(int seconds)
+    public void AfterEachRun_WithNonPositiveDelay_ShouldThrow(int seconds)
     {
         // Arrange
         var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
 
         // Act & Assert
         var exception = Assert.Throws<DevelopmentValidationException>(
-            () => builder.Rerun("extractor").Every(TimeSpan.FromSeconds(seconds)));
+            () => builder.Rerun("extractor").AfterEachRun(TimeSpan.FromSeconds(seconds)));
         Assert.Contains("must be positive", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Build_WithRerunMissingDelay_ShouldThrow()
     {
-        // Arrange: Rerun() declared but Every() never called
+        // Arrange: Rerun() declared but AfterEachRun() never called
         var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
         builder.Files(s_port).RootPath("./test/erp");
         builder.Rerun("extractor");

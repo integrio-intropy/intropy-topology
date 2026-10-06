@@ -54,6 +54,18 @@ public static class Services
 }
 ```
 
+## Declare component names
+
+Component names are strings passed to the `Add*` calls, and the development definition references components by name again. A `Components.cs` holding the names as constants — alongside the other ref files — keeps the compiler between the two definitions, so a rename refactors both:
+
+```csharp
+public static class Components
+{
+    public const string OrderExtractor = "order-extractor";
+    public const string OrderLoader = "order-loader";
+}
+```
+
 ## Declare the system
 
 A system is a class implementing `ISystemDefinition`. Each `Add*` call returns the block's builder directly, exposing only the edges legal for that block:
@@ -66,14 +78,14 @@ public sealed class OrderFlowSystem : ISystemDefinition
     public void Define(SystemBuilder builder)
     {
         // Extractor: edge block, pulls data out through a port and publishes it.
-        builder.AddExtractor("order-extractor")
+        builder.AddExtractor(Components.OrderExtractor)
             .From(Ports.OrderExtractorSource)
             .Publishes(Messages.Orders)
             .Uses(Services.Idempotency);
 
         // Loader: edge block, subscribes to one channel — here handling one message on it —
         // and writes through a port. Several: .Subscribes(sub => sub.Handles(a).Handles(b)).
-        builder.AddLoader("order-loader")
+        builder.AddLoader(Components.OrderLoader)
             .Subscribes(Messages.Orders)
             .To(Ports.OrderLoaderDestination)
             .Uses(Services.Idempotency);
@@ -119,9 +131,14 @@ public sealed class OrderFlowDevelopment : IDevelopmentDefinition
 
         development.Files(Ports.OrderLoaderDestination)
             .RootPath("./test/order-loader-destination");
+
+        development.Rerun(Components.OrderExtractor)
+            .AfterEachRun(TimeSpan.FromSeconds(30));
     }
 }
 ```
+
+`Rerun` names a run-to-completion component — the shared `Components` constant keeps the name compiling against the system declaration. `AfterEachRun` waits after a run *completes* before starting the next; it is local host mechanism only, never written into generated artifacts — the deployed schedule lives in deployment configuration.
 
 ## Wire up the entry point
 

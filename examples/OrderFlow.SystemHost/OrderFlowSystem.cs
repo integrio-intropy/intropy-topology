@@ -9,12 +9,12 @@ public sealed class OrderFlowSystem : ISystemDefinition
     /// <inheritdoc />
     public void Define(SystemBuilder builder)
     {
-        builder.AddExtractor("order-extractor")
+        builder.AddExtractor(Components.OrderExtractor)
             .From(Ports.OrderExtractorSource)
             .Publishes(Messages.Orders)
             .Uses(Services.Idempotency)
             .Uses(Services.BusinessIncidents);
-        builder.AddLoader("order-loader")
+        builder.AddLoader(Components.OrderLoader)
             .Subscribes(Messages.Orders)
             .To(Ports.OrderLoaderDestination)
             .Uses(Services.Idempotency)

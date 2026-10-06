@@ -85,6 +85,12 @@ public static class Services
         ServiceRef.Define("idempotency-service");
 }
 
+public static class Components
+{
+    public const string OrderExtractor = "order-extractor";
+    public const string OrderLoader = "order-loader";
+}
+
 public sealed class OrderFlowSystem : ISystemDefinition
 {
     public string SystemName => "order-flow";
@@ -95,12 +101,12 @@ public sealed class OrderFlowSystem : ISystemDefinition
             .WithProtocol(OtlpProtocol.Grpc)
             .WithHeader("x-api-key", "${OTLP_API_KEY}");
 
-        builder.AddExtractor("order-extractor")
+        builder.AddExtractor(Components.OrderExtractor)
             .From(Ports.OrderExtractorSource)
             .Publishes(Messages.Orders)
             .Uses(Services.Idempotency);
 
-        builder.AddLoader("order-loader")
+        builder.AddLoader(Components.OrderLoader)
             .Subscribes(Messages.Orders)
             .To(Ports.OrderLoaderDestination)
             .Uses(Services.Idempotency);
@@ -134,7 +140,7 @@ Invalid names throw `ArgumentException` immediately at the declaration call site
 
 ## Reference declarations
 
-References are usually static fields in scaffolded files such as `Messages.cs`, `Ports.cs`, and `Services.cs`. A reference alone does not create a resource; resources materialize only when components use the reference.
+References are usually static fields in scaffolded files such as `Messages.cs`, `Ports.cs`, `Services.cs`, and `Components.cs`. A reference alone does not create a resource; resources materialize only when components use the reference.
 
 ### Messages
 
@@ -185,6 +191,18 @@ public static readonly ServiceRef Idempotency =
 ```
 
 The service materializes when a component calls `Uses(service)`. The topology records consumers of the app ID; it does not define or deploy the provider.
+
+### Components
+
+Component names are plain strings and remain so — names are the identity, and the `Add*` builder returns a typed `Component` handle for in-definition references. A `Components.cs` holding the names as constants exists so the development definition can reference components by name without repeating a literal: `Rerun` validates the name against the topology, and a shared constant keeps a typo a compile error instead of a validation failure.
+
+```csharp
+public static class Components
+{
+    public const string OrderExtractor = "order-extractor";
+    public const string OrderLoader = "order-loader";
+}
+```
 
 ## Component DSL grammar
 
@@ -421,6 +439,9 @@ public sealed class OrderFlowDevelopment : IDevelopmentDefinition
 
         development.Files(Ports.OrderLoaderDestination)
             .RootPath("./test/order-loader-destination");
+
+        development.Rerun(Components.OrderExtractor)
+            .AfterEachRun(TimeSpan.FromSeconds(30));
     }
 }
 ```
@@ -429,8 +450,9 @@ public sealed class OrderFlowDevelopment : IDevelopmentDefinition
 |--------|---------|------------|
 | `Mock(service).FromOpenApi(path)` | Resolves a used service to a local OpenAPI-backed mock. | Service must be used by the topology; artifact must be OpenAPI 3.0.x, self-contained, readable, and inside the SystemHost directory. |
 | `Files(port).RootPath(path)` | Resolves a used port to a local folder. | Port must be used by the topology; path must stay inside the SystemHost directory. |
+| `Rerun(name).AfterEachRun(delay)` | Re-runs a run-to-completion component (extractor or transactional integration) once `delay` has passed after a run completes. | Name must be declared by the topology and belong to a run-to-completion component; delay must be positive and declared at most once. |
 
-Every used port must have a local file resolution when a development definition is built.
+Every used port must have a local file resolution when a development definition is built. The re-run delay is local host mechanism only: it is never written into generated artifacts, so it cannot drift with the deployed schedule that deployment configuration owns.
 
 ## What consumers can rely on
 

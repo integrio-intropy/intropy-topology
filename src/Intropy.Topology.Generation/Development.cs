@@ -193,9 +193,10 @@ public sealed class DevelopmentBuilder
         private readonly RerunDeclaration _declaration;
         internal RerunBuilder(RerunDeclaration declaration) => _declaration = declaration;
 
-        /// <summary>Re-runs the component again once <paramref name="delay"/> has passed after each local run completes.</summary>
-        /// <param name="delay">The wait between a run's completion and its next start; must be positive.</param>
-        public RerunBuilder Every(TimeSpan delay)
+        /// <summary>Re-runs the component again once <paramref name="delay"/> has passed after a run completes; the delay starts when the run finishes, not when it starts.</summary>
+        /// <param name="delay">The wait between a run's completion and the next run's start; must be positive.</param>
+        /// <remarks>The deployed schedule lives in deployment configuration; this delay is local host mechanism only and never appears in generated artifacts.</remarks>
+        public RerunBuilder AfterEachRun(TimeSpan delay)
         {
             if (delay <= TimeSpan.Zero)
             {
