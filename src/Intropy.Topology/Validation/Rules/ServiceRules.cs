@@ -2,30 +2,6 @@ using Intropy.Topology.Model;
 
 namespace Intropy.Topology.Validation.Rules;
 
-/// <summary>
-/// A component must not call the same service more than once. The materializer
-/// deduplicates repeated calls, so the repetition is visible only in the raw
-/// declarations.
-/// </summary>
-internal sealed class DuplicateServiceUsageRule : IDeclarationRule
-{
-    public IEnumerable<TopologyDiagnostic> Evaluate(SystemBuilder builder)
-    {
-        foreach (var component in builder.Components)
-        {
-            foreach (var duplicate in component.ServiceCalls
-                .GroupBy(service => service.AppId, StringComparer.Ordinal)
-                .Where(group => group.Count() > 1))
-            {
-                yield return new TopologyDiagnostic(
-                    DiagnosticSeverity.Error,
-                    $"Component '{component.Name}' calls service '{duplicate.Key}' more than once.",
-                    component.Name);
-            }
-        }
-    }
-}
-
 /// <summary>A service app ID must not collide with a topology component app ID.</summary>
 internal sealed class ServiceAppIdCollisionRule : IModelRule
 {

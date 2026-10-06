@@ -113,7 +113,8 @@ public class IntropyGenerateTests
         var placed = MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", "pubsub", "orders");
         var cancelled = MessageRef<OrderCancelled>.Define("fluxia.orders.order-cancelled", "pubsub", "orders");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("order-extractor").Publishes(placed).Publishes(cancelled);
+        builder.AddExtractor("order-extractor").Publishes(placed);
+        builder.AddExtractor("cancellation-extractor").Publishes(cancelled);
         builder.AddLoader("fulfillment").Subscribes(placed, configure: sub => sub
             .AlsoHandles(cancelled, when: "event.data.reason != 'fraud-review'")
             .IgnoreOthers());

@@ -10,7 +10,7 @@ This is the **minimal model** — exactly the surface the system tutorial and `i
 
 The topology models the edges *between* components — subscriptions, publishes, ports. Everything about the workload shape, including activation, lives in the component's own scaffold.
 
-The library's signature move is **compile-time legality**: each `Add*` call returns a block-specific builder that exposes only the grammar legal for that block. Illegal topology is a compile error, not a validation diagnostic; only what types cannot check (completeness and cross-component conflicts) is validated at `Build()`.
+The library's signature move is **compile-time legality**: each `Add*` call returns a block-specific builder that exposes only the grammar legal for that block. Illegal topology is a compile error, not a validation diagnostic; invariants local to one declaration chain throw `InvalidOperationException` at the declaration call, and `Build()` validates what spans components (completeness and cross-component conflicts).
 
 ## Installation
 

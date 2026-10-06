@@ -11,8 +11,10 @@ public abstract class Component
 {
     private readonly List<SubscriptionDeclaration> _subscriptions = [];
     private readonly List<MessageRef> _publishes = [];
+    private readonly HashSet<(string PubSub, string Topic)> _publishChannels = [];
     private readonly List<(PortRef Port, PortDirection Direction)> _ports = [];
     private readonly List<ServiceRef> _services = [];
+    private readonly HashSet<string> _serviceAppIds = new(StringComparer.Ordinal);
 
     private protected Component(string name, ComponentKind kind)
     {
@@ -38,9 +40,9 @@ public abstract class Component
 
     internal IReadOnlyList<ServiceRef> ServiceCalls => _services;
 
-    internal SubscriptionDeclaration AddSubscription()
+    internal SubscriptionDeclaration AddSubscription(string componentName)
     {
-        var subscription = new SubscriptionDeclaration();
+        var subscription = new SubscriptionDeclaration(componentName);
         _subscriptions.Add(subscription);
         return subscription;
     }
@@ -48,6 +50,12 @@ public abstract class Component
     internal void AddPublish(MessageRef message)
     {
         ArgumentNullException.ThrowIfNull(message);
+        if (!_publishChannels.Add((message.PubSubName, message.TopicName)))
+        {
+            throw new InvalidOperationException(
+                $"Component '{Name}' already declares publishing to the channel '{message.TopicName}' on pubsub '{message.PubSubName}'.");
+        }
+
         _publishes.Add(message);
     }
 
@@ -60,6 +68,12 @@ public abstract class Component
     internal void AddService(ServiceRef service)
     {
         ArgumentNullException.ThrowIfNull(service);
+        if (!_serviceAppIds.Add(service.AppId))
+        {
+            throw new InvalidOperationException(
+                $"Component '{Name}' already declares a call to service '{service.AppId}'.");
+        }
+
         _services.Add(service);
     }
 }
@@ -100,11 +114,17 @@ public sealed class TransactionalIntegrationComponent : Component
 }
 
 /// <summary>One declared subscription: the messages a component handles from one channel, and
-/// what happens to the channel's other messages. Mutable during declaration.</summary>
+/// what happens to the channel's other messages. The invariants that hold within one
+/// subscription — one handled message per name, all messages on one channel — are checked
+/// here, at the declaration call that would break them. Mutable during declaration.</summary>
 internal sealed class SubscriptionDeclaration
 {
+    private readonly string _componentName;
     private readonly List<MessageRef> _messages = [];
+    private readonly HashSet<string> _handledMessages = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _conditions = new(StringComparer.Ordinal);
+
+    public SubscriptionDeclaration(string componentName) => _componentName = componentName;
 
     /// <summary>The messages the subscription handles, in declaration order.</summary>
     public IReadOnlyList<MessageRef> Messages => _messages;
@@ -119,6 +139,22 @@ internal sealed class SubscriptionDeclaration
     public void Add(MessageRef message, string? condition)
     {
         ArgumentNullException.ThrowIfNull(message);
+        if (_messages.Count > 0
+            && (_messages[0].PubSubName != message.PubSubName || _messages[0].TopicName != message.TopicName))
+        {
+            var declared = $"'{_messages[0].TopicName}' on pubsub '{_messages[0].PubSubName}'";
+            var incoming = $"'{message.TopicName}' on pubsub '{message.PubSubName}'";
+            throw new InvalidOperationException(
+                $"Loader '{_componentName}' subscribes to messages on different channels ({declared}, {incoming}); "
+                + "a subscription is to one channel, so all of its messages must travel on it.");
+        }
+
+        if (!_handledMessages.Add(message.Name))
+        {
+            throw new InvalidOperationException(
+                $"Loader '{_componentName}' already handles the message '{message.Name}'; each message is handled once.");
+        }
+
         _messages.Add(message);
         if (condition is not null)
         {

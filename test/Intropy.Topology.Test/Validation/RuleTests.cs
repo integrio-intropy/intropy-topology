@@ -59,83 +59,47 @@ public class EmptySystemRuleTests
     }
 }
 
-public class DuplicatePublishRuleTests
+public class PublishDeclarationTests
 {
     [Fact]
-    public void Validate_WithDuplicateMessagePublish_ShouldReportError()
+    public void Publishes_WithTheSameMessageTwice_ShouldThrowAtTheDeclaration()
     {
         // Arrange: the same message declared twice — a redundant edge, not fan-out
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("extractor")
-            .Publishes(TestMessages.Raw)
-            .Publishes(TestMessages.Raw);
-
-        // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor<DuplicatePublishRule>());
-
-        // Assert
-        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
-        Assert.Equal("extractor", diagnostic.Target);
-        Assert.Equal(
-            "The message 'raw-events' is published more than once by the same component.",
-            diagnostic.Message);
-    }
-
-    [Fact]
-    public void Validate_WithSinglePublish_ShouldReportNothing()
-    {
-        // Arrange
-        var s = SystemBuilder.Create("test-system").WithValidComponent();
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor<DuplicatePublishRule>());
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            s.AddExtractor("extractor")
+                .Publishes(TestMessages.Raw)
+                .Publishes(TestMessages.Raw));
+        Assert.Contains("extractor", exception.Message);
+        Assert.Contains("raw-events", exception.Message);
     }
 
     [Fact]
-    public void Validate_WithTwoMessagesOnOneChannel_ShouldReportNothing()
+    public void Publishes_WithASecondMessageOnTheAlreadyPublishedChannel_ShouldThrowAtTheDeclaration()
     {
-        // Arrange: a channel carries several messages; one extractor may publish them all
+        // Arrange: a channel is published once per component, whatever the messages on it
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("extractor")
-            .Publishes(MessageRef<RawEvent>.Define("raw-created", "test-pubsub", "shared"))
-            .Publishes(MessageRef<EnrichedEvent>.Define("raw-cancelled", "test-pubsub", "shared"));
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor<DuplicatePublishRule>());
+        var exception = Assert.Throws<InvalidOperationException>(() => s.AddExtractor("extractor")
+            .Publishes(MessageRef<RawEvent>.Define("raw-created", "test-pubsub", "shared"))
+            .Publishes(MessageRef<EnrichedEvent>.Define("raw-cancelled", "test-pubsub", "shared")));
+        Assert.Contains("extractor", exception.Message);
+        Assert.Contains("'shared' on pubsub 'test-pubsub'", exception.Message);
     }
 
     [Fact]
-    public void Validate_WithDistinctMessages_ShouldReportNothing()
+    public void Publishes_WithDistinctMessagesOnDistinctChannels_ShouldDeclare()
     {
-        // Arrange: several messages per extractor are legal — each on its own channel
+        // Arrange: several messages per extractor are legal — each resolving to its own channel
         var otherMessage = MessageRef<EnrichedEvent>.Define("other-topic", "test-pubsub");
         var thirdMessage = MessageRef<RawEvent>.Define("third-topic", "test-pubsub");
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("extractor")
-            .Publishes(otherMessage)
-            .Publishes(thirdMessage);
 
-        // Act & Assert
-        Assert.Empty(s.DiagnosticsFor<DuplicatePublishRule>());
-    }
-}
-
-public class DuplicateSubscriptionRuleTests
-{
-    [Fact]
-    public void Validate_WithDuplicateSubscription_ShouldReportError()
-    {
-        // Arrange
-        var s = SystemBuilder.Create("test-system");
-        s.AddLoader("loader")
-            .Subscribes(TestMessages.Raw)
-            .Subscribes(TestMessages.Raw);
-
-        // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor<DuplicateSubscriptionRule>());
-
-        // Assert
-        Assert.Equal("loader", diagnostic.Target);
+        // Act & Assert (no throw)
+        s.AddExtractor("extractor").Publishes(otherMessage).Publishes(thirdMessage);
     }
 }
 

@@ -9,8 +9,6 @@ internal static class TopologyRules
     [
         new Rules.DuplicateComponentNameRule(),
         new Rules.EmptySystemRule(),
-        new Rules.DuplicatePublishRule(),
-        new Rules.DuplicateSubscriptionRule(),
         new Rules.MissingRequiredOutputRule(),
         new Rules.MissingRequiredSubscriptionRule(),
         new Rules.MissingRequiredPortRule(),
@@ -25,9 +23,6 @@ internal static class TopologyRules
     [
         new Rules.MessageChannelConflictRule(),
         new Rules.MessageContractConflictRule(),
-        new Rules.SubscriptionChannelConflictRule(),
-        new Rules.DuplicateHandledMessageRule(),
-        new Rules.DuplicateServiceUsageRule(),
     ];
 
     public static IReadOnlyList<TopologyDiagnostic> Run(SystemBuilder builder, SystemTopology topology)

@@ -20,8 +20,8 @@ The shape of an integration system — which components exist, which topics and 
 touch — is usually buried across Kubernetes manifests and Dapr YAML, where nothing checks it.
 Intropy.Topology moves that declaration into typed code: each `Add*` call returns a block-specific
 builder that exposes only the edges legal for that block. *Illegal topology is a compile error, not
-a validation diagnostic*; only what types cannot check (completeness and cross-component conflicts)
-is validated at `Build()`.
+a validation diagnostic*; invariants local to one declaration chain throw at the declaration call,
+and `Build()` validates what spans components (completeness and cross-component conflicts).
 
 The topology records the edges **between** components — subscriptions, publishes, and ports
 out to the outside world. Everything about the workload shape, including activation (a cron

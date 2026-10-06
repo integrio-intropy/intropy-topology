@@ -30,9 +30,10 @@ internal sealed class MissingRequiredOutputRule : IModelRule
 }
 
 /// <summary>
-/// Block kinds that consume topics must subscribe correctly — loaders to exactly
-/// one topic. The block builders prevent illegal calls but cannot force a required
-/// subscription.
+/// A loader must subscribe to a channel. The declaration site already rejects a second
+/// subscription and any handled message off the subscription's one channel, so what remains
+/// for Build-time validation is the loader that never calls <c>Subscribes</c> at all. A
+/// loader's destination may stay a private local component, so a missing <c>To</c> is legal.
 /// </summary>
 internal sealed class MissingRequiredSubscriptionRule : IModelRule
 {
@@ -40,11 +41,10 @@ internal sealed class MissingRequiredSubscriptionRule : IModelRule
     {
         foreach (var component in topology.Components)
         {
-            var count = component.Subscribes.Count;
             var message = component.Kind switch
             {
-                ComponentKind.Loader when count != 1 =>
-                    "Loader components must subscribe to exactly one topic.",
+                ComponentKind.Loader when component.Subscribes.Count == 0 =>
+                    "Loader components must subscribe to a channel; add a Subscribes call.",
                 _ => null,
             };
 

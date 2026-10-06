@@ -28,8 +28,11 @@ public class SubscriptionGenerationTests
 
     private static SystemBuilder Orders(Action<Intropy.Topology.Building.SubscriptionBuilder>? subscription = null)
     {
+        // One message per extractor: an extractor publishes a channel once, and this
+        // channel carries two messages with their own contracts.
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("order-extractor").Publishes(s_placed).Publishes(s_cancelled);
+        builder.AddExtractor("order-extractor").Publishes(s_placed);
+        builder.AddExtractor("cancellation-extractor").Publishes(s_cancelled);
         builder.AddLoader("fulfillment").Subscribes(s_placed, configure: subscription);
         return builder;
     }
@@ -147,10 +150,13 @@ public class SubscriptionGenerationTests
     public void Generate_ShouldWriteEachPublishedMessageIntoThePublishersRuntimeConfig()
     {
         // Act
-        var json = Generate(Orders(), "config/order-extractor.intropy.json");
+        var orderJson = Generate(Orders(), "config/order-extractor.intropy.json");
+        var cancellationJson = Generate(Orders(), "config/cancellation-extractor.intropy.json");
 
         // Assert
-        Assert.Contains("\"Message\": \"fluxia.orders.order-placed\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"Message\": \"fluxia.orders.order-cancelled\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"Message\": \"fluxia.orders.order-placed\"", orderJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("fluxia.orders.order-cancelled", orderJson, StringComparison.Ordinal);
+        Assert.Contains("\"Message\": \"fluxia.orders.order-cancelled\"", cancellationJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("fluxia.orders.order-placed", cancellationJson, StringComparison.Ordinal);
     }
 }

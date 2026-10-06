@@ -28,6 +28,8 @@ public abstract class ComponentBuilder<TSelf, TComponent>
     /// records the dependency as a consumer of the service's app ID; it does not define or
     /// deploy the provider.</summary>
     /// <param name="service">The Dapr app identity the component calls.</param>
+    /// <exception cref="InvalidOperationException">The component already declares a call to
+    /// <paramref name="service"/>'s app ID.</exception>
     public TSelf Calls(ServiceRef service)
     {
         Component.AddService(service);
@@ -53,6 +55,8 @@ public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, Extrac
 
     /// <summary>Declares that the extractor publishes a message.</summary>
     /// <param name="message">The message the extractor publishes.</param>
+    /// <exception cref="InvalidOperationException">The component already declares publishing to
+    /// <paramref name="message"/>'s channel; a component publishes to a channel at most once.</exception>
     public ExtractorBuilder Publishes(MessageRef message)
     {
         Component.AddPublish(message);
@@ -60,7 +64,7 @@ public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, Extrac
     }
 }
 
-/// <summary>Fluent builder for a loader: an edge block that subscribes to exactly one channel —
+/// <summary>Fluent builder for a loader: an edge block that subscribes to one channel —
 /// handling one or more of the messages on it — and writes to an external system through a port;
 /// loaders publish nothing.</summary>
 public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderComponent>
@@ -86,13 +90,21 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
     /// unhandled messages (<see cref="SubscriptionBuilder.IgnoreOthers"/>), and whether its
     /// messages are delivered in batches (<see cref="SubscriptionBuilder.InBatches"/>).</param>
     /// <exception cref="ArgumentException"><paramref name="when"/> is empty or whitespace.</exception>
+    /// <exception cref="InvalidOperationException">The loader already declares a subscription; a
+    /// loader subscribes to one channel.</exception>
     public LoaderBuilder Subscribes(
         MessageRef message,
         string? when = null,
         Action<SubscriptionBuilder>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var subscription = new SubscriptionBuilder(Component, Component.AddSubscription());
+        if (Component.SubscriptionCalls.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Loader '{Component.Name}' already declares its subscription; a loader subscribes to one channel.");
+        }
+
+        var subscription = new SubscriptionBuilder(Component, Component.AddSubscription(Component.Name));
         subscription.AlsoHandles(message, when);
         configure?.Invoke(subscription);
         return this;
@@ -132,6 +144,9 @@ public sealed class SubscriptionBuilder
     /// all of the message's events.</param>
     /// <exception cref="ArgumentNullException"><paramref name="message"/> is null.</exception>
     /// <exception cref="ArgumentException"><paramref name="when"/> is empty or whitespace.</exception>
+    /// <exception cref="InvalidOperationException">The subscription already handles a message with
+    /// <paramref name="message"/>'s name, or <paramref name="message"/> travels on a different
+    /// channel than the subscription's first message.</exception>
     public SubscriptionBuilder AlsoHandles(MessageRef message, string? when = null)
     {
         ArgumentNullException.ThrowIfNull(message);

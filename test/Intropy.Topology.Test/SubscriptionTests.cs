@@ -27,8 +27,11 @@ public sealed class SubscriptionTests
 
     private static SystemBuilder System(Action<LoaderBuilder> loader)
     {
+        // One message per extractor: an extractor publishes a channel once, and this
+        // channel carries two messages with their own contracts.
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("order-extractor").Publishes(s_placed).Publishes(s_cancelled);
+        builder.AddExtractor("order-extractor").Publishes(s_placed);
+        builder.AddExtractor("cancellation-extractor").Publishes(s_cancelled);
         loader(builder.AddLoader("fulfillment"));
         return builder;
     }
@@ -203,43 +206,56 @@ public sealed class SubscriptionTests
     }
 
     [Fact]
-    public void Validate_WithMessagesFromDifferentChannels_ShouldReportError()
+    public void Subscribes_DeclaredTwice_ShouldThrowAtTheDeclaration()
+    {
+        // Arrange: one channel per loader, and a loader declares its subscription once
+        var elsewhere = MessageRef<OrderCancelled>.Define("fluxia.returns.order-cancelled", "pubsub", "returns");
+
+        // Act & Assert
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            System(l => l.Subscribes(s_placed).Subscribes(elsewhere)));
+        Assert.Contains("fulfillment", exception.Message);
+    }
+
+    [Fact]
+    public void AlsoHandles_WithAMessageFromADifferentChannel_ShouldThrowAtTheDeclaration()
     {
         // Arrange
         var elsewhere = MessageRef<OrderCancelled>.Define("fluxia.returns.order-cancelled", "pubsub", "returns");
-        var builder = System(l => l.Subscribes(s_placed, configure: sub => sub.AlsoHandles(elsewhere)));
+
+        // Act & Assert
+        var exception = Assert.Throws<InvalidOperationException>(() => System(
+            l => l.Subscribes(s_placed, configure: sub => sub.AlsoHandles(elsewhere))));
+        Assert.Contains("fulfillment", exception.Message);
+        Assert.Contains("'orders' on pubsub 'pubsub'", exception.Message);
+        Assert.Contains("'returns' on pubsub 'pubsub'", exception.Message);
+    }
+
+    [Fact]
+    public void AlsoHandles_WithAMessageHandledTwice_ShouldThrowAtTheDeclaration()
+    {
+        // Act & Assert
+        var exception = Assert.Throws<InvalidOperationException>(() => System(
+            l => l.Subscribes(s_placed, configure: sub => sub.AlsoHandles(s_placed))));
+        Assert.Contains("fulfillment", exception.Message);
+        Assert.Contains("fluxia.orders.order-placed", exception.Message);
+    }
+
+    [Fact]
+    public void Build_WithoutASubscription_ShouldReportTheMissingSubscription()
+    {
+        // Arrange: a loader that never declares its subscription — the one subscription
+        // failure that is not local to a declaration chain, so it stays a Build-time rule
+        var builder = SystemBuilder.Create("orders");
+        builder.AddExtractor("order-extractor").Publishes(s_placed);
+        builder.AddLoader("fulfillment");
 
         // Act
-        var diagnostic = Assert.Single(builder.DeclarationDiagnosticsFor<SubscriptionChannelConflictRule>());
+        var diagnostic = Assert.Single(builder.DiagnosticsFor<MissingRequiredSubscriptionRule>());
 
         // Assert
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Equal("fulfillment", diagnostic.Target);
-        Assert.Contains("'orders' on pubsub 'pubsub'", diagnostic.Message);
-        Assert.Contains("'returns' on pubsub 'pubsub'", diagnostic.Message);
-    }
-
-    [Fact]
-    public void Validate_WithAMessageHandledTwice_ShouldReportError()
-    {
-        // Arrange
-        var builder = System(l => l.Subscribes(s_placed, configure: sub => sub.AlsoHandles(s_placed)));
-
-        // Act
-        var diagnostic = Assert.Single(builder.DeclarationDiagnosticsFor<DuplicateHandledMessageRule>());
-
-        // Assert
-        Assert.Contains("fluxia.orders.order-placed", diagnostic.Message);
-    }
-
-    [Fact]
-    public void Validate_WithTwoSubscriptions_ShouldReportThatALoaderSubscribesToExactlyOneTopic()
-    {
-        // Arrange: one channel per loader
-        var elsewhere = MessageRef<OrderCancelled>.Define("fluxia.returns.order-cancelled", "pubsub", "returns");
-        var builder = System(l => l.Subscribes(s_placed).Subscribes(elsewhere));
-
-        // Act & Assert
-        Assert.Single(builder.DiagnosticsFor<MissingRequiredSubscriptionRule>());
+        Assert.Throws<TopologyValidationException>(() => builder.Build());
     }
 }

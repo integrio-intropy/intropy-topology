@@ -88,8 +88,8 @@ internal static class TopologyMaterializer
         var subscribes = new List<TopicSubscription>();
         foreach (var subscription in component.SubscriptionCalls)
         {
-            // A subscription's channel is its first message's (first-seen wins); a subscription
-            // whose messages travel on different channels still materializes on the first one's.
+            // A subscription's channel is its first message's; the declaration site enforces
+            // that every handled message travels on that one channel.
             var channel = subscription.Messages[0];
             subscribes.Add(new TopicSubscription
             {

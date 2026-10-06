@@ -75,11 +75,19 @@ The component's runtime config (`<component>.intropy.json`) carries the same fac
 
 ## Rules
 
+The invariants local to one subscription throw where they are declared, as `InvalidOperationException`:
+
+| Thrown at | Invariant |
+|-----------|-----------|
+| `Subscribes` | A loader declares its subscription once; the handled message's channel is the subscription's channel |
+| `AlsoHandles` | A message name is handled once per subscription |
+| `AlsoHandles` | Every handled message travels on the subscription's first message's channel |
+
+What remains for `Build()` is the loader that never subscribes at all — a cross-declaration completeness rule:
+
 | Severity | Rule |
 |----------|------|
-| Error | A subscription's messages must all travel on one channel. |
-| Error | A component must not handle the same message more than once. |
-| Error | A loader subscribes to exactly one channel. |
+| Error | A loader subscribes to a channel. |
 
 ## Related
 

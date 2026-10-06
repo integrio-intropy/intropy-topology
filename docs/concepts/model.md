@@ -211,8 +211,8 @@ public static class Components
 | Entry point | Builder | Legal methods | Build-time requirements |
 |-------------|---------|---------------|-------------------------|
 | `AddExtractor(name)` | `ExtractorBuilder` | `From(port)`, `Publishes(message)`, `Calls(service)` | must publish at least one message |
-| `AddLoader(name)` | `LoaderBuilder` | `Subscribes(message, when?, configure: sub => …)`, `To(port)`, `Calls(service)` | must subscribe to exactly one channel; `To` is optional |
-| `Subscribes(message, when?, configure: sub => …)` | `SubscriptionBuilder` | `AlsoHandles(message, when?)`, `IgnoreOthers()`, `InBatches(maxMessages, maxWait)` | every handled message on one channel; see [Subscriptions](subscriptions.md) |
+| `AddLoader(name)` | `LoaderBuilder` | `Subscribes(message, when?, configure: sub => …)`, `To(port)`, `Calls(service)` | must subscribe at least once (once — a second `Subscribes` throws); `To` is optional |
+| `Subscribes(message, when?, configure: sub => …)` | `SubscriptionBuilder` | `AlsoHandles(message, when?)`, `IgnoreOthers()`, `InBatches(maxMessages, maxWait)` | every handled message on one channel — checked at the call; see [Subscriptions](subscriptions.md) |
 | `AddTransactionalIntegration(name)` | `TransactionalIntegrationBuilder` | `From(port)`, `To(port)`, `Calls(service)` | must have at least one `From` and at least one `To` |
 | `Otlp(endpoint)` | `OtlpBuilder` | `WithProtocol(protocol)`, `WithHeader(name, value)` | only one OTLP declaration per system |
 
@@ -233,8 +233,8 @@ Rules:
 
 - `From` is optional and may be called more than once.
 - `Publishes` is required at least once.
-- Publishing several distinct messages is legal.
-- Publishing the same `(pubsub, topic)` channel more than once from the same component is a validation error.
+- Publishing several distinct messages is legal — each resolving to its own channel.
+- A second `Publishes` resolving to a channel the component already publishes throws at the call site; a channel is published once per component.
 
 ### Loader
 
@@ -249,7 +249,7 @@ builder.AddLoader("order-loader")
 
 Rules:
 
-- `Subscribes` is required exactly once.
+- `Subscribes` is required once, and exactly once: a loader that never subscribes is a `Build()` error, and a second `Subscribes` throws at the call site.
 - `To` is optional; a loader without `To` has a private local destination.
 - Loaders cannot publish messages.
 
@@ -402,17 +402,12 @@ Materialization is deterministic so serialized topology JSON is stable across ru
 |----------|------|
 | Error | Component names must be unique. |
 | Error | A system must declare at least one component. |
-| Error | A component must not publish the same message more than once. |
-| Error | A component must not subscribe to the same `(pubsub, topic)` channel more than once. |
 | Error | One message name must not resolve to multiple channels. |
 | Error | One message name must not carry multiple payload contract types. |
-| Error | A subscription's messages must all travel on one channel. |
-| Error | A component must not handle the same message more than once. |
 | Error | Extractors must publish at least one message. |
-| Error | Loaders must subscribe to exactly one channel. |
+| Error | A loader must subscribe to a channel. |
 | Error | Transactional integrations must declare at least one `From` and one `To` port. |
 | Error | A pubsub name must not equal a port's Dapr component name. |
-| Error | A component must not call the same service more than once. |
 | Error | A service app ID must not collide with a topology component app ID. |
 | Warning | A published topic has no subscriber. |
 | Warning | A subscribed topic has no publisher. |

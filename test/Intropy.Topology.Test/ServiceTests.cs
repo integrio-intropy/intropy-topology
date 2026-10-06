@@ -24,34 +24,17 @@ public sealed class ServiceTests
     }
 
     [Fact]
-    public void Validate_WithRepeatedServiceUsage_ShouldReportAnError()
+    public void Calls_DeclaredTwice_ShouldThrowAtTheDeclaration()
     {
         // Arrange
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").Publishes(s_message).Calls(s_idempotency).Calls(s_idempotency);
-        builder.AddLoader("loader").Subscribes(s_message);
 
-        // Act
-        var diagnostics = builder.Validate();
-
-        // Assert
-        Assert.Contains(diagnostics, diagnostic => diagnostic.Message.Contains("more than once", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void Validate_WithRepeatedServiceUsageAndAppIdCollision_ShouldReportBothErrors()
-    {
-        // Arrange: the duplicate-usage and collision halves are separate rules that must compose
-        var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("idempotency-service").Publishes(s_message).Calls(s_idempotency).Calls(s_idempotency);
-        builder.AddLoader("loader").Subscribes(s_message);
-
-        // Act
-        var diagnostics = builder.Validate();
-
-        // Assert
-        Assert.Contains(diagnostics, diagnostic => diagnostic.Message.Contains("more than once", StringComparison.Ordinal));
-        Assert.Contains(diagnostics, diagnostic => diagnostic.Message.Contains("collides", StringComparison.Ordinal));
+        // Act & Assert
+        var exception = Assert.Throws<InvalidOperationException>(() => builder
+            .AddExtractor("extractor").Publishes(s_message)
+            .Calls(s_idempotency).Calls(s_idempotency));
+        Assert.Contains("extractor", exception.Message);
+        Assert.Contains("idempotency-service", exception.Message);
     }
 
     [Fact]

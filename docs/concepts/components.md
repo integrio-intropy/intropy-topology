@@ -33,7 +33,7 @@ Each kind exposes only its own legal edges:
 | Loader | exactly 1 message | — | `To(port)` | `Calls(service)` | `Subscribes` |
 | Transactional integration | — | — | `From` / `To(port)` | `Calls(service)` | `From` and `To` |
 
-`Subscribes`/`Publishes` are the asynchronous (message) edges; `From`/`To` are the edges out through ports; `Calls` records Dapr service app IDs the component invokes. A component may publish several distinct messages, to one channel or several — repeating one message is rejected at `Build()`. See [Messages](messages.md), [Ports](ports.md), and the [Model and DSL Reference](model.md).
+`Subscribes`/`Publishes` are the asynchronous (message) edges; `From`/`To` are the edges out through ports; `Calls` records Dapr service app IDs the component invokes. A component may publish several distinct messages, each resolving to its own channel — a second publish resolving to a channel the component already publishes throws `InvalidOperationException` at the declaration. See [Messages](messages.md), [Ports](ports.md), and the [Model and DSL Reference](model.md).
 
 ## Declaring components
 
@@ -62,7 +62,7 @@ s.AddLoader("l").Publishes(topic);        // loaders publish nothing
 s.AddExtractor("e").Subscribes(topic);    // extractors read ports, not topics
 ```
 
-Only what types cannot check is validated at `Build()`: completeness (a required output that was never declared, a missing subscription, a topic with only one side) and cross-component conflicts. A loader needs no `To`: its destination may stay a private local component. See [Validation](validation.md).
+Only what types cannot check — and what no single declaration line can decide — is validated at `Build()`. Invariants local to one declaration chain throw at the call site: a second `Subscribes` on one loader, a repeated `Calls` or `Publishes` channel, a handled message twice or off the subscription's channel. `Build()` validates what spans components: completeness (a required output that was never declared, a missing subscription, a topic with only one side) and cross-component conflicts. A loader needs no `To`: its destination may stay a private local component. See [Validation](validation.md).
 
 ## Related
 
