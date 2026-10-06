@@ -34,7 +34,6 @@ internal static class TopologyMaterializer
                 {
                     PubSubName = t.Key.PubSub,
                     TopicName = t.Key.Topic,
-                    ContractTypeName = t.Value.ContractTypeName,
                     Messages = [.. t.Value.Messages],
                     Publishers = [.. t.Value.Publishers],
                     Subscribers = [.. t.Value.Subscribers],
@@ -182,7 +181,7 @@ internal static class TopologyMaterializer
         var key = (message.PubSubName, message.TopicName);
         if (!topics.TryGetValue(key, out var accumulator))
         {
-            accumulator = new TopicAccumulator(message.ContractType.FullName ?? message.ContractType.Name);
+            accumulator = new TopicAccumulator();
             topics[key] = accumulator;
         }
 
@@ -223,9 +222,8 @@ internal static class TopologyMaterializer
         return accumulator;
     }
 
-    private sealed class TopicAccumulator(string contractTypeName)
+    private sealed class TopicAccumulator
     {
-        public string ContractTypeName { get; } = contractTypeName;
         public SortedSet<string> Messages { get; } = new(StringComparer.Ordinal);
         public SortedSet<string> Publishers { get; } = new(StringComparer.Ordinal);
         public SortedSet<string> Subscribers { get; } = new(StringComparer.Ordinal);

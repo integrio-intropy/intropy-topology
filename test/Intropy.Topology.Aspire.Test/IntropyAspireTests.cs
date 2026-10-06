@@ -83,7 +83,6 @@ public sealed class IntropyAspireTests : IDisposable
                 {
                     PubSubName = "pubsub-a",
                     TopicName = "order-raw",
-                    ContractTypeName = "Test.RawOrder",
                     Publishers = ["order-extractor"],
                     Subscribers = ["order-loader"],
                 },
@@ -91,7 +90,6 @@ public sealed class IntropyAspireTests : IDisposable
                 {
                     PubSubName = "pubsub-b",
                     TopicName = "order-processed",
-                    ContractTypeName = "Test.RawOrder",
                     Publishers = ["order-loader"],
                     Subscribers = ["order-extractor"],
                 },

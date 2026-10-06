@@ -35,7 +35,7 @@ public class MaterializationTests
         var raw = Assert.Single(topology.Topics);
         Assert.Equal("test-pubsub", raw.PubSubName);
         Assert.Equal("raw-events", raw.TopicName);
-        Assert.Equal(typeof(RawEvent).FullName, raw.ContractTypeName);
+        Assert.Equal(["raw-events"], raw.Messages);
         Assert.Equal(["extractor"], raw.Publishers);
         Assert.Equal(["sink"], raw.Subscribers);
     }
