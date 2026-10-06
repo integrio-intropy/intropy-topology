@@ -21,7 +21,7 @@
       <text x="352" y="135">publishes /</text>
       <text x="352" y="154">subscribes</text>
       <text x="352" y="341">reads / writes</text>
-      <text x="520" y="226">uses</text>
+      <text x="520" y="226">calls</text>
     </g>
 
     <rect x="60" y="190" width="190" height="100" fill="#d9e8d2" stroke="#71856a"/>

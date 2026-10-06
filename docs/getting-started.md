@@ -81,14 +81,14 @@ public sealed class OrderFlowSystem : ISystemDefinition
         builder.AddExtractor(Components.OrderExtractor)
             .From(Ports.OrderExtractorSource)
             .Publishes(Messages.Orders)
-            .Uses(Services.Idempotency);
+            .Calls(Services.Idempotency);
 
         // Loader: edge block, subscribes to one channel — here handling one message on it —
         // and writes through a port. More of the channel: .Subscribes(a, configure: sub => sub.AlsoHandles(b)).
         builder.AddLoader(Components.OrderLoader)
             .Subscribes(Messages.Orders)
             .To(Ports.OrderLoaderDestination)
-            .Uses(Services.Idempotency);
+            .Calls(Services.Idempotency);
     }
 }
 ```

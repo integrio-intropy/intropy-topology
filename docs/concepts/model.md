@@ -104,12 +104,12 @@ public sealed class OrderFlowSystem : ISystemDefinition
         builder.AddExtractor(Components.OrderExtractor)
             .From(Ports.OrderExtractorSource)
             .Publishes(Messages.Orders)
-            .Uses(Services.Idempotency);
+            .Calls(Services.Idempotency);
 
         builder.AddLoader(Components.OrderLoader)
             .Subscribes(Messages.Orders)
             .To(Ports.OrderLoaderDestination)
-            .Uses(Services.Idempotency);
+            .Calls(Services.Idempotency);
     }
 }
 ```
@@ -190,7 +190,7 @@ public static readonly ServiceRef Idempotency =
     ServiceRef.Define("idempotency-service");
 ```
 
-The service materializes when a component calls `Uses(service)`. The topology records consumers of the app ID; it does not define or deploy the provider.
+The service materializes when a component declares `Calls(service)`. The topology records consumers of the app ID; it does not define or deploy the provider.
 
 ### Components
 
@@ -210,10 +210,10 @@ public static class Components
 
 | Entry point | Builder | Legal methods | Build-time requirements |
 |-------------|---------|---------------|-------------------------|
-| `AddExtractor(name)` | `ExtractorBuilder` | `From(port)`, `Publishes(message)`, `Uses(service)` | must publish at least one message |
-| `AddLoader(name)` | `LoaderBuilder` | `Subscribes(message, when?, configure: sub => …)`, `To(port)`, `Uses(service)` | must subscribe to exactly one channel; `To` is optional |
+| `AddExtractor(name)` | `ExtractorBuilder` | `From(port)`, `Publishes(message)`, `Calls(service)` | must publish at least one message |
+| `AddLoader(name)` | `LoaderBuilder` | `Subscribes(message, when?, configure: sub => …)`, `To(port)`, `Calls(service)` | must subscribe to exactly one channel; `To` is optional |
 | `Subscribes(message, when?, configure: sub => …)` | `SubscriptionBuilder` | `AlsoHandles(message, when?)`, `IgnoreOthers()`, `InBatches(maxMessages, maxWait)` | every handled message on one channel; see [Subscriptions](subscriptions.md) |
-| `AddTransactionalIntegration(name)` | `TransactionalIntegrationBuilder` | `From(port)`, `To(port)`, `Uses(service)` | must have at least one `From` and at least one `To` |
+| `AddTransactionalIntegration(name)` | `TransactionalIntegrationBuilder` | `From(port)`, `To(port)`, `Calls(service)` | must have at least one `From` and at least one `To` |
 | `Otlp(endpoint)` | `OtlpBuilder` | `WithProtocol(protocol)`, `WithHeader(name, value)` | only one OTLP declaration per system |
 
 Every component builder also exposes `Component`, an optional typed handle with the declared component's `Name` and `Kind`.
@@ -226,7 +226,7 @@ An extractor pulls or receives data from outside the system and publishes messag
 builder.AddExtractor("order-extractor")
     .From(Ports.OrderExtractorSource)
     .Publishes(Messages.Orders)
-    .Uses(Services.Idempotency);
+    .Calls(Services.Idempotency);
 ```
 
 Rules:
@@ -261,7 +261,7 @@ A transactional integration reads and writes external systems through ports. It 
 builder.AddTransactionalIntegration("order-status-sync")
     .From(Ports.OrderExtractorSource)
     .To(Ports.OrderLoaderDestination)
-    .Uses(Services.Idempotency);
+    .Calls(Services.Idempotency);
 ```
 
 Rules:
@@ -412,7 +412,7 @@ Materialization is deterministic so serialized topology JSON is stable across ru
 | Error | Loaders must subscribe to exactly one channel. |
 | Error | Transactional integrations must declare at least one `From` and one `To` port. |
 | Error | A pubsub name must not equal a port's Dapr component name. |
-| Error | A component must not use the same service more than once. |
+| Error | A component must not call the same service more than once. |
 | Error | A service app ID must not collide with a topology component app ID. |
 | Warning | A published topic has no subscriber. |
 | Warning | A subscribed topic has no publisher. |

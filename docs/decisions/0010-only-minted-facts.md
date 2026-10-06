@@ -35,7 +35,7 @@ Under that test:
   binding name (`binding.<connector>`) are created by the topology: the Aspire backend
   materializes them locally, generated artifacts carry them, and deployment honors them. Breaking
   one is loud — a renamed app-id fails service invocation at runtime.
-- **Edges stay.** `Subscribes`/`Publishes`/`From`/`To`/`Uses` are compile-enforced claims about
+- **Edges stay.** `Subscribes`/`Publishes`/`From`/`To`/`Calls` are compile-enforced claims about
   the code itself. A deployment that contradicts them is a broken deployment, loudly.
 - **The connector transport goes.** The Dapr binding's `spec.type` is deployment-owned
   configuration, exactly like the credentials the model already excludes. Locally it was dead

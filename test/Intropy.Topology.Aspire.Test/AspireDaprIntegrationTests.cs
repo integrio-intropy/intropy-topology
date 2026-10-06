@@ -149,7 +149,7 @@ public sealed class AspireDaprIntegrationTests : IAsyncDisposable
     {
         var system = SystemBuilder.Create("order-flow");
         system.AddExtractor("order-extractor").Publishes(s_raw);
-        system.AddLoader("order-loader").Subscribes(s_raw).Uses(s_idempotency);
+        system.AddLoader("order-loader").Subscribes(s_raw).Calls(s_idempotency);
         return system.Build();
     }
 

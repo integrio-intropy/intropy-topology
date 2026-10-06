@@ -3,8 +3,8 @@ using Intropy.Topology.Model;
 namespace Intropy.Topology.Validation.Rules;
 
 /// <summary>
-/// A component must not use the same service more than once. The materializer
-/// deduplicates service usage, so the repetition is visible only in the raw
+/// A component must not call the same service more than once. The materializer
+/// deduplicates repeated calls, so the repetition is visible only in the raw
 /// declarations.
 /// </summary>
 internal sealed class DuplicateServiceUsageRule : IDeclarationRule
@@ -19,7 +19,7 @@ internal sealed class DuplicateServiceUsageRule : IDeclarationRule
             {
                 yield return new TopologyDiagnostic(
                     DiagnosticSeverity.Error,
-                    $"Component '{component.Name}' uses service '{duplicate.Key}' more than once.",
+                    $"Component '{component.Name}' calls service '{duplicate.Key}' more than once.",
                     component.Name);
             }
         }

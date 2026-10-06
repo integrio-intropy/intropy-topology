@@ -109,16 +109,16 @@ public class BuilderMappingTests
     }
 
     [Fact]
-    public void Uses_ShouldChainWithKindSpecificEdgesOnEveryBuilderKind()
+    public void Calls_ShouldChainWithKindSpecificEdgesOnEveryBuilderKind()
     {
-        // Arrange: Uses lives on the shared base and must chain with each kind's own edges
+        // Arrange: Calls lives on the shared base and must chain with each kind's own edges
         var service = ServiceRef.Define("idempotency-service");
         var s = SystemBuilder.Create("test-system");
 
         // Act
-        var extractor = s.AddExtractor("extractor").Uses(service).Publishes(TestMessages.Raw);
-        var loader = s.AddLoader("loader").Subscribes(TestMessages.Raw).Uses(service).To(TestPorts.Erp);
-        var integration = s.AddTransactionalIntegration("ti").From(TestPorts.Pim).Uses(service).To(TestPorts.Erp);
+        var extractor = s.AddExtractor("extractor").Calls(service).Publishes(TestMessages.Raw);
+        var loader = s.AddLoader("loader").Subscribes(TestMessages.Raw).Calls(service).To(TestPorts.Erp);
+        var integration = s.AddTransactionalIntegration("ti").From(TestPorts.Pim).Calls(service).To(TestPorts.Erp);
         var topology = s.Build();
 
         // Assert

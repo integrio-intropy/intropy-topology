@@ -10,8 +10,8 @@ public sealed class ServiceTests
     {
         // Arrange
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").Publishes(s_message).Uses(s_idempotency);
-        builder.AddLoader("loader").Subscribes(s_message).Uses(s_idempotency);
+        builder.AddExtractor("extractor").Publishes(s_message).Calls(s_idempotency);
+        builder.AddLoader("loader").Subscribes(s_message).Calls(s_idempotency);
 
         // Act
         var topology = builder.Build();
@@ -28,7 +28,7 @@ public sealed class ServiceTests
     {
         // Arrange
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").Publishes(s_message).Uses(s_idempotency).Uses(s_idempotency);
+        builder.AddExtractor("extractor").Publishes(s_message).Calls(s_idempotency).Calls(s_idempotency);
         builder.AddLoader("loader").Subscribes(s_message);
 
         // Act
@@ -43,7 +43,7 @@ public sealed class ServiceTests
     {
         // Arrange: the duplicate-usage and collision halves are separate rules that must compose
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("idempotency-service").Publishes(s_message).Uses(s_idempotency).Uses(s_idempotency);
+        builder.AddExtractor("idempotency-service").Publishes(s_message).Calls(s_idempotency).Calls(s_idempotency);
         builder.AddLoader("loader").Subscribes(s_message);
 
         // Act
@@ -59,7 +59,7 @@ public sealed class ServiceTests
     {
         // Arrange
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("idempotency-service").Publishes(s_message).Uses(s_idempotency);
+        builder.AddExtractor("idempotency-service").Publishes(s_message).Calls(s_idempotency);
         builder.AddLoader("loader").Subscribes(s_message);
 
         // Act

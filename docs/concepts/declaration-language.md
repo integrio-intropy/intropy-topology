@@ -30,7 +30,7 @@ The language has five relationship statements:
 | A component subscribes to a message | The component consumes data from that message's channel. |
 | A component reads from a port | The port is an input connection for the component. |
 | A component writes to a port | The port is an output connection for the component. |
-| A component uses a service | The component invokes the external provider. |
+| A component calls a service | The component invokes the external provider. |
 
 A port's direction follows from these statements; it is not fixed by the port's identity. The same port can be used by several components and in both directions.
 
@@ -40,7 +40,7 @@ A relationship does not specify when work starts, how data is transformed, or ho
 
 Component kind determines the allowed relationships and their counts:
 
-| Component kind | Reads from ports | Writes to ports | Publishes messages | Subscribes to messages | Uses services |
+| Component kind | Reads from ports | Writes to ports | Publishes messages | Subscribes to messages | Calls services |
 |----------------|------------------|-----------------|--------------------|-----------------------|---------------|
 | Extractor | Zero or more | None | One or more | None | Zero or more |
 | Loader | None | Zero or more | None | Exactly one | Zero or more |

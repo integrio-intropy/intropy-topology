@@ -23,9 +23,12 @@ public abstract class ComponentBuilder<TSelf, TComponent>
     /// <summary>The fluent self-reference every chainable member returns.</summary>
     private protected abstract TSelf Self { get; }
 
-    /// <summary>Declares that the component invokes an external platform service.</summary>
-    /// <param name="service">The Dapr app identity invoked by the component.</param>
-    public TSelf Uses(ServiceRef service)
+    /// <summary>Declares that the component invokes an external platform service through Dapr
+    /// service invocation — a synchronous request/response call via the sidecar. The topology
+    /// records the dependency as a consumer of the service's app ID; it does not define or
+    /// deploy the provider.</summary>
+    /// <param name="service">The Dapr app identity the component calls.</param>
+    public TSelf Calls(ServiceRef service)
     {
         Component.AddService(service);
         return Self;

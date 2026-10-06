@@ -169,8 +169,8 @@ public class TopologyGeneratorTests
         var message = MessageRef<string>.Define("created", "orders");
         var service = ServiceRef.Define("idempotency-service");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").Publishes(message).Uses(service);
-        builder.AddLoader("loader").Subscribes(message).Uses(service);
+        builder.AddExtractor("extractor").Publishes(message).Calls(service);
+        builder.AddLoader("loader").Subscribes(message).Calls(service);
         var manifest = new DevelopmentManifest(
             [new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency Service", "1.0/rc")],
             [],
