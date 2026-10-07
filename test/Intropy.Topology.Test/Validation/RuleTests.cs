@@ -4,6 +4,8 @@ using Intropy.Topology.Validation.Rules;
 
 namespace Intropy.Topology.Test.Validation;
 
+public sealed record OrderShipped;
+
 internal static class ValidationTestHelper
 {
     /// <summary>A publisher/subscriber pair that on its own violates nothing.</summary>
@@ -220,6 +222,116 @@ public class TopicCarryingSeveralContractsTests
         // Assert
         var topic = Assert.Single(topology.Topics);
         Assert.Equal(["shared-enriched", "shared-raw"], topic.Messages);
+    }
+}
+
+public class UnhandledChannelMessagesRuleTests
+{
+    private static readonly MessageRef<OrderPlaced> s_placed =
+        MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", "pubsub", "orders");
+
+    private static readonly MessageRef<OrderCancelled> s_cancelled =
+        MessageRef<OrderCancelled>.Define("fluxia.orders.order-cancelled", "pubsub", "orders");
+
+    private static readonly MessageRef<OrderShipped> s_shipped =
+        MessageRef<OrderShipped>.Define("fluxia.orders.order-shipped", "pubsub", "orders");
+
+    private static SystemBuilder System(Action<LoaderBuilder> firstLoader, Action<LoaderBuilder>? secondLoader = null)
+    {
+        // One message per extractor: an extractor publishes a channel once, and this
+        // channel carries three messages with their own contracts.
+        var builder = SystemBuilder.Create("orders");
+        builder.AddExtractor("placed-extractor").Publishes(s_placed);
+        builder.AddExtractor("cancelled-extractor").Publishes(s_cancelled);
+        builder.AddExtractor("shipped-extractor").Publishes(s_shipped);
+        firstLoader(builder.AddLoader("fulfillment"));
+        secondLoader?.Invoke(builder.AddLoader("archival"));
+        return builder;
+    }
+
+    [Fact]
+    public void Validate_WithUnhandledChannelMates_ShouldWarnWithTheirNamesAndTheComponentTarget()
+    {
+        // Arrange
+        var builder = System(l => l.Subscribes(s_placed));
+
+        // Act
+        var diagnostic = Assert.Single(builder.DiagnosticsFor<UnhandledChannelMessagesRule>());
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.Equal("fulfillment", diagnostic.Target);
+        Assert.Contains("handles 1 of 3 messages on topic 'orders' (pubsub 'pubsub')", diagnostic.Message);
+        Assert.Contains("'fluxia.orders.order-cancelled', 'fluxia.orders.order-shipped'", diagnostic.Message);
+    }
+
+    [Fact]
+    public void Build_WithOnlyThisWarning_ShouldSucceedAndTryBuildShouldCarryIt()
+    {
+        // Arrange
+        var builder = System(l => l.Subscribes(s_placed));
+
+        // Act & Assert: a warning does not fail Build
+        builder.Build();
+
+        Assert.True(builder.TryBuild(out _, out var diagnostics));
+        Assert.Contains(diagnostics, d => d.Severity is DiagnosticSeverity.Warning
+            && d.Message.Contains("will dead-letter"));
+        Assert.Contains(builder.Validate(), d => d.Message.Contains("will dead-letter"));
+    }
+
+    [Fact]
+    public void Validate_WithIgnoreOthers_ShouldReportNothing()
+    {
+        // Arrange: acknowledging the channel's other messages is the deliberate choice
+        var builder = System(l => l.Subscribes(s_placed, configure: sub => sub.IgnoreOthers()));
+
+        // Act & Assert
+        Assert.Empty(builder.DiagnosticsFor<UnhandledChannelMessagesRule>());
+    }
+
+    [Fact]
+    public void Validate_WhenTheSubscriptionHandlesEveryMessage_ShouldReportNothing()
+    {
+        // Arrange
+        var builder = System(l => l.Subscribes(s_placed, configure: sub => sub
+            .AlsoHandles(s_cancelled)
+            .AlsoHandles(s_shipped)));
+
+        // Act & Assert
+        Assert.Empty(builder.DiagnosticsFor<UnhandledChannelMessagesRule>());
+    }
+
+    [Fact]
+    public void Validate_WithASingleMessageChannel_ShouldReportNothing()
+    {
+        // Arrange: the common case — the required message is the channel's only one
+        var builder = SystemBuilder.Create("single");
+        builder.AddExtractor("extractor").Publishes(TestMessages.Raw);
+        builder.AddLoader("sink").Subscribes(TestMessages.Raw);
+
+        // Act & Assert
+        Assert.Empty(builder.DiagnosticsFor<UnhandledChannelMessagesRule>());
+    }
+
+    [Fact]
+    public void Validate_WithTwoLoadersOnOneChannel_ShouldWarnEachForItsOwnUnhandledMessages()
+    {
+        // Arrange: Dapr delivers every message to each consuming component's own group,
+        // so each loader's channel-mate warnings are independent
+        var builder = System(
+            l => l.Subscribes(s_placed),
+            l => l.Subscribes(s_shipped));
+
+        // Act
+        var diagnostics = builder.DiagnosticsFor<UnhandledChannelMessagesRule>();
+
+        // Assert
+        Assert.Equal(2, diagnostics.Count);
+        var fulfillment = diagnostics.Single(d => d.Target == "fulfillment");
+        Assert.Contains("'fluxia.orders.order-cancelled', 'fluxia.orders.order-shipped'", fulfillment.Message);
+        var archival = diagnostics.Single(d => d.Target == "archival");
+        Assert.Contains("'fluxia.orders.order-cancelled', 'fluxia.orders.order-placed'", archival.Message);
     }
 }
 

@@ -14,6 +14,7 @@ internal static class TopologyRules
         new Rules.MissingRequiredPortRule(),
         new Rules.UnconsumedTopicRule(),
         new Rules.UnproducedTopicRule(),
+        new Rules.UnhandledChannelMessagesRule(),
         new Rules.NoEdgesRule(),
         new Rules.PubSubPortNameCollisionRule(),
         new Rules.ServiceAppIdCollisionRule(),

@@ -33,6 +33,17 @@ builder.AddLoader("fulfillment")
 
 Because `Subscribes` requires its message, an empty subscription cannot be declared.
 
+Because each subscribing component gets its own consumer group, Dapr still delivers every message
+on the channel to this component — a message another subscriber handles is not "taken" by them;
+it dead-letters here too when not handled. `Build()` therefore warns when a subscription keeps the
+dead-letter default while its channel carries messages it leaves unhandled, naming every one of
+them: a loader handling one message on a channel carrying three would otherwise dead-letter the
+other two with no signal in the declaration. Handle the warnings' messages with `AlsoHandles`, or
+declare `IgnoreOthers()` as the explicit acknowledgment that unhandled messages are dropped. The
+warning never fires for a channel whose messages the subscription handles completely, and a
+content filter does not affect it — the rule works at message granularity. As with the one-sided
+topic warnings, deployment validation may promote this warning to an error.
+
 The topology says *which* messages a component handles; the component's code says *how* — one
 pipeline per message, registered under the same message names.
 

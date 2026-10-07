@@ -57,6 +57,7 @@ Some semantic invariants are knowable at the exact line where the mistake is mad
 | Error | Transactional integrations must declare at least one `From` and one `To` port |
 | Warning | A published topic has no subscriber |
 | Warning | A subscribed topic has no publisher |
+| Warning | A subscription dead-lettering by default leaves some of the channel's messages unhandled for that component |
 | Warning | A component with no edges (no subscriptions, publishes, or ports) is likely unfinished |
 | Error | A pubsub name must not equal a port's derived Dapr component name |
 | Error | A service app ID must not collide with a topology component app ID |
@@ -65,7 +66,7 @@ Some semantic invariants are knowable at the exact line where the mistake is mad
 
 Name and argument invariants are enforced eagerly at the call site, not collected: system, component, port, and service app ID names are DNS-1123 labels; message, pubsub, and topic names are DNS-1123 subdomains; invalid values throw `ArgumentException` immediately. OTLP endpoint and header shape are also validated at the call site, as are the declaration-time invariants above. `Build()` collects every remaining diagnostic in one pass so all cross-component problems report at once.
 
-Published topics without subscribers and subscribed topics without publishers are warnings in the core model so partially built systems can still run locally and be inspected. Deployment validation can choose to treat them as errors.
+Published topics without subscribers and subscribed topics without publishers are warnings in the core model so partially built systems can still run locally and be inspected. Deployment validation can choose to treat them as errors. The same holds for a subscription whose channel carries messages it leaves unhandled while keeping the dead-letter default: `Build()` warns (see [Subscriptions](subscriptions.md)), and deployment validation may promote the warning to an error.
 
 ## Related
 
