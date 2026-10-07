@@ -7,10 +7,10 @@ public sealed record EnrichedEvent;
 public static class TestMessages
 {
     public static readonly MessageRef<RawEvent> Raw =
-        MessageRef<RawEvent>.Define("raw-events", "test-pubsub");
+        MessageRef<RawEvent>.Define("raw-events", pubSub: "test-pubsub");
 
     public static readonly MessageRef<EnrichedEvent> Enriched =
-        MessageRef<EnrichedEvent>.Define("enriched-events", "test-pubsub");
+        MessageRef<EnrichedEvent>.Define("enriched-events", pubSub: "test-pubsub");
 }
 
 public static class TestPorts

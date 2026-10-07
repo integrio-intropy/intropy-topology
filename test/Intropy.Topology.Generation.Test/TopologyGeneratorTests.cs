@@ -77,7 +77,7 @@ public class TopologyGeneratorTests
     {
         // Arrange — a port used by the topology but absent from the development manifest.
         // The manifest is the single validation boundary; the generator trusts it.
-        var message = MessageRef<string>.Define("created", "orders");
+        var message = MessageRef<string>.Define("created", pubSub: "orders");
         var port = PortRef.Define("erp");
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("extractor").From(port).Publishes(message);
@@ -166,7 +166,7 @@ public class TopologyGeneratorTests
     public void Generate_WithOpenApiMock_ShouldEmitScopedHttpEndpoint()
     {
         // Arrange
-        var message = MessageRef<string>.Define("created", "orders");
+        var message = MessageRef<string>.Define("created", pubSub: "orders");
         var service = ServiceRef.Define("idempotency-service");
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("extractor").Publishes(message).Calls(service);
@@ -191,7 +191,7 @@ public class TopologyGeneratorTests
     public void Generate_WithABatchingLoader_ShouldEmitItsBulkSettingsInTheRuntimeConfig()
     {
         // Arrange
-        var topic = MessageRef<string>.Define("product-changed", "catalog");
+        var topic = MessageRef<string>.Define("product-changed", pubSub: "catalog");
         var builder = SystemBuilder.Create("catalog");
         builder.AddExtractor("extractor").Publishes(topic);
         builder.AddLoader("loader").Subscribes(topic, configure: sub => sub.InBatches(200, TimeSpan.FromSeconds(2)));
@@ -234,7 +234,7 @@ public class TopologyGeneratorTests
     {
         // Arrange — local generation resolves every port to localstorage; the deployed
         // binding type is deployment-owned and never declared in the topology.
-        var message = MessageRef<string>.Define("created", "orders");
+        var message = MessageRef<string>.Define("created", pubSub: "orders");
         var port = PortRef.Define("placeholder");
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("extractor").From(port).Publishes(message);

@@ -86,8 +86,8 @@ public class PublishDeclarationTests
 
         // Act & Assert
         var exception = Assert.Throws<InvalidOperationException>(() => s.AddExtractor("extractor")
-            .Publishes(MessageRef<RawEvent>.Define("raw-created", "test-pubsub", "shared"))
-            .Publishes(MessageRef<EnrichedEvent>.Define("raw-cancelled", "test-pubsub", "shared")));
+            .Publishes(MessageRef<RawEvent>.Define("raw-created", pubSub: "test-pubsub", topic: "shared"))
+            .Publishes(MessageRef<EnrichedEvent>.Define("raw-cancelled", pubSub: "test-pubsub", topic: "shared")));
         Assert.Contains("extractor", exception.Message);
         Assert.Contains("'shared' on pubsub 'test-pubsub'", exception.Message);
     }
@@ -96,8 +96,8 @@ public class PublishDeclarationTests
     public void Publishes_WithDistinctMessagesOnDistinctChannels_ShouldDeclare()
     {
         // Arrange: several messages per extractor are legal — each resolving to its own channel
-        var otherMessage = MessageRef<EnrichedEvent>.Define("other-topic", "test-pubsub");
-        var thirdMessage = MessageRef<RawEvent>.Define("third-topic", "test-pubsub");
+        var otherMessage = MessageRef<EnrichedEvent>.Define("other-topic", pubSub: "test-pubsub");
+        var thirdMessage = MessageRef<RawEvent>.Define("third-topic", pubSub: "test-pubsub");
         var s = SystemBuilder.Create("test-system");
 
         // Act & Assert (no throw)
@@ -210,8 +210,8 @@ public class TopicCarryingSeveralContractsTests
     {
         // Arrange: a channel carries several messages, each with its own contract
         var s = SystemBuilder.Create("test-system");
-        var raw = MessageRef<RawEvent>.Define("shared-raw", "test-pubsub", "shared-topic");
-        var enriched = MessageRef<EnrichedEvent>.Define("shared-enriched", "test-pubsub", "shared-topic");
+        var raw = MessageRef<RawEvent>.Define("shared-raw", pubSub: "test-pubsub", topic: "shared-topic");
+        var enriched = MessageRef<EnrichedEvent>.Define("shared-enriched", pubSub: "test-pubsub", topic: "shared-topic");
         s.AddExtractor("first").Publishes(raw);
         s.AddExtractor("second").Publishes(enriched);
         s.AddLoader("consumer").Subscribes(raw, configure: sub => sub.AlsoHandles(enriched));
@@ -228,13 +228,13 @@ public class TopicCarryingSeveralContractsTests
 public class UnhandledChannelMessagesRuleTests
 {
     private static readonly MessageRef<OrderPlaced> s_placed =
-        MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", "pubsub", "orders");
+        MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", topic: "orders");
 
     private static readonly MessageRef<OrderCancelled> s_cancelled =
-        MessageRef<OrderCancelled>.Define("fluxia.orders.order-cancelled", "pubsub", "orders");
+        MessageRef<OrderCancelled>.Define("fluxia.orders.order-cancelled", topic: "orders");
 
     private static readonly MessageRef<OrderShipped> s_shipped =
-        MessageRef<OrderShipped>.Define("fluxia.orders.order-shipped", "pubsub", "orders");
+        MessageRef<OrderShipped>.Define("fluxia.orders.order-shipped", topic: "orders");
 
     private static SystemBuilder System(Action<LoaderBuilder> firstLoader, Action<LoaderBuilder>? secondLoader = null)
     {
@@ -343,9 +343,9 @@ public class MessageChannelConflictRuleTests
         // Arrange: one message identity declared on two transport channels
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("first")
-            .Publishes(MessageRef<RawEvent>.Define("shared", "test-pubsub", "first-topic"));
+            .Publishes(MessageRef<RawEvent>.Define("shared", pubSub: "test-pubsub", topic: "first-topic"));
         s.AddLoader("second")
-            .Subscribes(MessageRef<RawEvent>.Define("shared", "test-pubsub", "second-topic"));
+            .Subscribes(MessageRef<RawEvent>.Define("shared", pubSub: "test-pubsub", topic: "second-topic"));
 
         // Act
         var diagnostic = Assert.Single(s.DeclarationDiagnosticsFor<MessageChannelConflictRule>());
@@ -375,9 +375,9 @@ public class MessageContractConflictRuleTests
         // Arrange: one message identity declared with two contract types
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("first")
-            .Publishes(MessageRef<RawEvent>.Define("shared", "test-pubsub"));
+            .Publishes(MessageRef<RawEvent>.Define("shared", pubSub: "test-pubsub"));
         s.AddLoader("second")
-            .Subscribes(MessageRef<EnrichedEvent>.Define("shared", "test-pubsub"));
+            .Subscribes(MessageRef<EnrichedEvent>.Define("shared", pubSub: "test-pubsub"));
 
         // Act
         var diagnostic = Assert.Single(s.DeclarationDiagnosticsFor<MessageContractConflictRule>());
@@ -400,7 +400,7 @@ public class PubSubPortNameCollisionRuleTests
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor")
             .From(PortRef.Define("shared"))
-            .Publishes(MessageRef<RawEvent>.Define("some-topic", "shared", "some-topic"));
+            .Publishes(MessageRef<RawEvent>.Define("some-topic", pubSub: "shared", topic: "some-topic"));
 
         // Act
         var diagnostic = Assert.Single(s.DiagnosticsFor<PubSubPortNameCollisionRule>());

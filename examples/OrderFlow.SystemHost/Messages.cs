@@ -5,5 +5,5 @@ using Contracts;
 public static class Messages
 {
     /// <summary>Order messages (pubsub 'pubsub'); the topic name defaults to the message name.</summary>
-    public static readonly MessageRef<Order> Orders = MessageRef<Order>.Define("orders", "pubsub");
+    public static readonly MessageRef<Order> Orders = MessageRef<Order>.Define("orders");
 }

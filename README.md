@@ -65,7 +65,7 @@ takes the port's name unchanged (`order-extractor-source`), never declared separ
 ```csharp
 public static class Messages
 {
-    public static readonly MessageRef<Order> Orders = MessageRef<Order>.Define("orders", "pubsub");
+    public static readonly MessageRef<Order> Orders = MessageRef<Order>.Define("orders");
 }
 
 public static class Ports

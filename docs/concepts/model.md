@@ -67,7 +67,7 @@ public sealed record Order(string Id);
 public static class Messages
 {
     public static readonly MessageRef<Order> Orders =
-        MessageRef<Order>.Define("orders", "pubsub");
+        MessageRef<Order>.Define("orders");
 }
 
 public static class Ports
@@ -153,14 +153,14 @@ A `MessageRef<T>` declares:
 
 ```csharp
 public static readonly MessageRef<Order> Orders =
-    MessageRef<Order>.Define("orders", "pubsub");
+    MessageRef<Order>.Define("orders");
 ```
 
-The two-argument form uses the message name as the topic name. Use the three-argument form when the logical identity and transport topic differ:
+Pubsub defaults to `pubsub` and the topic name defaults to the message name. Use the named overrides when the defaults do not fit — for example when the logical identity and transport topic differ:
 
 ```csharp
 public static readonly MessageRef<Order> LegacyOrders =
-    MessageRef<Order>.Define("legacy-orders", "pubsub", "orders-v1");
+    MessageRef<Order>.Define("legacy-orders", topic: "orders-v1");
 ```
 
 A message materializes when a component calls `Publishes(message)` or `Subscribes(message)`.

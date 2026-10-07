@@ -110,13 +110,13 @@ public class MaterializationTests
         var erp = PortRef.Define("erp");
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("zeta")
-            .Publishes(MessageRef<RawEvent>.Define("zzz-topic", "test-pubsub"))
+            .Publishes(MessageRef<RawEvent>.Define("zzz-topic", pubSub: "test-pubsub"))
             .From(TestPorts.Pim);
         s.AddExtractor("alpha")
-            .Publishes(MessageRef<RawEvent>.Define("aaa-topic", "test-pubsub"))
+            .Publishes(MessageRef<RawEvent>.Define("aaa-topic", pubSub: "test-pubsub"))
             .From(erp);
-        s.AddLoader("sink-a").Subscribes(MessageRef<RawEvent>.Define("aaa-topic", "test-pubsub"));
-        s.AddLoader("sink-z").Subscribes(MessageRef<RawEvent>.Define("zzz-topic", "test-pubsub"));
+        s.AddLoader("sink-a").Subscribes(MessageRef<RawEvent>.Define("aaa-topic", pubSub: "test-pubsub"));
+        s.AddLoader("sink-z").Subscribes(MessageRef<RawEvent>.Define("zzz-topic", pubSub: "test-pubsub"));
 
         // Act
         var topology = s.Build();

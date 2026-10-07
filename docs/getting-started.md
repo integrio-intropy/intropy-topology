@@ -20,7 +20,7 @@ Messages are declared as static fields — in a `Messages.cs` for system-interna
 ```csharp
 public static class Messages
 {
-    public static readonly MessageRef<Order> Orders = MessageRef<Order>.Define("orders", "pubsub");
+    public static readonly MessageRef<Order> Orders = MessageRef<Order>.Define("orders");
 }
 ```
 

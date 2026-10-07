@@ -28,11 +28,11 @@ Messages are declared as static fields — in a scaffolded `Messages.cs` for sys
 public static class Messages
 {
     /// <summary>Order messages (pubsub 'pubsub'); the topic name defaults to the message name.</summary>
-    public static readonly MessageRef<Order> Orders = MessageRef<Order>.Define("orders", "pubsub");
+    public static readonly MessageRef<Order> Orders = MessageRef<Order>.Define("orders");
 }
 ```
 
-The message, pubsub, and topic names are DNS-1123 names, validated at `Define`. The pubsub name is minted here: local runs materialize a pubsub component with exactly this name, and deployment configuration consumes it rather than maintaining its own copy. Use the three-argument `Define` when the topic name must differ from the message name.
+The message, pubsub, and topic names are DNS-1123 names, validated at `Define`. The pubsub name is minted here: local runs materialize a pubsub component with exactly this name, and deployment configuration consumes it rather than maintaining its own copy. Use `Define(name, topic: "…")` when the topic name must differ from the message name (or `pubSub:` to pick a pubsub component other than the default `pubsub`); the channel defaults to `pubsub/<name>`.
 
 These names describe the *inter-component* vocabulary. The one pubsub a component never declares here is a transactional integration's internal hop — minted by the model as `internal-<component>`, never declarable via `MessageRef`, and scoped to exactly its owning component. The `internal-` prefix keeps the two namespaces disjoint.
 

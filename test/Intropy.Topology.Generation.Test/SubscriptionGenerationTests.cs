@@ -15,10 +15,10 @@ public sealed record OrderCancelled;
 public class SubscriptionGenerationTests
 {
     private static readonly MessageRef<OrderPlaced> s_placed =
-        MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", "pubsub", "orders");
+        MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", topic: "orders");
 
     private static readonly MessageRef<OrderCancelled> s_cancelled =
-        MessageRef<OrderCancelled>.Define("fluxia.orders.order-cancelled", "pubsub", "orders");
+        MessageRef<OrderCancelled>.Define("fluxia.orders.order-cancelled", topic: "orders");
 
     private static readonly DevelopmentManifest s_noDevelopment = new([], [], []);
 

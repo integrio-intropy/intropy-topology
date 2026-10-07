@@ -48,32 +48,21 @@ public sealed record MessageRef<T> : MessageRef
     {
     }
 
-    /// <summary>Declares a message; the channel defaults to pubsub/topic <c>pubsub/{name}</c>.</summary>
+    /// <summary>Declares a message; the channel defaults to pubsub/topic <c>pubsub/{name}</c>.
+    /// Declare <paramref name="pubSub"/> and/or <paramref name="topic"/> to override — for
+    /// example when the logical identity differs from the transport topic.</summary>
     /// <param name="name">The message's logical name (DNS-1123 subdomain).</param>
-    /// <exception cref="ArgumentException">The name is not a valid DNS-1123 subdomain.</exception>
-    public static MessageRef<T> Define([ConstantExpected] string name) =>
-        new(name, "pubsub", name);
-
-    /// <summary>Declares a message on a pubsub component; the topic name defaults to the
-    /// message name.</summary>
-    /// <param name="name">The message's logical name (DNS-1123 subdomain).</param>
-    /// <param name="pubSubName">The Dapr pubsub component name (DNS-1123 subdomain).</param>
-    /// <exception cref="ArgumentException">A name is not a valid DNS-1123 subdomain.</exception>
+    /// <param name="pubSub">The Dapr pubsub component name (DNS-1123 subdomain);
+    /// defaults to <c>pubsub</c>.</param>
+    /// <param name="topic">The topic name within the pubsub (DNS-1123 subdomain);
+    /// defaults to <paramref name="name"/>.</param>
+    /// <exception cref="ArgumentException">A name (message, pubsub, or topic) is not a
+    /// valid DNS-1123 subdomain.</exception>
     public static MessageRef<T> Define(
         [ConstantExpected] string name,
-        [ConstantExpected] string pubSubName) =>
-        new(name, pubSubName, name);
-
-    /// <summary>Declares a message whose transport topic differs from its logical name.</summary>
-    /// <param name="name">The message's logical name (DNS-1123 subdomain).</param>
-    /// <param name="pubSubName">The Dapr pubsub component name (DNS-1123 subdomain).</param>
-    /// <param name="topicName">The topic name within the pubsub (DNS-1123 subdomain).</param>
-    /// <exception cref="ArgumentException">A name is not a valid DNS-1123 subdomain.</exception>
-    public static MessageRef<T> Define(
-        [ConstantExpected] string name,
-        [ConstantExpected] string pubSubName,
-        [ConstantExpected] string topicName) =>
-        new(name, pubSubName, topicName);
+        [ConstantExpected] string? pubSub = null,
+        [ConstantExpected] string? topic = null) =>
+        new(name, pubSub ?? "pubsub", topic ?? name);
 }
 
 /// <summary>

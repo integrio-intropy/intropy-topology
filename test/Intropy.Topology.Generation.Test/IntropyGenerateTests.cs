@@ -110,8 +110,8 @@ public class IntropyGenerateTests
     public void GraphJson_ShouldListRoutesInDeclarationOrderWithTheirFilters()
     {
         // Arrange
-        var placed = MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", "pubsub", "orders");
-        var cancelled = MessageRef<OrderCancelled>.Define("fluxia.orders.order-cancelled", "pubsub", "orders");
+        var placed = MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", topic: "orders");
+        var cancelled = MessageRef<OrderCancelled>.Define("fluxia.orders.order-cancelled", topic: "orders");
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("order-extractor").Publishes(placed);
         builder.AddExtractor("cancellation-extractor").Publishes(cancelled);
@@ -289,7 +289,7 @@ public class IntropyGenerateTests
     {
         // Arrange: a manifest mock no topology service matches — a programming error,
         // not user input, so it must crash rather than surface as exit code 1.
-        var message = MessageRef<string>.Define("created", "orders");
+        var message = MessageRef<string>.Define("created", pubSub: "orders");
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("extractor").Publishes(message);
         builder.AddLoader("loader").Subscribes(message);
@@ -327,7 +327,7 @@ public class IntropyGenerateTests
     public void GraphJson_ShouldCarryABulkSubscriptionsBatching()
     {
         // Arrange
-        var placed = MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", "pubsub", "orders");
+        var placed = MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", topic: "orders");
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("order-extractor").Publishes(placed);
         builder.AddLoader("fulfillment").Subscribes(placed, configure: sub => sub.InBatches(100, TimeSpan.FromSeconds(2)));

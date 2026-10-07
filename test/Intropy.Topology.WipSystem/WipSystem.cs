@@ -11,7 +11,7 @@ public sealed record WipOrder(string OrderNumber);
 /// </summary>
 public sealed class WipSystemDefinition : ISystemDefinition
 {
-    public static readonly MessageRef<WipOrder> Raw = MessageRef<WipOrder>.Define("wip-raw", "pubsub-a");
+    public static readonly MessageRef<WipOrder> Raw = MessageRef<WipOrder>.Define("wip-raw", pubSub: "pubsub-a");
     public static readonly PortRef Placeholder = PortRef.Define("placeholder");
 
     public string SystemName => "wip-system";

@@ -12,13 +12,13 @@ public class EndToEndTests
     private static class ProductFlow
     {
         public static readonly MessageRef<RawEvent> Raw =
-            MessageRef<RawEvent>.Define("product-raw", "product-distribution-pubsub");
+            MessageRef<RawEvent>.Define("product-raw", pubSub: "product-distribution-pubsub");
     }
 
     private static class PriceFlow
     {
         public static readonly MessageRef<RawEvent> Raw =
-            MessageRef<RawEvent>.Define("price-raw", "product-distribution-pubsub");
+            MessageRef<RawEvent>.Define("price-raw", pubSub: "product-distribution-pubsub");
     }
 
     private static readonly PortRef s_pim = PortRef.Define("pim");

@@ -41,10 +41,23 @@ public class PortRefTests
 public class MessageRefTests
 {
     [Fact]
-    public void Define_WithTwoArguments_ShouldDefaultTopicToName()
+    public void Define_WithDefaultsOnly_ShouldDefaultPubSubAndTopicToName()
     {
         // Act
-        var message = MessageRef<RawEvent>.Define("raw-events", "test-pubsub");
+        var message = MessageRef<RawEvent>.Define("raw-events");
+
+        // Assert
+        Assert.Equal("raw-events", message.Name);
+        Assert.Equal("pubsub", message.PubSubName);
+        Assert.Equal("raw-events", message.TopicName);
+        Assert.Equal(typeof(RawEvent), message.ContractType);
+    }
+
+    [Fact]
+    public void Define_WithPubSubOnly_ShouldDefaultTopicToName()
+    {
+        // Act
+        var message = MessageRef<RawEvent>.Define("raw-events", pubSub: "test-pubsub");
 
         // Assert
         Assert.Equal("raw-events", message.Name);
@@ -54,10 +67,23 @@ public class MessageRefTests
     }
 
     [Fact]
-    public void Define_WithThreeArguments_ShouldExposeProperties()
+    public void Define_WithTopicOnly_ShouldDefaultPubSubToPubsub()
     {
         // Act
-        var message = MessageRef<RawEvent>.Define("raw-events", "test-pubsub", "raw-events-topic");
+        var message = MessageRef<RawEvent>.Define("raw-events", topic: "raw-events-topic");
+
+        // Assert
+        Assert.Equal("raw-events", message.Name);
+        Assert.Equal("pubsub", message.PubSubName);
+        Assert.Equal("raw-events-topic", message.TopicName);
+        Assert.Equal(typeof(RawEvent), message.ContractType);
+    }
+
+    [Fact]
+    public void Define_WithPubSubAndTopic_ShouldExposeProperties()
+    {
+        // Act
+        var message = MessageRef<RawEvent>.Define("raw-events", pubSub: "test-pubsub", topic: "raw-events-topic");
 
         // Assert
         Assert.Equal("raw-events", message.Name);
@@ -78,7 +104,7 @@ public class MessageRefTests
     {
         // Act & Assert: [ConstantExpected] suppressed to test the runtime guard
 #pragma warning disable CA1857
-        Assert.Throws<ArgumentException>(() => MessageRef<RawEvent>.Define(name, pubSubName, topicName));
+        Assert.Throws<ArgumentException>(() => MessageRef<RawEvent>.Define(name, pubSub: pubSubName, topic: topicName));
 #pragma warning restore CA1857
     }
 
@@ -90,7 +116,7 @@ public class MessageRefTests
 
         // Act & Assert: [ConstantExpected] suppressed to test the runtime guard
 #pragma warning disable CA1857
-        Assert.Throws<ArgumentException>(() => MessageRef<RawEvent>.Define(longName, "pubsub"));
+        Assert.Throws<ArgumentException>(() => MessageRef<RawEvent>.Define(longName, pubSub: "pubsub"));
 #pragma warning restore CA1857
     }
 
@@ -98,8 +124,8 @@ public class MessageRefTests
     public void Equals_WithSameNamesAndContract_ShouldBeEqual()
     {
         // Arrange
-        var first = MessageRef<RawEvent>.Define("raw-events", "test-pubsub");
-        var second = MessageRef<RawEvent>.Define("raw-events", "test-pubsub");
+        var first = MessageRef<RawEvent>.Define("raw-events", pubSub: "test-pubsub");
+        var second = MessageRef<RawEvent>.Define("raw-events", pubSub: "test-pubsub");
 
         // Assert
         Assert.Equal(first, second);
@@ -109,8 +135,8 @@ public class MessageRefTests
     public void Equals_WithSameNamesButDifferentContract_ShouldNotBeEqual()
     {
         // Arrange
-        MessageRef first = MessageRef<RawEvent>.Define("raw-events", "test-pubsub");
-        MessageRef second = MessageRef<EnrichedEvent>.Define("raw-events", "test-pubsub");
+        MessageRef first = MessageRef<RawEvent>.Define("raw-events", pubSub: "test-pubsub");
+        MessageRef second = MessageRef<EnrichedEvent>.Define("raw-events", pubSub: "test-pubsub");
 
         // Assert
         Assert.NotEqual(first, second);

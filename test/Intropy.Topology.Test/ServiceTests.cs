@@ -2,7 +2,7 @@ namespace Intropy.Topology.Test;
 
 public sealed class ServiceTests
 {
-    private static readonly MessageRef<string> s_message = MessageRef<string>.Define("created", "orders");
+    private static readonly MessageRef<string> s_message = MessageRef<string>.Define("created", pubSub: "orders");
     private static readonly ServiceRef s_idempotency = ServiceRef.Define("idempotency-service");
 
     [Fact]

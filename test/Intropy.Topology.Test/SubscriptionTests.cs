@@ -17,10 +17,10 @@ public sealed record OrderCancelled;
 public sealed class SubscriptionTests
 {
     private static readonly MessageRef<OrderPlaced> s_placed =
-        MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", "pubsub", "orders");
+        MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", topic: "orders");
 
     private static readonly MessageRef<OrderCancelled> s_cancelled =
-        MessageRef<OrderCancelled>.Define("fluxia.orders.order-cancelled", "pubsub", "orders");
+        MessageRef<OrderCancelled>.Define("fluxia.orders.order-cancelled", topic: "orders");
 
     private static ComponentModel Loader(SystemTopology topology) =>
         topology.Components.Single(c => c.Name == "fulfillment");
@@ -209,7 +209,7 @@ public sealed class SubscriptionTests
     public void Subscribes_DeclaredTwice_ShouldThrowAtTheDeclaration()
     {
         // Arrange: one channel per loader, and a loader declares its subscription once
-        var elsewhere = MessageRef<OrderCancelled>.Define("fluxia.returns.order-cancelled", "pubsub", "returns");
+        var elsewhere = MessageRef<OrderCancelled>.Define("fluxia.returns.order-cancelled", topic: "returns");
 
         // Act & Assert
         var exception = Assert.Throws<InvalidOperationException>(() =>
@@ -221,7 +221,7 @@ public sealed class SubscriptionTests
     public void AlsoHandles_WithAMessageFromADifferentChannel_ShouldThrowAtTheDeclaration()
     {
         // Arrange
-        var elsewhere = MessageRef<OrderCancelled>.Define("fluxia.returns.order-cancelled", "pubsub", "returns");
+        var elsewhere = MessageRef<OrderCancelled>.Define("fluxia.returns.order-cancelled", topic: "returns");
 
         // Act & Assert
         var exception = Assert.Throws<InvalidOperationException>(() => System(
