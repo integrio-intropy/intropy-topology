@@ -79,17 +79,21 @@ public class PublishDeclarationTests
     }
 
     [Fact]
-    public void Publishes_WithASecondMessageOnTheAlreadyPublishedChannel_ShouldThrowAtTheDeclaration()
+    public void Publishes_WithASecondMessageOnTheSameChannel_ShouldMaterializeBothMessagesOnTheTopic()
     {
-        // Arrange: a channel is published once per component, whatever the messages on it
+        // Arrange: several published messages may share one channel, as handled messages do
         var s = SystemBuilder.Create("test-system");
-
-        // Act & Assert
-        var exception = Assert.Throws<InvalidOperationException>(() => s.AddExtractor("extractor")
+        s.AddExtractor("extractor")
             .Publishes(MessageRef<RawEvent>.Define("raw-created", pubSub: "test-pubsub", topic: "shared"))
-            .Publishes(MessageRef<EnrichedEvent>.Define("raw-cancelled", pubSub: "test-pubsub", topic: "shared")));
-        Assert.Contains("extractor", exception.Message);
-        Assert.Contains("'shared' on pubsub 'test-pubsub'", exception.Message);
+            .Publishes(MessageRef<EnrichedEvent>.Define("raw-cancelled", pubSub: "test-pubsub", topic: "shared"));
+
+        // Act
+        var topology = s.Build();
+
+        // Assert
+        var topic = Assert.Single(topology.Topics);
+        Assert.Equal(["raw-cancelled", "raw-created"], topic.Messages);
+        Assert.Equal(2, topology.Components[0].Publishes.Count);
     }
 
     [Fact]
@@ -238,8 +242,8 @@ public class UnhandledChannelMessagesRuleTests
 
     private static SystemBuilder System(Action<LoaderBuilder> firstLoader, Action<LoaderBuilder>? secondLoader = null)
     {
-        // One message per extractor: an extractor publishes a channel once, and this
-        // channel carries three messages with their own contracts.
+        // One extractor per published message; the channel carries three messages with
+        // their own contracts.
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("placed-extractor").Publishes(s_placed);
         builder.AddExtractor("cancelled-extractor").Publishes(s_cancelled);

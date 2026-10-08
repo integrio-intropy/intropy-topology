@@ -53,10 +53,11 @@ public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, Extrac
         return this;
     }
 
-    /// <summary>Declares that the extractor publishes a message.</summary>
+    /// <summary>Declares that the extractor publishes a message. Several published messages
+    /// may travel on the same channel.</summary>
     /// <param name="message">The message the extractor publishes.</param>
-    /// <exception cref="InvalidOperationException">The component already declares publishing to
-    /// <paramref name="message"/>'s channel; a component publishes to a channel at most once.</exception>
+    /// <exception cref="InvalidOperationException">The component already declares publishing
+    /// <paramref name="message"/>; a component publishes a message at most once.</exception>
     public ExtractorBuilder Publishes(MessageRef message)
     {
         Component.AddPublish(message);

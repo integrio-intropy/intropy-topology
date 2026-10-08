@@ -14,7 +14,7 @@ graph LR
 
 Validation runs at `Build()`, after materialization. Materialization never fails — structurally broken declarations still materialize (first-seen wins on conflicts) so rules can inspect and report the full picture. Each rule produces `TopologyDiagnostic` records with a severity, a message, and the component or resource it targets.
 
-Each `Add*` call on `SystemBuilder` returns the block builder, whose members are exactly that block's legal edges; invariants local to one declaration chain — a second subscription on one loader, a repeated service call or published channel, a handled message off the subscription's channel — throw `InvalidOperationException` at the offending call, with a stack trace pointing at the line. What remains for `Build()` is what spans components: completeness and cross-component conflicts.
+Each `Add*` call on `SystemBuilder` returns the block builder, whose members are exactly that block's legal edges; invariants local to one declaration chain — a second subscription on one loader, a repeated service call or published message, a handled message off the subscription's channel — throw `InvalidOperationException` at the offending call, with a stack trace pointing at the line. What remains for `Build()` is what spans components: completeness and cross-component conflicts.
 
 ## The API
 
@@ -39,7 +39,7 @@ Some semantic invariants are knowable at the exact line where the mistake is mad
 | Thrown at | Invariant |
 |-----------|-----------|
 | `Subscribes` on a loader | A loader declares its subscription once |
-| `Publishes` | A component publishes to a channel (the same pubsub and topic) at most once |
+| `Publishes` | A component publishes a message at most once |
 | `Calls` | A component calls a service app ID at most once |
 | `Subscribes` / `AlsoHandles` | A subscription handles a message name once |
 | `Subscribes` / `AlsoHandles` | Every handled message travels on the subscription's first message's channel |

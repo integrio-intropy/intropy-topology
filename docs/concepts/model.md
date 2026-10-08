@@ -233,8 +233,8 @@ Rules:
 
 - `From` is optional and may be called more than once.
 - `Publishes` is required at least once.
-- Publishing several distinct messages is legal — each resolving to its own channel.
-- A second `Publishes` resolving to a channel the component already publishes throws at the call site; a channel is published once per component.
+- Publishing several distinct messages is legal — several may share one channel.
+- Publishing the same message twice throws at the call site; a component publishes a message at most once.
 
 ### Loader
 

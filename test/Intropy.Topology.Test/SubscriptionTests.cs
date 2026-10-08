@@ -27,8 +27,8 @@ public sealed class SubscriptionTests
 
     private static SystemBuilder System(Action<LoaderBuilder> loader)
     {
-        // One message per extractor: an extractor publishes a channel once, and this
-        // channel carries two messages with their own contracts.
+        // One extractor per published message; the channel carries two messages with
+        // their own contracts.
         var builder = SystemBuilder.Create("orders");
         builder.AddExtractor("order-extractor").Publishes(s_placed);
         builder.AddExtractor("cancellation-extractor").Publishes(s_cancelled);

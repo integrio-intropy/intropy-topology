@@ -11,7 +11,7 @@ public abstract class Component
 {
     private readonly List<SubscriptionDeclaration> _subscriptions = [];
     private readonly List<MessageRef> _publishes = [];
-    private readonly HashSet<(string PubSub, string Topic)> _publishChannels = [];
+    private readonly HashSet<string> _publishedMessages = new(StringComparer.Ordinal);
     private readonly List<(PortRef Port, PortDirection Direction)> _ports = [];
     private readonly List<ServiceRef> _services = [];
     private readonly HashSet<string> _serviceAppIds = new(StringComparer.Ordinal);
@@ -50,10 +50,10 @@ public abstract class Component
     internal void AddPublish(MessageRef message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        if (!_publishChannels.Add((message.PubSubName, message.TopicName)))
+        if (!_publishedMessages.Add(message.Name))
         {
             throw new InvalidOperationException(
-                $"Component '{Name}' already declares publishing to the channel '{message.TopicName}' on pubsub '{message.PubSubName}'.");
+                $"Component '{Name}' already declares publishing the message '{message.Name}'; a component publishes a message at most once.");
         }
 
         _publishes.Add(message);
