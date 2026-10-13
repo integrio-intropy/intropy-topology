@@ -41,14 +41,14 @@ public class PortRefTests
 public class MessageRefTests
 {
     [Fact]
-    public void Define_WithDefaultsOnly_ShouldDefaultPubSubAndTopicToName()
+    public void Define_WithDefaultsOnly_ShouldLeaveThePubSubToTheSystemAndDefaultTopicToName()
     {
         // Act
         var message = MessageRef<RawEvent>.Define("raw-events");
 
         // Assert
         Assert.Equal("raw-events", message.Name);
-        Assert.Equal("pubsub", message.PubSubName);
+        Assert.Null(message.PubSubName);
         Assert.Equal("raw-events", message.TopicName);
         Assert.Equal(typeof(RawEvent), message.ContractType);
     }
@@ -67,14 +67,14 @@ public class MessageRefTests
     }
 
     [Fact]
-    public void Define_WithTopicOnly_ShouldDefaultPubSubToPubsub()
+    public void Define_WithTopicOnly_ShouldLeaveThePubSubToTheSystem()
     {
         // Act
         var message = MessageRef<RawEvent>.Define("raw-events", topic: "raw-events-topic");
 
         // Assert
         Assert.Equal("raw-events", message.Name);
-        Assert.Equal("pubsub", message.PubSubName);
+        Assert.Null(message.PubSubName);
         Assert.Equal("raw-events-topic", message.TopicName);
         Assert.Equal(typeof(RawEvent), message.ContractType);
     }

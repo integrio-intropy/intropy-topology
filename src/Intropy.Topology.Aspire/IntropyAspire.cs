@@ -174,7 +174,7 @@ public static class IntropyAspire
                 ? project.WithHttpEndpoint(name: GrpcAppEndpoint, env: "APP_PORT")
                 : project.WithHttpEndpoint();
 
-            Wire(project, component, stagedPath, configDir, redis, microcks,
+            Wire(project, topology.SystemName, component, stagedPath, configDir, redis, microcks,
                 PortRootPaths(builder.AppHostDirectory, component, development), topology.Otlp);
             resources[component.Name] = project;
             waiters[component.Name] = dependency => project.WaitFor(dependency);
@@ -364,9 +364,12 @@ public static class IntropyAspire
     /// only the component would split the system's telemetry across two sinks. Without the
     /// declaration nothing is written: Aspire's own dashboard wiring remains the default, and
     /// these calls are the sole source of OTEL_EXPORTER_OTLP_* values this host injects.
+    /// INTROPY_SYSTEM_NAME tells the framework which system the component runs in; it derives the
+    /// system's pubsub, <c>&lt;system&gt;-pubsub</c>, from it, as deployment does.
     /// </summary>
     private static void Wire(
         IResourceBuilder<ProjectResource> project,
+        string systemName,
         ComponentModel component,
         string resourcesPath,
         string configDir,
@@ -393,6 +396,7 @@ public static class IntropyAspire
                     sidecar.WithAnnotation(OtlpVariables(otlp));
                 }
             })
+            .WithEnvironment("INTROPY_SYSTEM_NAME", systemName)
             .WithEnvironment("INTROPY__COMPONENT", component.Name)
             .WithEnvironment("INTROPY__CONFIG", Path.Combine(configDir, $"{component.Name}.intropy.json"))
             .WithEnvironment("DOTNET_ENVIRONMENT", development)

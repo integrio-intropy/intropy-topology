@@ -24,6 +24,15 @@ public sealed class SystemBuilder
         SystemName = systemName;
     }
 
+    /// <summary>The system's own pubsub component, <c>&lt;system&gt;-pubsub</c>: the channel of every
+    /// message that names no pubsub, and of every transactional integration's internal queue.
+    /// Systems share an environment's namespace and broker, so each owns a component of its own,
+    /// scoped to its components and carrying its broker credentials.</summary>
+    internal string PubSubName => PubSubNameFor(SystemName);
+
+    /// <summary>The pubsub component a system named <paramref name="systemName"/> owns.</summary>
+    internal static string PubSubNameFor(string systemName) => $"{systemName}-pubsub";
+
     internal IReadOnlyList<Component> Components => _components;
 
     /// <summary>The OTLP settings declared for this system, or null when none.</summary>

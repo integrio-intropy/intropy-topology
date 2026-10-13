@@ -325,6 +325,8 @@ public sealed class IntropyAspireTests : IDisposable
 
         // Assert
         Assert.Equal("order-extractor", env["INTROPY__COMPONENT"]);
+        // The framework derives the system's pubsub from it, as a deployment does.
+        Assert.Equal(Topology().SystemName, env["INTROPY_SYSTEM_NAME"]);
         Assert.Equal(
             Path.Combine(GeneratedRoot, GeneratedArtifacts.ConfigDir, "order-extractor.intropy.json"),
             env["INTROPY__CONFIG"]);

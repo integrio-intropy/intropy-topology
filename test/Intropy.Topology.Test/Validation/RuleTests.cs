@@ -265,7 +265,7 @@ public class UnhandledChannelMessagesRuleTests
         // Assert
         Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
         Assert.Equal("fulfillment", diagnostic.Target);
-        Assert.Contains("handles 1 of 3 messages on topic 'orders' (pubsub 'pubsub')", diagnostic.Message);
+        Assert.Contains("handles 1 of 3 messages on topic 'orders' (pubsub 'orders-pubsub')", diagnostic.Message);
         Assert.Contains("'fluxia.orders.order-cancelled', 'fluxia.orders.order-shipped'", diagnostic.Message);
     }
 
@@ -412,6 +412,23 @@ public class PubSubPortNameCollisionRuleTests
         // Assert
         Assert.Equal("shared", diagnostic.Target);
         Assert.Contains("shared", diagnostic.Message);
+    }
+
+    [Fact]
+    public void Validate_WithPortNamedLikeTheInternalQueuesPubSub_ShouldReportError()
+    {
+        // Arrange: a system of only transactional integrations has no topics, yet its internal
+        // queues ride the system's pubsub, which still becomes a Dapr Component.
+        var s = SystemBuilder.Create("test-system");
+        s.AddTransactionalIntegration("ti")
+            .From(PortRef.Define("test-system-pubsub"))
+            .To(TestPorts.Erp);
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor<PubSubPortNameCollisionRule>());
+
+        // Assert
+        Assert.Equal("test-system-pubsub", diagnostic.Target);
     }
 }
 

@@ -5,7 +5,8 @@ namespace Intropy.Topology;
 
 /// <summary>
 /// Identifies a message by its logical name and the transport channel it moves over
-/// (the Dapr pubsub component and topic names). A single message identity implies all
+/// (the Dapr pubsub component and topic names). A message that names no pubsub travels on
+/// the system's own, <c>&lt;system&gt;-pubsub</c>, resolved when the topology is built. A single message identity implies all
 /// three: the name, the channel, and the payload contract type — the topic is a
 /// derivation of the message, never an independent declaration. The channel and
 /// contract materialize only when a component uses the reference.
@@ -15,8 +16,10 @@ public abstract record MessageRef
     /// <summary>The message's logical name (DNS-1123 subdomain).</summary>
     public string Name { get; }
 
-    /// <summary>The Dapr pubsub component name carrying the message (DNS-1123 subdomain).</summary>
-    public string PubSubName { get; }
+    /// <summary>The Dapr pubsub component name carrying the message (DNS-1123 subdomain), or
+    /// null for the system's own pubsub, which the materialized model names
+    /// <c>&lt;system&gt;-pubsub</c>.</summary>
+    public string? PubSubName { get; }
 
     /// <summary>The topic name the message flows over within the pubsub (DNS-1123 subdomain).</summary>
     public string TopicName { get; }
@@ -24,12 +27,17 @@ public abstract record MessageRef
     /// <summary>The payload contract type transported by the message.</summary>
     public abstract Type ContractType { get; }
 
-    private protected MessageRef(string name, string pubSubName, string topicName)
+    private protected MessageRef(string name, string? pubSubName, string topicName)
     {
         Name = NameRules.RequireSubdomain(name, nameof(name));
-        PubSubName = NameRules.RequireSubdomain(pubSubName, nameof(pubSubName));
+        PubSubName = pubSubName is null ? null : NameRules.RequireSubdomain(pubSubName, nameof(pubSubName));
         TopicName = NameRules.RequireSubdomain(topicName, nameof(topicName));
     }
+
+    /// <summary>The channel for diagnostics: the topic and the pubsub it travels on.</summary>
+    internal string DescribeChannel() => PubSubName is null
+        ? $"'{TopicName}' on the system's pubsub"
+        : $"'{TopicName}' on pubsub '{PubSubName}'";
 }
 
 /// <summary>
@@ -43,17 +51,20 @@ public sealed record MessageRef<T> : MessageRef
     /// <inheritdoc />
     public override Type ContractType => typeof(T);
 
-    private MessageRef(string name, string pubSubName, string topicName)
+    private MessageRef(string name, string? pubSubName, string topicName)
         : base(name, pubSubName, topicName)
     {
     }
 
-    /// <summary>Declares a message; the channel defaults to pubsub/topic <c>pubsub/{name}</c>.
-    /// Declare <paramref name="pubSub"/> and/or <paramref name="topic"/> to override — for
-    /// example when the logical identity differs from the transport topic.</summary>
+    /// <summary>Declares a message; the channel defaults to the system's pubsub,
+    /// <c>&lt;system&gt;-pubsub</c>, and the topic <c>{name}</c>. Declare
+    /// <paramref name="pubSub"/> and/or <paramref name="topic"/> to override — for example when
+    /// the logical identity differs from the transport topic.</summary>
     /// <param name="name">The message's logical name (DNS-1123 subdomain).</param>
-    /// <param name="pubSub">The Dapr pubsub component name (DNS-1123 subdomain);
-    /// defaults to <c>pubsub</c>.</param>
+    /// <param name="pubSub">The Dapr pubsub component name (DNS-1123 subdomain); defaults to
+    /// the system's own, <c>&lt;system&gt;-pubsub</c>. Every system in an environment namespace
+    /// owns its own pubsub component, so name another only to reach a component this system
+    /// does not own.</param>
     /// <param name="topic">The topic name within the pubsub (DNS-1123 subdomain);
     /// defaults to <paramref name="name"/>.</param>
     /// <exception cref="ArgumentException">A name (message, pubsub, or topic) is not a
@@ -62,7 +73,7 @@ public sealed record MessageRef<T> : MessageRef
         [ConstantExpected] string name,
         [ConstantExpected] string? pubSub = null,
         [ConstantExpected] string? topic = null) =>
-        new(name, pubSub ?? "pubsub", topic ?? name);
+        new(name, pubSub, topic ?? name);
 }
 
 /// <summary>

@@ -142,8 +142,8 @@ internal sealed class SubscriptionDeclaration
         if (_messages.Count > 0
             && (_messages[0].PubSubName != message.PubSubName || _messages[0].TopicName != message.TopicName))
         {
-            var declared = $"'{_messages[0].TopicName}' on pubsub '{_messages[0].PubSubName}'";
-            var incoming = $"'{message.TopicName}' on pubsub '{message.PubSubName}'";
+            var declared = _messages[0].DescribeChannel();
+            var incoming = message.DescribeChannel();
             throw new InvalidOperationException(
                 $"Loader '{_componentName}' subscribes to messages on different channels ({declared}, {incoming}); "
                 + "a subscription is to one channel, so all of its messages must travel on it.");

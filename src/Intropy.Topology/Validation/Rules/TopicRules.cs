@@ -74,13 +74,15 @@ internal sealed class MessageChannelConflictRule : IDeclarationRule
 
         var conflicts = usages
             .GroupBy(m => m.Name, StringComparer.Ordinal)
-            .Where(g => g.Select(m => (m.PubSubName, m.TopicName)).Distinct().Count() > 1);
+            .Where(g => g.Select(m => (m.PubSubName ?? builder.PubSubName, m.TopicName)).Distinct().Count() > 1);
 
         foreach (var group in conflicts)
         {
             var channels = string.Join(
                 ", ",
-                group.Select(m => $"'{m.TopicName}' on pubsub '{m.PubSubName}'").Distinct().Order(StringComparer.Ordinal));
+                group.Select(m => $"'{m.TopicName}' on pubsub '{m.PubSubName ?? builder.PubSubName}'")
+                    .Distinct()
+                    .Order(StringComparer.Ordinal));
             yield return new TopologyDiagnostic(
                 DiagnosticSeverity.Error,
                 $"The message '{group.Key}' is declared on conflicting channels: {channels}.",

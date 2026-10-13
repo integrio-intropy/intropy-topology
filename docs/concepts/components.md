@@ -53,7 +53,7 @@ The names in the topology — component names, service app-ids, pubsub names, th
 
 One qualification: a `ServiceRef` app-id is unqualified, while Dapr service resolution in a cluster is namespace-scoped. The minted identity holds within the system's own namespace; invoking a service across namespaces would need qualified app-ids, which the model does not express today.
 
-A second minted identity is derived rather than declared: a transactional integration's `InternalQueue` (`internal-<component>` pubsub, `hop` topic) — the queue joining its receive and send pipelines. It is workload shape, not an inter-component edge, so it never enters `SystemTopology.Topics` and the DSL exposes nothing for it. It is minted in the model so every backend materializes the same component (locally: Redis, scoped to exactly the owning integration) and the framework runner reads the names from the generated `.intropy.json` instead of a scaffold constant.
+A second minted identity is derived rather than declared: a transactional integration's `InternalQueue` (the system's `<system>-pubsub` pubsub, `internal-<component>` topic) — the queue joining its receive and send pipelines. It is workload shape, not an inter-component edge, so it never enters `SystemTopology.Topics` and the DSL exposes nothing for it. It is minted in the model so every backend materializes the same names (locally: the system's Redis pubsub, with the integration in its scopes); the framework runner derives the same names from the system name and its component name. The topic is unique per integration because brokers keep queues apart by topic, not by Dapr component.
 
 ## What the compiler rejects
 

@@ -140,13 +140,35 @@ public class MaterializationTests
 
         // Assert
         var ti = topology.Components.Single(c => c.Name == "price-sync");
-        Assert.Equal("internal-price-sync", ti.InternalQueue?.PubSubName);
-        Assert.Equal("hop", ti.InternalQueue?.TopicName);
+        Assert.Equal("test-system-pubsub", ti.InternalQueue?.PubSubName);
+        Assert.Equal("internal-price-sync", ti.InternalQueue?.TopicName);
         Assert.Null(topology.Components.Single(c => c.Name == "extractor").InternalQueue);
         Assert.Null(topology.Components.Single(c => c.Name == "loader").InternalQueue);
 
-        // The hop is workload shape, not an inter-component edge: it never enters Topics.
-        Assert.DoesNotContain(topology.Topics, t => t.PubSubName == "internal-price-sync");
+        // The queue is workload shape, not an inter-component edge: it never enters Topics.
+        Assert.DoesNotContain(topology.Topics, t => t.TopicName == "internal-price-sync");
+    }
+
+    [Fact]
+    public void Build_WithAMessageNamingNoPubSub_ShouldResolveItToTheSystemsPubSub()
+    {
+        // Arrange
+        var orders = MessageRef<RawEvent>.Define("orders");
+        var s = SystemBuilder.Create("order-flow");
+        s.AddExtractor("extractor").Publishes(orders);
+        s.AddLoader("loader").Subscribes(orders);
+
+        // Act
+        var topology = s.Build();
+
+        // Assert
+        Assert.Equal("order-flow-pubsub", Assert.Single(topology.Topics).PubSubName);
+        Assert.Equal("order-flow-pubsub",
+            Assert.Single(topology.Components.Single(c => c.Name == "extractor").Publishes).PubSubName);
+        Assert.Equal("order-flow-pubsub",
+            Assert.Single(topology.Components.Single(c => c.Name == "loader").Subscribes).PubSubName);
+        Assert.Equal("order-flow-pubsub",
+            Assert.Single(Assert.Single(topology.MessageGroups).Messages).Channel.PubSubName);
     }
 
     // A second edge that a block cannot legally have is a compile error: the block

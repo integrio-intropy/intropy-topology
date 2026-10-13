@@ -52,7 +52,7 @@ public class SubscriptionGenerationTests
             metadata:
               name: "fulfillment-subscription"
             spec:
-              pubsubname: "pubsub"
+              pubsubname: "orders-pubsub"
               topic: "orders"
               routes:
                 rules:
@@ -104,7 +104,7 @@ public class SubscriptionGenerationTests
     }
 
     [Fact]
-    public void Generate_ForATransactionalIntegration_ShouldEmitASubscriptionToItsInternalHop()
+    public void Generate_ForATransactionalIntegration_ShouldEmitASubscriptionToItsInternalQueue()
     {
         // Arrange
         var builder = SystemBuilder.Create("orders");
@@ -116,9 +116,9 @@ public class SubscriptionGenerationTests
         var yaml = TopologyGenerator.Generate(builder.Build(), development, Directory.GetCurrentDirectory()).Files
             .Single(f => f.RelativePath == "components/order-sync-subscription.yaml").Content;
 
-        // Assert — one kind of message on the hop: the default route only
-        Assert.Contains("pubsubname: \"internal-order-sync\"", yaml, StringComparison.Ordinal);
-        Assert.Contains("topic: \"hop\"", yaml, StringComparison.Ordinal);
+        // Assert — one kind of message on the queue: the default route only
+        Assert.Contains("pubsubname: \"orders-pubsub\"", yaml, StringComparison.Ordinal);
+        Assert.Contains("topic: \"internal-order-sync\"", yaml, StringComparison.Ordinal);
         Assert.DoesNotContain("rules:", yaml, StringComparison.Ordinal);
         Assert.Contains("default: \"/unhandled\"", yaml, StringComparison.Ordinal);
         Assert.Contains("- \"order-sync\"", yaml, StringComparison.Ordinal);

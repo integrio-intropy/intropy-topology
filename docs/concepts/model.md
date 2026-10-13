@@ -156,7 +156,7 @@ public static readonly MessageRef<Order> Orders =
     MessageRef<Order>.Define("orders");
 ```
 
-Pubsub defaults to `pubsub` and the topic name defaults to the message name. Use the named overrides when the defaults do not fit — for example when the logical identity and transport topic differ:
+Pubsub defaults to the system's own, `<system>-pubsub`, and the topic name defaults to the message name. Use the named overrides when the defaults do not fit — for example when the logical identity and transport topic differ:
 
 ```csharp
 public static readonly MessageRef<Order> LegacyOrders =
@@ -269,7 +269,7 @@ Rules:
 - At least one `From` is required.
 - At least one `To` is required.
 - Multiple input and output ports are legal.
-- The model mints an internal queue named `internal-<component-name>` with topic `hop`. This queue is internal workload shape and does not appear in public `Topics`.
+- The model mints an internal queue on the system's pubsub, `<system>-pubsub`, with topic `internal-<component-name>`. This queue is internal workload shape and does not appear in public `Topics`.
 
 ### Compile-time illegality
 

@@ -1,6 +1,8 @@
 # 0011: The topology mints the transactional integration's internal queue
 
-> Status: implemented.
+> Status: implemented. The names it mints are superseded by
+> [0014](0014-one-pubsub-per-system.md): the queue rides the system's pubsub on the topic
+> `internal-<component>`.
 
 **Background.** A transactional integration runs as two pipelines joined by a queue: its
 receive pipeline reads the `From` connectors and publishes to an internal topic; its send

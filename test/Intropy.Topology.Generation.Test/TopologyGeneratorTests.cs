@@ -102,11 +102,11 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Generate_ShouldEmit_InternalPubSubPerTransactionalIntegration_ScopedToItself()
+    public void Generate_ShouldEmit_TheSystemsPubSub_ScopedToTheTransactionalIntegrationItCarries()
     {
-        // Act — the internal hop is minted in the model, not declared as a topic edge, so it
-        // does not emerge from the topic-pubsub loop; generation emits it explicitly.
-        var yaml = Content("components/internal-price-sync.yaml");
+        // Act — the internal queue is minted in the model, not declared as a topic edge, so its
+        // pubsub does not emerge from the topics; generation emits it and scopes it explicitly.
+        var yaml = Content("components/order-fulfillment-pubsub.yaml");
 
         // Assert
         Assert.Contains("type: \"pubsub.redis\"", yaml, StringComparison.Ordinal);
@@ -117,6 +117,33 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
+    public void Generate_WithOnlyTransactionalIntegrations_ShouldEmitOneSystemPubSubScopedToAllOfThem()
+    {
+        // Arrange — no messages, so no topics: the system's pubsub exists only for the queues.
+        var builder = SystemBuilder.Create("tx-flow");
+        builder.AddTransactionalIntegration("order-sync").From(PortRef.Define("order-in")).To(PortRef.Define("order-out"));
+        builder.AddTransactionalIntegration("price-sync").From(PortRef.Define("price-in")).To(PortRef.Define("price-out"));
+        builder.AddTransactionalIntegration("stock-sync").From(PortRef.Define("stock-in")).To(PortRef.Define("stock-out"));
+        PortFileResolution[] resolutions =
+        [
+            new("order-in", "./test/order-in"), new("order-out", "./test/order-out"),
+            new("price-in", "./test/price-in"), new("price-out", "./test/price-out"),
+            new("stock-in", "./test/stock-in"), new("stock-out", "./test/stock-out"),
+        ];
+
+        // Act
+        var files = TopologyGenerator.Generate(builder.Build(), new DevelopmentManifest([], resolutions, []),
+            Directory.GetCurrentDirectory()).Files;
+
+        // Assert
+        var pubSub = Assert.Single(files, f => f.Content.Contains("type: \"pubsub.redis\"", StringComparison.Ordinal));
+        Assert.Equal("components/tx-flow-pubsub.yaml", pubSub.RelativePath);
+        Assert.Contains("- \"order-sync\"", pubSub.Content, StringComparison.Ordinal);
+        Assert.Contains("- \"price-sync\"", pubSub.Content, StringComparison.Ordinal);
+        Assert.Contains("- \"stock-sync\"", pubSub.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Generate_ShouldCarry_InternalQueueInTheRuntimeConfig()
     {
         // Act
@@ -124,8 +151,8 @@ public class TopologyGeneratorTests
 
         // Assert
         Assert.Contains("\"InternalQueue\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"PubSubName\": \"internal-price-sync\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"TopicName\": \"hop\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"PubSubName\": \"order-fulfillment-pubsub\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"TopicName\": \"internal-price-sync\"", json, StringComparison.Ordinal);
     }
 
     [Fact]

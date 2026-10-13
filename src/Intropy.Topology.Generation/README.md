@@ -14,7 +14,7 @@ It produces, deterministically:
 - one declarative Dapr **Subscription** per subscribing component (`<component>-subscription`):
   one routing rule per handled message (`event.type == '<message>'` to `/<message>`), a default
   route (`/unhandled`) for the channel's other messages, `bulkSubscribe` when the subscription
-  batches, scoped to the component; a transactional integration's subscribes to its internal hop
+  batches, scoped to the component; a transactional integration's subscribes to its internal queue
   with the default route only,
 - a per-component `*.intropy.json` describing that component's identity and edges, including each
   subscription's handled messages and what happens to the others (`Unhandled`).

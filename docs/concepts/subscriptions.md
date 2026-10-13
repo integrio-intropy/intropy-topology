@@ -58,7 +58,7 @@ kind: Subscription
 metadata:
   name: "fulfillment-subscription"
 spec:
-  pubsubname: "pubsub"
+  pubsubname: "orders-pubsub"
   topic: "orders"
   routes:
     rules:
@@ -79,7 +79,7 @@ though a pipeline handles the message's type.
 
 The names come from one place, `SubscriptionRouting` (`ResourceNameFor`, `PathFor`, `MatchFor`,
 `UnhandledPath`), so every backend renders the same resource. A transactional integration's
-internal hop carries one kind of message; its `Subscription` has the default route only.
+internal queue carries one kind of message; its `Subscription` has the default route only.
 
 The component's runtime config (`<component>.intropy.json`) carries the same facts:
 `Subscribes[].Messages`, `Subscribes[].Conditions` and `Subscribes[].Unhandled`.

@@ -20,7 +20,7 @@ internal static class TopologyMaterializer
 
         foreach (var component in builder.Components)
         {
-            components.Add(MaterializeComponent(component, topics, messages, ports, services));
+            components.Add(MaterializeComponent(component, builder.PubSubName, topics, messages, ports, services));
         }
 
         return new SystemTopology
@@ -80,6 +80,7 @@ internal static class TopologyMaterializer
 
     private static ComponentModel MaterializeComponent(
         Component component,
+        string systemPubSub,
         Dictionary<(string PubSub, string Topic), TopicAccumulator> topics,
         Dictionary<string, MessageAccumulator> messages,
         Dictionary<string, PortAccumulator> ports,
@@ -93,7 +94,7 @@ internal static class TopologyMaterializer
             var channel = subscription.Messages[0];
             subscribes.Add(new TopicSubscription
             {
-                PubSubName = channel.PubSubName,
+                PubSubName = channel.PubSubName ?? systemPubSub,
                 TopicName = channel.TopicName,
                 Messages = [.. subscription.Messages.Select(m => m.Name).Distinct(StringComparer.Ordinal)],
                 Conditions = subscription.Conditions.Count == 0
@@ -105,8 +106,8 @@ internal static class TopologyMaterializer
 
             foreach (var message in subscription.Messages)
             {
-                AccumulateTopic(topics, message).Subscribers.Add(component.Name);
-                AccumulateMessage(messages, message).Subscribers.Add(component.Name);
+                AccumulateTopic(topics, message, systemPubSub).Subscribers.Add(component.Name);
+                AccumulateMessage(messages, message, systemPubSub).Subscribers.Add(component.Name);
             }
         }
 
@@ -115,12 +116,12 @@ internal static class TopologyMaterializer
         {
             publishes.Add(new PublishEdge
             {
-                PubSubName = message.PubSubName,
+                PubSubName = message.PubSubName ?? systemPubSub,
                 TopicName = message.TopicName,
                 Message = message.Name,
             });
-            AccumulateTopic(topics, message).Publishers.Add(component.Name);
-            AccumulateMessage(messages, message).Publishers.Add(component.Name);
+            AccumulateTopic(topics, message, systemPubSub).Publishers.Add(component.Name);
+            AccumulateMessage(messages, message, systemPubSub).Publishers.Add(component.Name);
         }
 
         var portEdges = new List<PortEdge>();
@@ -158,11 +159,14 @@ internal static class TopologyMaterializer
             Publishes = publishes,
             Ports = portEdges,
             Uses = serviceAppIds,
+            // The queue rides the system's pubsub on a topic of its own: brokers name exchanges and
+            // topics after the topic, so a topic shared by several integrations would deliver each
+            // one's files to all of them, whatever Dapr component they publish through.
             InternalQueue = component.Kind is ComponentKind.TransactionalIntegration
                 ? new InternalQueue
                 {
-                    PubSubName = $"internal-{component.Name}",
-                    TopicName = "hop",
+                    PubSubName = systemPubSub,
+                    TopicName = InternalQueue.TopicNameFor(component.Name),
                 }
                 : null,
         };
@@ -170,9 +174,10 @@ internal static class TopologyMaterializer
 
     private static TopicAccumulator AccumulateTopic(
         Dictionary<(string PubSub, string Topic), TopicAccumulator> topics,
-        MessageRef message)
+        MessageRef message,
+        string systemPubSub)
     {
-        var key = (message.PubSubName, message.TopicName);
+        var key = (message.PubSubName ?? systemPubSub, message.TopicName);
         if (!topics.TryGetValue(key, out var accumulator))
         {
             accumulator = new TopicAccumulator();
@@ -187,13 +192,14 @@ internal static class TopologyMaterializer
     // the declaration rules report the conflicts against the raw MessageRef usages.
     private static MessageAccumulator AccumulateMessage(
         Dictionary<string, MessageAccumulator> messages,
-        MessageRef message)
+        MessageRef message,
+        string systemPubSub)
     {
         if (!messages.TryGetValue(message.Name, out var accumulator))
         {
             accumulator = new MessageAccumulator(
                 message.ContractType.FullName ?? message.ContractType.Name,
-                message.PubSubName,
+                message.PubSubName ?? systemPubSub,
                 message.TopicName);
             messages[message.Name] = accumulator;
         }

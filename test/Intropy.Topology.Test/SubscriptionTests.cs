@@ -47,7 +47,7 @@ public sealed class SubscriptionTests
 
         // Assert
         var subscription = Assert.Single(Loader(topology).Subscribes);
-        Assert.Equal("pubsub", subscription.PubSubName);
+        Assert.Equal("orders-pubsub", subscription.PubSubName);
         Assert.Equal("orders", subscription.TopicName);
         Assert.Equal(["fluxia.orders.order-placed", "fluxia.orders.order-cancelled"], subscription.Messages);
         Assert.Equal(UnhandledMessages.DeadLetter, subscription.Unhandled);
@@ -227,8 +227,8 @@ public sealed class SubscriptionTests
         var exception = Assert.Throws<InvalidOperationException>(() => System(
             l => l.Subscribes(s_placed, configure: sub => sub.AlsoHandles(elsewhere))));
         Assert.Contains("fulfillment", exception.Message);
-        Assert.Contains("'orders' on pubsub 'pubsub'", exception.Message);
-        Assert.Contains("'returns' on pubsub 'pubsub'", exception.Message);
+        Assert.Contains("'orders' on the system's pubsub", exception.Message);
+        Assert.Contains("'returns' on the system's pubsub", exception.Message);
     }
 
     [Fact]

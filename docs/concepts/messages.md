@@ -32,9 +32,9 @@ public static class Messages
 }
 ```
 
-The message, pubsub, and topic names are DNS-1123 names, validated at `Define`. The pubsub name is minted here: local runs materialize a pubsub component with exactly this name, and deployment configuration consumes it rather than maintaining its own copy. Use `Define(name, topic: "…")` when the topic name must differ from the message name (or `pubSub:` to pick a pubsub component other than the default `pubsub`); the channel defaults to `pubsub/<name>`.
+The message, pubsub, and topic names are DNS-1123 names, validated at `Define`. A message that names no pubsub travels on the system's own, `<system>-pubsub`, resolved when the topology is built: several systems share an environment's namespace and broker, so each owns a pubsub component, scoped to its components and carrying its own broker credentials. Local runs materialize a pubsub component with exactly the resolved name, and deployment configuration consumes it rather than maintaining its own copy. Use `Define(name, topic: "…")` when the topic name must differ from the message name, or `pubSub:` only to reach a pubsub component the system does not own; the channel defaults to `<system>-pubsub/<name>`.
 
-These names describe the *inter-component* vocabulary. The one pubsub a component never declares here is a transactional integration's internal hop — minted by the model as `internal-<component>`, never declarable via `MessageRef`, and scoped to exactly its owning component. The `internal-` prefix keeps the two namespaces disjoint.
+These names describe the *inter-component* vocabulary. The one channel a component never declares here is a transactional integration's internal queue — minted by the model on the system's pubsub as the topic `internal-<component>`, never declarable via `MessageRef`. The `internal-` prefix keeps queue topics apart from message topics, and the component name keeps each integration's queue apart from the others'.
 
 ## The contract type
 

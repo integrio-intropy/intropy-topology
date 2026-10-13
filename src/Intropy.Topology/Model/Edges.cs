@@ -69,17 +69,23 @@ public sealed record PortEdge
 }
 
 /// <summary>
-/// A transactional integration's internal receive-to-send hop. Not a user-declared topic:
-/// the names are minted from the component name at materialization, so nothing outside the
-/// component can subscribe to or publish on it.
+/// A transactional integration's internal receive-to-send queue. Not a user-declared topic: the
+/// names are minted at materialization — the system's pubsub and a topic named after the
+/// component — so nothing outside the component publishes or subscribes on it.
 /// </summary>
 public sealed record InternalQueue
 {
-    /// <summary>The Dapr pubsub component name backing the hop.</summary>
+    /// <summary>The Dapr pubsub component name backing the queue: the system's own,
+    /// <c>&lt;system&gt;-pubsub</c>.</summary>
     public required string PubSubName { get; init; }
 
-    /// <summary>The topic the receive pipeline publishes and the send pipeline subscribes to.</summary>
+    /// <summary>The topic the receive pipeline publishes and the send pipeline subscribes to,
+    /// <c>internal-&lt;component&gt;</c>. Unique per component, because brokers keep queues apart by
+    /// topic, not by Dapr component.</summary>
     public required string TopicName { get; init; }
+
+    /// <summary>The internal queue's topic for <paramref name="componentName"/>.</summary>
+    public static string TopicNameFor(string componentName) => $"internal-{componentName}";
 }
 
 /// <summary>

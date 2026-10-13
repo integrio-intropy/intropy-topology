@@ -157,8 +157,8 @@ public class IntropyGenerateTests
         var ti = components.Single(component => component.GetProperty("name").GetString() == "price-sync");
 
         // Assert
-        Assert.Equal("internal-price-sync", ti.GetProperty("internalQueue").GetProperty("pubsub").GetString());
-        Assert.Equal("hop", ti.GetProperty("internalQueue").GetProperty("topic").GetString());
+        Assert.Equal("order-fulfillment-pubsub", ti.GetProperty("internalQueue").GetProperty("pubsub").GetString());
+        Assert.Equal("internal-price-sync", ti.GetProperty("internalQueue").GetProperty("topic").GetString());
         Assert.Equal("price-sync-subscription", ti.GetProperty("internalQueue").GetProperty("resource").GetString());
         Assert.Equal("/unhandled", ti.GetProperty("internalQueue").GetProperty("defaultPath").GetString());
         foreach (var component in components.Where(c => c.GetProperty("name").GetString() != "price-sync"))

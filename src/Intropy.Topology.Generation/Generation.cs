@@ -83,17 +83,16 @@ public static class TopologyGenerator
         ArgumentException.ThrowIfNullOrEmpty(hostRoot);
         var files = new List<GeneratedFile>();
 
-        foreach (var topic in topology.Topics.Select(t => t.PubSubName).Distinct(StringComparer.Ordinal))
+        // A transactional integration's internal queue is minted in the model, not declared as a
+        // topic edge, so its pubsub does not emerge from the topics alone: a system of only
+        // transactional integrations has no topics, yet still needs the system's pubsub.
+        var pubSubNames = topology.Topics.Select(t => t.PubSubName)
+            .Concat(topology.Components.Select(c => c.InternalQueue?.PubSubName).OfType<string>())
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal);
+        foreach (var pubSubName in pubSubNames)
         {
-            files.Add(PubSubComponent(topic, topology));
-        }
-
-        // The transactional integration's internal hop is minted in the model, not declared as
-        // a topic edge, so its pubsub does not emerge from the Topics loop above. Same Redis
-        // backend as the inter-component pubsubs; scoped to exactly the owning component.
-        foreach (var component in topology.Components.Where(c => c.InternalQueue is not null))
-        {
-            files.Add(PubSubComponent(component.InternalQueue!.PubSubName, [component.Name]));
+            files.Add(PubSubComponent(pubSubName, topology));
         }
 
         // Local runs resolve every port to localstorage, so the declared transport is
@@ -142,8 +141,12 @@ public static class TopologyGenerator
 
     private static GeneratedFile PubSubComponent(string pubSubName, SystemTopology topology)
     {
+        // A transactional integration must be in the scopes of the pubsub carrying its internal
+        // queue: a component its sidecar cannot load leaves the queue unreachable.
         var scopes = topology.Components
-            .Where(c => c.Subscribes.Any(s => s.PubSubName == pubSubName) || c.Publishes.Any(p => p.PubSubName == pubSubName))
+            .Where(c => c.Subscribes.Any(s => s.PubSubName == pubSubName)
+                || c.Publishes.Any(p => p.PubSubName == pubSubName)
+                || c.InternalQueue?.PubSubName == pubSubName)
             .Select(c => c.Name);
         return PubSubComponent(pubSubName, scopes);
     }
