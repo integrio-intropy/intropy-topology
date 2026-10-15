@@ -137,7 +137,8 @@ public static class IntropyGenerate
         IReadOnlyList<GraphPublication>? Publishes,
         IReadOnlyList<GraphPortUse>? Ports,
         IReadOnlyList<string>? Uses,
-        GraphInternalQueue? InternalQueue)
+        GraphInternalQueue? InternalQueue,
+        GraphChannel? Channel)
     {
         public static GraphComponent From(ComponentModel component) => new(
             component.Name,
@@ -151,7 +152,20 @@ public static class IntropyGenerate
             component.InternalQueue is null
                 ? null
                 : new GraphInternalQueue(component.InternalQueue.PubSubName, component.InternalQueue.TopicName,
-                    SubscriptionRouting.ResourceNameFor(component.Name), SubscriptionRouting.UnhandledPath));
+                    SubscriptionRouting.ResourceNameFor(component.Name), SubscriptionRouting.UnhandledPath),
+            GraphChannel.From(ComponentChannel.For(component)));
+    }
+
+    /// <summary>The one pubsub and topic the component runs on, as a deployment passes them in
+    /// <c>INTROPY_PUBSUB_NAME</c> and <c>INTROPY_TOPIC_NAME</c>. Absent when neither is settled.</summary>
+    private sealed record GraphChannel(
+        [property: JsonPropertyName("pubsub")] string? PubSub,
+        string? Topic)
+    {
+        public static GraphChannel? From(ComponentChannel channel) =>
+            channel.PubSubName is null && channel.TopicName is null
+                ? null
+                : new(channel.PubSubName, channel.TopicName);
     }
 
     /// <summary>A transactional integration's internal hop, and the <c>Subscription</c> it receives

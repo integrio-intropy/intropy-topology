@@ -89,6 +89,38 @@ public sealed record InternalQueue
 }
 
 /// <summary>
+/// The one pubsub and the one topic a component runs on — what the framework reads from
+/// <c>INTROPY_PUBSUB_NAME</c> and <c>INTROPY_TOPIC_NAME</c>, and derives nothing of its own. The
+/// single derivation site, so the local host and deployment tooling pass the same names.
+/// </summary>
+/// <param name="PubSubName">The internal queue's pubsub for a transactional integration; otherwise
+/// the pubsub every channel the component subscribes to or publishes on shares. Null when it has
+/// no channel, or channels on several pubsubs.</param>
+/// <param name="TopicName">The internal queue's topic for a transactional integration; otherwise
+/// the component's only channel's topic. Null when it has no channel, or several.</param>
+public sealed record ComponentChannel(string? PubSubName, string? TopicName)
+{
+    /// <summary>The channel <paramref name="component"/> runs on.</summary>
+    public static ComponentChannel For(ComponentModel component)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+        if (component.InternalQueue is { } queue)
+        {
+            return new(queue.PubSubName, queue.TopicName);
+        }
+
+        var channels = component.Subscribes.Select(s => (s.PubSubName, s.TopicName))
+            .Concat(component.Publishes.Select(p => (p.PubSubName, p.TopicName)))
+            .Distinct()
+            .ToList();
+        var pubSubs = channels.Select(c => c.PubSubName).Distinct().ToList();
+        return new(
+            pubSubs.Count == 1 ? pubSubs[0] : null,
+            channels.Count == 1 ? channels[0].TopicName : null);
+    }
+}
+
+/// <summary>
 /// The names a component's Dapr <c>Subscription</c> is rendered with — the single derivation site,
 /// so every backend (local generation, Aspire, deployment tooling) and the framework agree.
 /// </summary>
