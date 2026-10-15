@@ -57,12 +57,94 @@ public class IntropyGenerateTests
         Assert.False(extractor.GetProperty("publishes")[0].TryGetProperty("pubSub", out _));
         Assert.Equal("pubsub-a", rawTopic.GetProperty("pubsub").GetString());
         Assert.False(rawTopic.TryGetProperty("pubSub", out _));
-        Assert.Equal("Intropy.Topology.Generation.Test.RawOrder", rawTopic.GetProperty("contract").GetString());
+        Assert.False(rawTopic.TryGetProperty("contract", out _));
+        Assert.Equal(["order-raw"], rawTopic.GetProperty("messages").EnumerateArray().Select(value => value.GetString()));
         Assert.Equal(["order-extractor"], rawTopic.GetProperty("publishers").EnumerateArray().Select(value => value.GetString()));
         Assert.Equal(["order-loader", "raw-audit"], rawTopic.GetProperty("subscribers").EnumerateArray().Select(value => value.GetString()));
         Assert.False(webshop.TryGetProperty("transport", out _));
         Assert.Equal(["out"], webshop.GetProperty("directions").EnumerateArray().Select(value => value.GetString()));
         Assert.Equal(["order-loader", "price-sync"], webshop.GetProperty("usedBy").EnumerateArray().Select(value => value.GetString()));
+    }
+
+    [Fact]
+    public void Run_Graph_ShouldEmit_MessageGroupsAlongsideTopics()
+    {
+        // Act
+        var (_, output, _) = Capture(() => IntropyGenerate.Run(s_assembly, ["graph"]));
+        using var json = JsonDocument.Parse(output);
+        var root = json.RootElement;
+
+        // Assert — message groups are always emitted, even alongside an unchanged topics view
+        var group = Assert.Single(root.GetProperty("messagegroups").EnumerateArray());
+        Assert.Equal("order-fulfillment", group.GetProperty("name").GetString());
+        var message = group.GetProperty("messages").EnumerateArray()
+            .Single(message => message.GetProperty("name").GetString() == "order-raw");
+        Assert.Equal("Intropy.Topology.Generation.Test.RawOrder", message.GetProperty("contract").GetString());
+        Assert.Equal("pubsub-a", message.GetProperty("channel").GetProperty("pubsub").GetString());
+        Assert.Equal("order-raw", message.GetProperty("channel").GetProperty("topic").GetString());
+        Assert.Equal(["order-extractor"], message.GetProperty("publishers").EnumerateArray().Select(value => value.GetString()));
+        Assert.Equal(["order-loader", "raw-audit"], message.GetProperty("subscribers").EnumerateArray().Select(value => value.GetString()));
+    }
+
+    [Fact]
+    public void Run_Graph_ShouldEmitEachSubscriptionsRoutesAndDefault()
+    {
+        // Act
+        var (_, output, _) = Capture(() => IntropyGenerate.Run(s_assembly, ["graph"]));
+        using var json = JsonDocument.Parse(output);
+        var loader = json.RootElement.GetProperty("components").EnumerateArray()
+            .Single(component => component.GetProperty("name").GetString() == "order-loader");
+        var subscription = Assert.Single(loader.GetProperty("subscribes").EnumerateArray());
+
+        // Assert
+        var route = Assert.Single(subscription.GetProperty("routes").EnumerateArray());
+        Assert.Equal("order-raw", route.GetProperty("message").GetString());
+        Assert.False(route.TryGetProperty("when", out _));
+        Assert.Equal("dead-letter", subscription.GetProperty("default").GetString());
+        Assert.False(subscription.TryGetProperty("messages", out _));
+        Assert.False(subscription.TryGetProperty("conditions", out _));
+        Assert.False(subscription.TryGetProperty("unhandled", out _));
+    }
+
+    [Fact]
+    public void GraphJson_ShouldListRoutesInDeclarationOrderWithTheirFilters()
+    {
+        // Arrange
+        var placed = MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", topic: "orders");
+        var cancelled = MessageRef<OrderCancelled>.Define("fluxia.orders.order-cancelled", topic: "orders");
+        var builder = SystemBuilder.Create("orders");
+        builder.AddExtractor("order-extractor").Publishes(placed);
+        builder.AddExtractor("cancellation-extractor").Publishes(cancelled);
+        builder.AddLoader("fulfillment").Subscribes(placed, configure: sub => sub
+            .AlsoHandles(cancelled, when: "event.data.reason != 'fraud-review'")
+            .IgnoreOthers());
+
+        // Act
+        using var json = JsonDocument.Parse(IntropyGenerate.GraphJson(builder.Build(), development: null));
+        var root = json.RootElement;
+        var subscription = root.GetProperty("components").EnumerateArray()
+            .Single(component => component.GetProperty("name").GetString() == "fulfillment")
+            .GetProperty("subscribes")[0];
+        var topic = Assert.Single(root.GetProperty("topics").EnumerateArray());
+
+        // Assert
+        var routes = subscription.GetProperty("routes").EnumerateArray().ToArray();
+        Assert.Equal(["fluxia.orders.order-placed", "fluxia.orders.order-cancelled"],
+            routes.Select(r => r.GetProperty("message").GetString()));
+        Assert.False(routes[0].TryGetProperty("when", out _));
+        Assert.Equal("event.data.reason != 'fraud-review'", routes[1].GetProperty("when").GetString());
+        Assert.Equal("ignore", subscription.GetProperty("default").GetString());
+        // The rendered Subscription, as SubscriptionRouting writes it for a local run.
+        Assert.Equal("event.type == 'fluxia.orders.order-placed'", routes[0].GetProperty("match").GetString());
+        Assert.Equal("/fluxia.orders.order-placed", routes[0].GetProperty("path").GetString());
+        Assert.Equal("event.type == 'fluxia.orders.order-cancelled' && (event.data.reason != 'fraud-review')",
+            routes[1].GetProperty("match").GetString());
+        Assert.Equal("fulfillment-subscription", subscription.GetProperty("resource").GetString());
+        Assert.Equal("/unhandled", subscription.GetProperty("defaultPath").GetString());
+        Assert.False(subscription.TryGetProperty("bulk", out _));
+        Assert.False(topic.TryGetProperty("contract", out _));
+        Assert.Equal(["fluxia.orders.order-cancelled", "fluxia.orders.order-placed"],
+            topic.GetProperty("messages").EnumerateArray().Select(value => value.GetString()));
     }
 
     [Fact]
@@ -75,8 +157,10 @@ public class IntropyGenerateTests
         var ti = components.Single(component => component.GetProperty("name").GetString() == "price-sync");
 
         // Assert
-        Assert.Equal("internal-price-sync", ti.GetProperty("internalQueue").GetProperty("pubsub").GetString());
-        Assert.Equal("hop", ti.GetProperty("internalQueue").GetProperty("topic").GetString());
+        Assert.Equal("order-fulfillment-pubsub", ti.GetProperty("internalQueue").GetProperty("pubsub").GetString());
+        Assert.Equal("internal-price-sync", ti.GetProperty("internalQueue").GetProperty("topic").GetString());
+        Assert.Equal("price-sync-subscription", ti.GetProperty("internalQueue").GetProperty("resource").GetString());
+        Assert.Equal("/unhandled", ti.GetProperty("internalQueue").GetProperty("defaultPath").GetString());
         foreach (var component in components.Where(c => c.GetProperty("name").GetString() != "price-sync"))
         {
             Assert.False(component.TryGetProperty("internalQueue", out _));
@@ -205,12 +289,13 @@ public class IntropyGenerateTests
     {
         // Arrange: a manifest mock no topology service matches — a programming error,
         // not user input, so it must crash rather than surface as exit code 1.
-        var topic = TopicRef<string>.Define("orders", "created");
+        var message = MessageRef<string>.Define("created", pubSub: "orders");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").Publishes(topic);
-        builder.AddLoader("loader").Subscribes(topic);
+        builder.AddExtractor("extractor").Publishes(message);
+        builder.AddLoader("loader").Subscribes(message);
         var manifest = new DevelopmentManifest(
             [new OpenApiMock("ghost-service", "/tmp/ghost.yaml", "Ghost", "1")],
+            [],
             []);
 
         // Act & Assert
@@ -236,5 +321,25 @@ public class IntropyGenerateTests
             Console.SetOut(originalOut);
             Console.SetError(originalError);
         }
+    }
+
+    [Fact]
+    public void GraphJson_ShouldCarryABulkSubscriptionsBatching()
+    {
+        // Arrange
+        var placed = MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", topic: "orders");
+        var builder = SystemBuilder.Create("orders");
+        builder.AddExtractor("order-extractor").Publishes(placed);
+        builder.AddLoader("fulfillment").Subscribes(placed, configure: sub => sub.InBatches(100, TimeSpan.FromSeconds(2)));
+
+        // Act
+        using var json = JsonDocument.Parse(IntropyGenerate.GraphJson(builder.Build(), development: null));
+        var bulk = json.RootElement.GetProperty("components").EnumerateArray()
+            .Single(component => component.GetProperty("name").GetString() == "fulfillment")
+            .GetProperty("subscribes")[0].GetProperty("bulk");
+
+        // Assert
+        Assert.Equal(100, bulk.GetProperty("maxMessagesCount").GetInt32());
+        Assert.Equal(2000, bulk.GetProperty("maxAwaitDurationMs").GetInt64());
     }
 }

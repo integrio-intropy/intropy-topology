@@ -13,6 +13,20 @@ public enum ComponentKind
     TransactionalIntegration,
 }
 
+/// <summary>What happens to the messages on a subscribed channel that the subscription does not
+/// handle.</summary>
+[System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<UnhandledMessages>))]
+public enum UnhandledMessages
+{
+    /// <summary>Left for redelivery, so the broker dead-letters them (the default): a message
+    /// nobody expected on the channel is visible and replayable.</summary>
+    DeadLetter,
+
+    /// <summary>Acknowledged and dropped: the channel carries messages this component deliberately
+    /// ignores.</summary>
+    Ignore,
+}
+
 /// <summary>The direction a component uses a port in.</summary>
 public enum PortDirection
 {

@@ -86,11 +86,11 @@ public class StartupOrderingTests
                 {
                     PubSubName = "pubsub",
                     TopicName = t.Topic,
-                    ContractTypeName = "Test.Event",
                     Publishers = t.Publishers,
                     Subscribers = t.Subscribers,
                 }),
             ],
+            MessageGroups = [],
             Ports = [],
             Services = [],
         };

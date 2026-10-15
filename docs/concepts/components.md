@@ -10,14 +10,14 @@ graph LR
     C -->|"From / Publishes"| C
 ```
 
-Each `Add*` call on `SystemBuilder` returns the block's builder directly, whose members are exactly that block's legal edges. A method that would be illegal for the block type does not exist on its builder type, so the compiler rejects it before validation ever runs. The topology records the edges *between* components. Everything about the workload shape (hosting model, activation, ports, process lifetime) lives in the component's own scaffold — a cron schedule is deployment-owned configuration the topology deliberately does not repeat.
+Each `Add*` call on `SystemBuilder` returns the block's builder directly, whose members are exactly that block's legal edges. A method that would be illegal for the block type does not exist on its builder type, so the compiler rejects it before validation ever runs. All component builders also expose `Calls(service)` for platform-service invocations — synchronous request/response calls through the Dapr sidecar. The topology records the edges *between* components and platform services. Everything about the workload shape (hosting model, activation, ports, process lifetime) lives in the component's own scaffold — a cron schedule is deployment-owned configuration the topology deliberately does not repeat.
 
 Underneath, every declaration is a **`Component`** — the shared substance each builder records into, mirroring `Pipeline`'s role in `intropy-framework`. Each block kind is a sealed subclass (`ExtractorComponent`, `LoaderComponent`, `TransactionalIntegrationComponent`), and the builder exposes it via its `Component` property:
 
 ```csharp
 ExtractorComponent orders = s.AddExtractor("order-extractor")
     .From(Ports.OrderExtractorSource)
-    .Publishes(Topics.Orders)
+    .Publishes(Messages.Orders)
     .Component;                       // optional typed handle — Name, Kind
 ```
 
@@ -27,13 +27,13 @@ Holding the handle is opt-in; chains that don't need it are unchanged. The compo
 
 Each kind exposes only its own legal edges:
 
-| Kind | Subscribes | Publishes | Port | Required |
-|------|-----------|-----------|-----------|----------|
-| Extractor | — | one topic | `From(port)` | `Publishes` |
-| Loader | exactly 1 topic | — | `To(port)` | `Subscribes` |
-| Transactional integration | — | — | `From` / `To(port)` | `From` and `To` |
+| Kind | Subscribes | Publishes | Port | Services | Required |
+|------|-----------|-----------|------|----------|----------|
+| Extractor | — | messages | `From(port)` | `Calls(service)` | `Publishes` |
+| Loader | exactly 1 message | — | `To(port)` | `Calls(service)` | `Subscribes` |
+| Transactional integration | — | — | `From` / `To(port)` | `Calls(service)` | `From` and `To` |
 
-`Subscribes`/`Publishes` are the asynchronous (topic) edges; `From`/`To` are the edges out through ports. A component publishes at most one topic — a second `Publishes` call is rejected at `Build()`. See [Topics](topics.md) and [Ports](ports.md).
+`Subscribes`/`Publishes` are the asynchronous (message) edges; `From`/`To` are the edges out through ports; `Calls` records Dapr service app IDs the component invokes. A component may publish several distinct messages — several may share one channel; publishing the same message twice throws `InvalidOperationException` at the declaration. See [Messages](messages.md), [Ports](ports.md), and the [Model and DSL Reference](model.md).
 
 ## Declaring components
 
@@ -42,7 +42,7 @@ var s = SystemBuilder.Create("order-flow");
 
 s.AddExtractor("order-extractor")
     .From(Ports.OrderExtractorSource)
-    .Publishes(Topics.Orders);
+    .Publishes(Messages.Orders);
 ```
 
 Component names are DNS-1123 labels, validated at the call site with an `ArgumentException` — they become Kubernetes resource names and Dapr app-ids.
@@ -53,7 +53,7 @@ The names in the topology — component names, service app-ids, pubsub names, th
 
 One qualification: a `ServiceRef` app-id is unqualified, while Dapr service resolution in a cluster is namespace-scoped. The minted identity holds within the system's own namespace; invoking a service across namespaces would need qualified app-ids, which the model does not express today.
 
-A second minted identity is derived rather than declared: a transactional integration's `InternalQueue` (`internal-<component>` pubsub, `hop` topic) — the queue joining its receive and send pipelines. It is workload shape, not an inter-component edge, so it never enters `SystemTopology.Topics` and the DSL exposes nothing for it. It is minted in the model so every backend materializes the same component (locally: Redis, scoped to exactly the owning integration) and the framework runner reads the names from the generated `.intropy.json` instead of a scaffold constant.
+A second minted identity is derived rather than declared: a transactional integration's `InternalQueue` (the system's `<system>-pubsub` pubsub, `internal-<component>` topic) — the queue joining its receive and send pipelines. It is workload shape, not an inter-component edge, so it never enters `SystemTopology.Topics` and the DSL exposes nothing for it. It is minted in the model so every backend materializes the same names (locally: the system's Redis pubsub, with the integration in its scopes); the framework runner derives the same names from the system name and its component name. The topic is unique per integration because brokers keep queues apart by topic, not by Dapr component.
 
 ## What the compiler rejects
 
@@ -62,10 +62,11 @@ s.AddLoader("l").Publishes(topic);        // loaders publish nothing
 s.AddExtractor("e").Subscribes(topic);    // extractors read ports, not topics
 ```
 
-Only what types cannot check is validated at `Build()`: completeness (a required output that was never declared, a missing subscription, a topic with only one side) and cross-component conflicts. A loader needs no `To`: its destination may stay a private local component. See [Validation](validation.md).
+Only what types cannot check — and what no single declaration line can decide — is validated at `Build()`. Invariants local to one declaration chain throw at the call site: a second `Subscribes` on one loader, a repeated `Calls` or `Publishes` channel, a handled message twice or off the subscription's channel. `Build()` validates what spans components: completeness (a required output that was never declared, a missing subscription, a topic with only one side) and cross-component conflicts. A loader needs no `To`: its destination may stay a private local component. See [Validation](validation.md).
 
 ## Related
 
-- [Topics](topics.md) — the asynchronous `Subscribes` / `Publishes` edges
+- [Model and DSL Reference](model.md) — the complete DSL grammar and output model
+- [Messages](messages.md) — the asynchronous `Subscribes` / `Publishes` edges
 - [Ports](ports.md) — the `From` / `To` edges out of the system
 - [Validation](validation.md) — what remains for Build-time rules

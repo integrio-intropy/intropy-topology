@@ -4,13 +4,13 @@
 
 ## Overview
 
-Intropy.Topology lets a SystemHost project declare a system's components (extractors, loaders, transactional integrations) and the edges between them (topics, ports) in code. `Build()` validates the declaration and produces an immutable, serializable `SystemTopology` that the generation and Aspire backends consume.
+Intropy.Topology lets a SystemHost project declare a system's components (extractors, loaders, transactional integrations), the edges between them (topics, ports), the platform services they invoke, and optional system-wide telemetry export in code. `Build()` validates the declaration and produces an immutable, serializable `SystemTopology` that the generation and Aspire backends consume.
 
 This is the **minimal model** — exactly the surface the system tutorial and `intropy sys create` use. The full model (aggregators, APIs, named publish ports, dev mocking) is preserved on the `full-topology` branch.
 
 The topology models the edges *between* components — subscriptions, publishes, ports. Everything about the workload shape, including activation, lives in the component's own scaffold.
 
-The library's signature move is **compile-time legality**: each `Add*` call returns a block-specific builder that exposes only the grammar legal for that block. Illegal topology is a compile error, not a validation diagnostic; only what types cannot check (completeness and cross-component conflicts) is validated at `Build()`.
+The library's signature move is **compile-time legality**: each `Add*` call returns a block-specific builder that exposes only the grammar legal for that block. Illegal topology is a compile error, not a validation diagnostic; invariants local to one declaration chain throw `InvalidOperationException` at the declaration call, and `Build()` validates what spans components (completeness and cross-component conflicts).
 
 ## Installation
 
@@ -25,21 +25,21 @@ var s = SystemBuilder.Create("order-flow");
 
 s.AddExtractor("order-extractor")
     .From(Ports.OrderExtractorSource)
-    .Publishes(Topics.Orders);
+    .Publishes(Messages.Orders);
 
 s.AddLoader("order-loader")
-    .Subscribes(Topics.Orders)
+    .Subscribes(Messages.Orders)
     .To(Ports.OrderLoaderDestination);
 
 SystemTopology topology = s.Build();   // throws TopologyValidationException with all violations
 ```
 
-Topics and ports are declared as static fields in a scaffolded `Topics.cs` / `Ports.cs`; resources materialize from usage — there is no `AddTopic`.
+Messages and ports are declared as static fields in a scaffolded `Messages.cs` / `Ports.cs`; resources materialize from usage — there is no `AddTopic`.
 
 ## Key features
 
 - **Compile-time legality** — block builders make illegal topology uncompilable. [Learn more](concepts/components.md)
-- **Typed refs** — `TopicRef<T>` carries an async event contract; `PortRef` names the port an edge block reaches the outside world through. [Learn more](concepts/topics.md)
+- **Typed refs** — `MessageRef<T>` names a message's identity, channel, and event contract; `PortRef` names the port an edge block reaches the outside world through; `ServiceRef` names a Dapr service app ID a component invokes. [Learn more](concepts/model.md)
 - **Port-named Dapr bindings** — every port materializes as exactly one Dapr binding component named after the port; local runs resolve it to a host folder. [Learn more](concepts/ports.md)
 - **Collect-all validation** — `Build()` reports every violation at once, never just the first. [Learn more](concepts/validation.md)
 - **Deterministic materialization** — the output model is immutable, sorted, and byte-stable across runs. [Learn more](concepts/materialization.md)
@@ -49,8 +49,12 @@ Topics and ports are declared as static fields in a scaffolded `Topics.cs` / `Po
 | Section | Description |
 |---------|-------------|
 | [Getting Started](getting-started.md) | Declare the complete order-flow topology from scratch |
+| [System Model](concepts/system-model.md) | Concepts and relationships, with a diagram |
+| [Topology Declaration Language](concepts/declaration-language.md) | Allowed statements and rules, independent of implementation |
+| [Model and DSL Reference](concepts/model.md) | C# implementation, runtime mappings, and output model |
 | [Components](concepts/components.md) | Component kinds, block builders, and their legal edges |
-| [Topics](concepts/topics.md) | Typed topic refs and the materialize-from-usage model |
+| [Messages](concepts/messages.md) | Typed message refs and the materialize-from-usage model |
+| [Subscriptions](concepts/subscriptions.md) | The messages a component handles from a channel, and the Dapr Subscription they render |
 | [Ports](concepts/ports.md) | Ports and their Dapr bindings |
 | [Validation](concepts/validation.md) | The validation rules and the Build/TryBuild/Validate API |
 | [Materialization](concepts/materialization.md) | How declarations fold into the immutable model |

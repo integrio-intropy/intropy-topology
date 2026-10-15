@@ -72,15 +72,22 @@ public static class IntropyAspire
     /// <summary>
     /// Whether a component kind runs to completion (one sweep, then exit) rather than as a
     /// resident service. Sound because each kind has exactly one legitimate host — the
-    /// framework's <c>RunToCompletionRunner</c> for extractors and
-    /// <c>TransactionalIntegrationRunner</c> for transactional integrations, both of which shut
-    /// the Dapr sidecar down in a <c>finally</c> so the project/sidecar pair reaches its terminal
-    /// state together. Deliberately derived from kind rather than modeled: the topology records
-    /// edges, not workload shape. If a kind ever gains a lifetime its edges do not imply, this
-    /// derivation must become an explicit model fact.
+    /// framework's unified <c>JobRunner</c> (<c>RunToCompletionAsync</c>), which shuts the Dapr
+    /// sidecar down in a <c>finally</c> so the project/sidecar pair reaches its terminal state
+    /// together. The derivation is shared with development-manifest validation so the DSL and
+    /// this host cannot disagree about which kinds may be re-run.
     /// </summary>
     internal static bool IsRunToCompletion(ComponentKind kind) =>
-        kind is ComponentKind.Extractor or ComponentKind.TransactionalIntegration;
+        ComponentKinds.IsRunToCompletion(kind);
+
+    /// <summary>The endpoint a message-receiving component serves the Dapr gRPC app callback on.</summary>
+    internal const string GrpcAppEndpoint = "grpc";
+
+    /// <summary>Whether the component receives messages: it subscribes to a topic, or (a
+    /// transactional integration) to its internal hop. Its sidecar then pushes them over a gRPC
+    /// app channel to the callback the framework serves.</summary>
+    internal static bool ReceivesMessages(ComponentModel component) =>
+        component.Subscribes.Count > 0 || component.InternalQueue is not null;
 
     /// <summary>
     /// Translates the topology into Aspire resources on <paramref name="builder"/>. Separated from
@@ -88,7 +95,7 @@ public static class IntropyAspire
     /// </summary>
     internal static void Apply(
         IDistributedApplicationBuilder builder, SystemTopology topology, string generatedRoot) =>
-        Apply(builder, topology, generatedRoot, new DevelopmentManifest([], []));
+        Apply(builder, topology, generatedRoot, new DevelopmentManifest([], [], []));
 
     internal static void Apply(
         IDistributedApplicationBuilder builder, SystemTopology topology, string generatedRoot, DevelopmentManifest development)
@@ -160,16 +167,20 @@ public static class IntropyAspire
 
             var project = builder.AddProject(component.Name, projectPath);
             // The endpoint makes Aspire allocate a port and inject ASPNETCORE_URLS (without it
-            // every Kestrel binds the 5000 default) and gives the Dapr sidecar its app-port.
-            project = project.WithHttpEndpoint();
+            // every Kestrel binds the 5000 default) and gives the Dapr sidecar its app-port. A
+            // component that receives messages serves the Dapr gRPC app callback: its endpoint's
+            // port reaches the app as APP_PORT, where the framework listens.
+            project = ReceivesMessages(component)
+                ? project.WithHttpEndpoint(name: GrpcAppEndpoint, env: "APP_PORT")
+                : project.WithHttpEndpoint();
 
-            Wire(project, component, stagedPath, configDir, redis, microcks,
+            Wire(project, topology.SystemName, component, stagedPath, configDir, redis, microcks,
                 PortRootPaths(builder.AppHostDirectory, component, development), topology.Otlp);
             resources[component.Name] = project;
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
 
-        RegisterDaprSidecarRecovery(builder, redisReadiness, RunToCompletionSidecarsFor(topology));
+        RegisterHostServices(builder, redisReadiness, RunToCompletionSidecarsFor(topology), RunToCompletionComponentsFor(topology, development));
 
         if (unresolved.Count > 0)
         {
@@ -225,22 +236,46 @@ public static class IntropyAspire
             .ToHashSet(StringComparer.Ordinal));
 
     /// <summary>
-    /// Registers recovery for components' Dapr sidecars. The normal pre-start gate
-    /// prevents the common race; recovery covers the remaining interval where a backend passes
-    /// TCP readiness but daprd's component initialization still fails.
+    /// The components whose projects are re-run by the host's scheduler (see
+    /// <see cref="IsRunToCompletion"/>), each with its re-run delay: the cadence declared in
+    /// the development manifest where one exists, the host default otherwise. The manifest
+    /// cadence is local host mechanism and never leaves this process — the deployed schedule
+    /// stays in deployment configuration. The kind derivation is the same one the sidecar
+    /// exemption uses, observed from the project resource instead of the sidecar executable.
     /// </summary>
-    private static void RegisterDaprSidecarRecovery(
+    internal static RunToCompletionComponents RunToCompletionComponentsFor(SystemTopology topology, DevelopmentManifest development)
+    {
+        var declared = development.Reruns.ToDictionary(rerun => rerun.ComponentName, rerun => rerun.Delay, StringComparer.Ordinal);
+        return new(topology.Components
+            .Where(c => IsRunToCompletion(c.Kind))
+            .ToDictionary(
+                c => c.Name,
+                c => declared.TryGetValue(c.Name, out var delay) ? delay : RunToCompletionComponents.DefaultRestartDelay,
+                StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    /// Registers the host's background services and their shared seams. Sidecar repair covers
+    /// the interval where a backend passes TCP readiness but daprd's component initialization
+    /// still fails; the run-to-completion scheduler re-runs extractors and transactional
+    /// integrations on their configured cadence so file-driven integrations keep sweeping.
+    /// </summary>
+    private static void RegisterHostServices(
         IDistributedApplicationBuilder builder,
         IBackendReadiness backendReadiness,
-        RunToCompletionSidecars runToCompletionSidecars)
+        RunToCompletionSidecars runToCompletionSidecars,
+        RunToCompletionComponents runToCompletionComponents)
     {
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<IResourceLifecycle, AspireResourceLifecycle>();
         builder.Services.AddSingleton<IResourceStateMonitor, AspireResourceStateMonitor>();
         builder.Services.AddSingleton<IBackendReadiness>(backendReadiness);
         builder.Services.AddSingleton(runToCompletionSidecars);
+        builder.Services.AddSingleton(runToCompletionComponents);
         builder.Services.AddSingleton<DaprSidecarRecovery>();
+        builder.Services.AddSingleton<RunToCompletionScheduler>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<DaprSidecarRecovery>());
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<RunToCompletionScheduler>());
     }
 
     /// <summary>
@@ -329,9 +364,12 @@ public static class IntropyAspire
     /// only the component would split the system's telemetry across two sinks. Without the
     /// declaration nothing is written: Aspire's own dashboard wiring remains the default, and
     /// these calls are the sole source of OTEL_EXPORTER_OTLP_* values this host injects.
+    /// INTROPY_SYSTEM_NAME tells the framework which system the component runs in; it derives the
+    /// system's pubsub, <c>&lt;system&gt;-pubsub</c>, from it, as deployment does.
     /// </summary>
     private static void Wire(
         IResourceBuilder<ProjectResource> project,
+        string systemName,
         ComponentModel component,
         string resourcesPath,
         string configDir,
@@ -344,10 +382,13 @@ public static class IntropyAspire
         project
             .WithDaprSidecar(sidecar =>
             {
+                var receives = ReceivesMessages(component);
                 sidecar.WithOptions(new DaprSidecarOptions
                 {
                     AppId = component.Name,
                     ResourcesPaths = [resourcesPath],
+                    AppProtocol = receives ? "grpc" : null,
+                    AppEndpoint = receives ? GrpcAppEndpoint : null,
                 });
                 sidecar.WaitFor(redis);
                 if (otlp is not null)
@@ -355,6 +396,7 @@ public static class IntropyAspire
                     sidecar.WithAnnotation(OtlpVariables(otlp));
                 }
             })
+            .WithEnvironment("INTROPY_SYSTEM_NAME", systemName)
             .WithEnvironment("INTROPY__COMPONENT", component.Name)
             .WithEnvironment("INTROPY__CONFIG", Path.Combine(configDir, $"{component.Name}.intropy.json"))
             .WithEnvironment("DOTNET_ENVIRONMENT", development)

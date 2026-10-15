@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -82,17 +83,16 @@ public static class TopologyGenerator
         ArgumentException.ThrowIfNullOrEmpty(hostRoot);
         var files = new List<GeneratedFile>();
 
-        foreach (var topic in topology.Topics.Select(t => t.PubSubName).Distinct(StringComparer.Ordinal))
+        // A transactional integration's internal queue is minted in the model, not declared as a
+        // topic edge, so its pubsub does not emerge from the topics alone: a system of only
+        // transactional integrations has no topics, yet still needs the system's pubsub.
+        var pubSubNames = topology.Topics.Select(t => t.PubSubName)
+            .Concat(topology.Components.Select(c => c.InternalQueue?.PubSubName).OfType<string>())
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal);
+        foreach (var pubSubName in pubSubNames)
         {
-            files.Add(PubSubComponent(topic, topology));
-        }
-
-        // The transactional integration's internal hop is minted in the model, not declared as
-        // a topic edge, so its pubsub does not emerge from the Topics loop above. Same Redis
-        // backend as the inter-component pubsubs; scoped to exactly the owning component.
-        foreach (var component in topology.Components.Where(c => c.InternalQueue is not null))
-        {
-            files.Add(PubSubComponent(component.InternalQueue!.PubSubName, [component.Name]));
+            files.Add(PubSubComponent(pubSubName, topology));
         }
 
         // Local runs resolve every port to localstorage, so the declared transport is
@@ -112,6 +112,25 @@ public static class TopologyGenerator
             files.Add(HttpEndpoint(mock, service));
         }
 
+        // Every subscribing component receives through its gRPC app callback, pushed to by the
+        // sidecar under a declarative Subscription: one routing rule per handled message (with its
+        // content filter, if any), plus a default route for the channel's other messages. A transactional integration subscribes
+        // to its own internal hop, which carries one kind of message, so it gets the default
+        // route only.
+        foreach (var component in topology.Components)
+        {
+            foreach (var subscription in component.Subscribes)
+            {
+                files.Add(SubscriptionResource(component.Name, subscription.PubSubName, subscription.TopicName,
+                    [.. subscription.Messages.Select(m => (m, subscription.ConditionFor(m)))], subscription.Bulk));
+            }
+
+            if (component.InternalQueue is { } queue)
+            {
+                files.Add(SubscriptionResource(component.Name, queue.PubSubName, queue.TopicName, [], bulk: null));
+            }
+        }
+
         foreach (var component in topology.Components)
         {
             files.Add(ComponentConfig(topology.SystemName, component));
@@ -122,8 +141,12 @@ public static class TopologyGenerator
 
     private static GeneratedFile PubSubComponent(string pubSubName, SystemTopology topology)
     {
+        // A transactional integration must be in the scopes of the pubsub carrying its internal
+        // queue: a component its sidecar cannot load leaves the queue unreachable.
         var scopes = topology.Components
-            .Where(c => c.Subscribes.Any(s => s.PubSubName == pubSubName) || c.Publishes.Any(p => p.PubSubName == pubSubName))
+            .Where(c => c.Subscribes.Any(s => s.PubSubName == pubSubName)
+                || c.Publishes.Any(p => p.PubSubName == pubSubName)
+                || c.InternalQueue?.PubSubName == pubSubName)
             .Select(c => c.Name);
         return PubSubComponent(pubSubName, scopes);
     }
@@ -141,6 +164,17 @@ public static class TopologyGenerator
         };
         var yaml = DaprYaml.Component(pubSubName, "pubsub.redis", metadata, scopes);
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{pubSubName}.yaml", yaml);
+    }
+
+    private static GeneratedFile SubscriptionResource(string componentName, string pubSubName, string topicName,
+        IReadOnlyList<(string Message, string? Condition)> messages, BulkSubscription? bulk)
+    {
+        var name = SubscriptionRouting.ResourceNameFor(componentName);
+        var rules = messages.Select(m =>
+            (SubscriptionRouting.MatchFor(m.Message, m.Condition), SubscriptionRouting.PathFor(m.Message)));
+        var yaml = DaprYaml.Subscription(name, pubSubName, topicName, rules, SubscriptionRouting.UnhandledPath, bulk,
+            [componentName]);
+        return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{name}.yaml", yaml);
     }
 
     private static GeneratedFile BindingComponent(PortResource port, PortFileResolution resolution, string hostRoot)
@@ -170,8 +204,18 @@ public static class TopologyGenerator
                 System = systemName,
                 Component = component.Name,
                 Kind = component.Kind.ToString(),
-                Subscribes = component.Subscribes.Select(s => new { s.PubSubName, s.TopicName }),
-                Publishes = component.Publishes.Select(p => new { p.PubSubName, p.TopicName }),
+                Subscribes = component.Subscribes.Select(s => new
+                {
+                    s.PubSubName,
+                    s.TopicName,
+                    s.Messages,
+                    s.Conditions,
+                    Unhandled = s.Unhandled.ToString(),
+                    Bulk = s.Bulk is null
+                        ? null
+                        : new { s.Bulk.MaxMessages, MaxWaitMilliseconds = (long)s.Bulk.MaxWait.TotalMilliseconds },
+                }),
+                Publishes = component.Publishes.Select(p => new { p.PubSubName, p.TopicName, p.Message }),
                 Ports = component.Ports.Select(c => new
                 {
                     c.PortName,
@@ -190,9 +234,58 @@ public static class TopologyGenerator
     }
 }
 
-/// <summary>Minimal, deterministic emitter for Dapr <c>Component</c> YAML.</summary>
+/// <summary>Minimal, deterministic emitter for Dapr <c>Component</c>, <c>HTTPEndpoint</c> and
+/// <c>Subscription</c> YAML.</summary>
 internal static class DaprYaml
 {
+    public static string Subscription(
+        string name,
+        string pubSubName,
+        string topicName,
+        IEnumerable<(string Match, string Path)> rules,
+        string defaultPath,
+        BulkSubscription? bulk,
+        IEnumerable<string> scopes)
+    {
+        var ruleList = rules.ToList();
+        var sb = new StringBuilder();
+        sb.Append("apiVersion: dapr.io/v2alpha1\n");
+        sb.Append("kind: Subscription\n");
+        sb.Append("metadata:\n");
+        sb.Append("  name: ").Append(Quote(name)).Append('\n');
+        sb.Append("spec:\n");
+        sb.Append("  pubsubname: ").Append(Quote(pubSubName)).Append('\n');
+        sb.Append("  topic: ").Append(Quote(topicName)).Append('\n');
+        sb.Append("  routes:\n");
+        if (ruleList.Count > 0)
+        {
+            sb.Append("    rules:\n");
+            foreach (var (match, path) in ruleList)
+            {
+                sb.Append("    - match: ").Append(Quote(match)).Append('\n');
+                sb.Append("      path: ").Append(Quote(path)).Append('\n');
+            }
+        }
+
+        sb.Append("    default: ").Append(Quote(defaultPath)).Append('\n');
+        if (bulk is not null)
+        {
+            sb.Append("  bulkSubscribe:\n");
+            sb.Append("    enabled: true\n");
+            sb.Append("    maxMessagesCount: ").Append(bulk.MaxMessages.ToString(CultureInfo.InvariantCulture)).Append('\n');
+            sb.Append("    maxAwaitDurationMs: ")
+                .Append(((long)bulk.MaxWait.TotalMilliseconds).ToString(CultureInfo.InvariantCulture)).Append('\n');
+        }
+
+        sb.Append("scopes:\n");
+        foreach (var scope in scopes.OrderBy(scope => scope, StringComparer.Ordinal))
+        {
+            sb.Append("- ").Append(Quote(scope)).Append('\n');
+        }
+
+        return sb.ToString();
+    }
+
     public static string HttpEndpoint(string name, string baseUrl, IEnumerable<string> scopes)
     {
         var sb = new StringBuilder();

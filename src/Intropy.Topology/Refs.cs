@@ -4,58 +4,84 @@ using Intropy.Topology.Validation;
 namespace Intropy.Topology;
 
 /// <summary>
-/// Identifies a pub/sub topic by its Dapr component and topic names. The backing
-/// resource materializes only when a component uses the reference.
+/// Identifies a message by its logical name and the transport channel it moves over
+/// (the Dapr pubsub component and topic names). A message that names no pubsub travels on
+/// the system's own, <c>&lt;system&gt;-pubsub</c>, resolved when the topology is built. A single message identity implies all
+/// three: the name, the channel, and the payload contract type — the topic is a
+/// derivation of the message, never an independent declaration. The channel and
+/// contract materialize only when a component uses the reference.
 /// </summary>
-public abstract record TopicRef
+public abstract record MessageRef
 {
-    /// <summary>The Dapr pubsub component name (DNS-1123 subdomain).</summary>
-    public string PubSubName { get; }
+    /// <summary>The message's logical name (DNS-1123 subdomain).</summary>
+    public string Name { get; }
 
-    /// <summary>The topic name within the pubsub (DNS-1123 subdomain).</summary>
+    /// <summary>The Dapr pubsub component name carrying the message (DNS-1123 subdomain), or
+    /// null for the system's own pubsub, which the materialized model names
+    /// <c>&lt;system&gt;-pubsub</c>.</summary>
+    public string? PubSubName { get; }
+
+    /// <summary>The topic name the message flows over within the pubsub (DNS-1123 subdomain).</summary>
     public string TopicName { get; }
 
-    /// <summary>The event contract type carried on the topic.</summary>
+    /// <summary>The payload contract type transported by the message.</summary>
     public abstract Type ContractType { get; }
 
-    private protected TopicRef(string pubSubName, string topicName)
+    private protected MessageRef(string name, string? pubSubName, string topicName)
     {
-        PubSubName = NameRules.RequireSubdomain(pubSubName, nameof(pubSubName));
+        Name = NameRules.RequireSubdomain(name, nameof(name));
+        PubSubName = pubSubName is null ? null : NameRules.RequireSubdomain(pubSubName, nameof(pubSubName));
         TopicName = NameRules.RequireSubdomain(topicName, nameof(topicName));
     }
+
+    /// <summary>The channel for diagnostics: the topic and the pubsub it travels on.</summary>
+    internal string DescribeChannel() => PubSubName is null
+        ? $"'{TopicName}' on the system's pubsub"
+        : $"'{TopicName}' on pubsub '{PubSubName}'";
 }
 
 /// <summary>
-/// A <see cref="TopicRef"/> whose generic argument identifies the event contract. Topology
-/// wiring uses the topic names, while <see cref="TopicRef.ContractType"/> exposes the type.
+/// A <see cref="MessageRef"/> whose generic argument identifies the payload contract.
+/// Component wiring uses the message name and channel, while
+/// <see cref="MessageRef.ContractType"/> exposes the contract type.
 /// </summary>
-/// <typeparam name="T">The event contract type published on the topic.</typeparam>
-public sealed record TopicRef<T> : TopicRef
+/// <typeparam name="T">The payload contract type transported by the message.</typeparam>
+public sealed record MessageRef<T> : MessageRef
 {
     /// <inheritdoc />
     public override Type ContractType => typeof(T);
 
-    private TopicRef(string pubSubName, string topicName)
-        : base(pubSubName, topicName)
+    private MessageRef(string name, string? pubSubName, string topicName)
+        : base(name, pubSubName, topicName)
     {
     }
 
-    /// <summary>Declares a topic on a pubsub component.</summary>
-    /// <param name="pubSubName">The Dapr pubsub component name (DNS-1123 subdomain).</param>
-    /// <param name="topicName">The topic name (DNS-1123 subdomain).</param>
-    /// <exception cref="ArgumentException">A name is not a valid DNS-1123 subdomain.</exception>
-    public static TopicRef<T> Define(
-        [ConstantExpected] string pubSubName,
-        [ConstantExpected] string topicName) =>
-        new(pubSubName, topicName);
+    /// <summary>Declares a message; the channel defaults to the system's pubsub,
+    /// <c>&lt;system&gt;-pubsub</c>, and the topic <c>{name}</c>. Declare
+    /// <paramref name="pubSub"/> and/or <paramref name="topic"/> to override — for example when
+    /// the logical identity differs from the transport topic.</summary>
+    /// <param name="name">The message's logical name (DNS-1123 subdomain).</param>
+    /// <param name="pubSub">The Dapr pubsub component name (DNS-1123 subdomain); defaults to
+    /// the system's own, <c>&lt;system&gt;-pubsub</c>. Every system in an environment namespace
+    /// owns its own pubsub component, so name another only to reach a component this system
+    /// does not own.</param>
+    /// <param name="topic">The topic name within the pubsub (DNS-1123 subdomain);
+    /// defaults to <paramref name="name"/>.</param>
+    /// <exception cref="ArgumentException">A name (message, pubsub, or topic) is not a
+    /// valid DNS-1123 subdomain.</exception>
+    public static MessageRef<T> Define(
+        [ConstantExpected] string name,
+        [ConstantExpected] string? pubSub = null,
+        [ConstantExpected] string? topic = null) =>
+        new(name, pubSub, topic ?? name);
 }
 
 /// <summary>
 /// Identifies a platform service by the Dapr app ID callers use. The app ID is a minted
 /// identity: deployment honors it rather than maintaining its own copy. It is unqualified —
 /// Dapr service resolution in a cluster is namespace-scoped, so the identity holds within
-/// the system's own namespace. The service materializes from component usage; this reference
-/// neither owns nor deploys its provider.
+/// the system's own namespace. The service materializes when a component declares a call to
+/// it; this reference neither owns nor deploys its provider.
 /// </summary>
 public sealed record ServiceRef
 {

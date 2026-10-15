@@ -8,8 +8,8 @@ public class DiscoveryTests
 
         public void Define(SystemBuilder builder)
         {
-            builder.AddExtractor("raw-extractor").From(TestPorts.Pim).Publishes(TestTopics.Raw);
-            builder.AddLoader("enriched-loader").Subscribes(TestTopics.Raw).To(TestPorts.Erp);
+            builder.AddExtractor("raw-extractor").From(TestPorts.Pim).Publishes(TestMessages.Raw);
+            builder.AddLoader("enriched-loader").Subscribes(TestMessages.Raw).To(TestPorts.Erp);
         }
     }
 
@@ -17,7 +17,7 @@ public class DiscoveryTests
     {
         public string SystemName => "other-system";
 
-        public void Define(SystemBuilder builder) => builder.AddExtractor("x").From(TestPorts.Pim).Publishes(TestTopics.Raw);
+        public void Define(SystemBuilder builder) => builder.AddExtractor("x").From(TestPorts.Pim).Publishes(TestMessages.Raw);
     }
 
     // An extractor that publishes nothing is an invalid topology (fails validation at Build).

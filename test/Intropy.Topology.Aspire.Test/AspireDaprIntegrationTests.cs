@@ -29,7 +29,7 @@ public sealed class AspireDaprIntegrationTests : IAsyncDisposable
 {
     private sealed record RawOrder(string OrderNumber);
 
-    private static readonly TopicRef<RawOrder> s_raw = TopicRef<RawOrder>.Define("pubsub-a", "order-raw");
+    private static readonly MessageRef<RawOrder> s_raw = MessageRef<RawOrder>.Define("order-raw", pubSub: "pubsub-a");
     private static readonly ServiceRef s_idempotency = ServiceRef.Define("idempotency-service");
     private readonly string _workspace = Directory.CreateTempSubdirectory("intropy-aspire-dapr-").FullName;
 
@@ -42,7 +42,7 @@ public sealed class AspireDaprIntegrationTests : IAsyncDisposable
         WriteWebProject("order-extractor");
         WriteWebProject("order-loader");
         var generatedRoot = Path.Combine(_workspace, "generated");
-        TopologyGenerator.Generate(Topology(), new DevelopmentManifest([], []), appHostDirectory).WriteTo(generatedRoot);
+        TopologyGenerator.Generate(Topology(), new DevelopmentManifest([], [], []), appHostDirectory).WriteTo(generatedRoot);
         var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions
         {
             ProjectDirectory = appHostDirectory,
@@ -100,6 +100,7 @@ public sealed class AspireDaprIntegrationTests : IAsyncDisposable
         var topology = TopologyWithService();
         var development = new DevelopmentManifest(
             [new OpenApiMock("idempotency-service", artifactPath, "Idempotency Service", "1.0.0")],
+            [],
             []);
         var generatedRoot = Path.Combine(_workspace, "generated");
         TopologyGenerator.Generate(topology, development, appHostDirectory).WriteTo(generatedRoot);
@@ -148,7 +149,7 @@ public sealed class AspireDaprIntegrationTests : IAsyncDisposable
     {
         var system = SystemBuilder.Create("order-flow");
         system.AddExtractor("order-extractor").Publishes(s_raw);
-        system.AddLoader("order-loader").Subscribes(s_raw).Uses(s_idempotency);
+        system.AddLoader("order-loader").Subscribes(s_raw).Calls(s_idempotency);
         return system.Build();
     }
 

@@ -35,6 +35,7 @@ internal sealed class PubSubPortNameCollisionRule : IModelRule
     {
         var pubSubNames = topology.Topics
             .Select(t => t.PubSubName)
+            .Concat(topology.Components.Select(c => c.InternalQueue?.PubSubName).OfType<string>())
             .ToHashSet(StringComparer.Ordinal);
 
         foreach (var port in topology.Ports

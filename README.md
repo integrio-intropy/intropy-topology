@@ -4,8 +4,9 @@ A typed, fluent DSL for declaring integration-system topologies in .NET, and two
 a declaration into something you can run or deploy.
 
 A system is a class implementing `ISystemDefinition`: it declares components (extractors, loaders,
-transactional integrations) and the edges between them (topics, ports). `Build()` validates the
-declaration and produces an immutable, serializable `SystemTopology`. From that one validated model,
+transactional integrations), the edges between them (topics, ports), the platform services they invoke,
+and optional system-wide telemetry export. `Build()` validates the declaration and produces an immutable,
+serializable `SystemTopology`. From that one validated model,
 the backends generate Dapr components / runtime config, or translate it into a live .NET Aspire
 application for local F5.
 
@@ -19,8 +20,8 @@ The shape of an integration system — which components exist, which topics and 
 touch — is usually buried across Kubernetes manifests and Dapr YAML, where nothing checks it.
 Intropy.Topology moves that declaration into typed code: each `Add*` call returns a block-specific
 builder that exposes only the edges legal for that block. *Illegal topology is a compile error, not
-a validation diagnostic*; only what types cannot check (completeness and cross-component conflicts)
-is validated at `Build()`.
+a validation diagnostic*; invariants local to one declaration chain throw at the declaration call,
+and `Build()` validates what spans components (completeness and cross-component conflicts).
 
 The topology records the edges **between** components — subscriptions, publishes, and ports
 out to the outside world. Everything about the workload shape, including activation (a cron
@@ -47,23 +48,24 @@ public sealed class OrderFlowSystem : ISystemDefinition
     {
         builder.AddExtractor("order-extractor")
             .From(Ports.OrderExtractorSource)
-            .Publishes(Topics.Orders);
+            .Publishes(Messages.Orders);
 
         builder.AddLoader("order-loader")
-            .Subscribes(Topics.Orders)
+            .Subscribes(Messages.Orders)
             .To(Ports.OrderLoaderDestination);
     }
 }
 ```
 
-Topics and ports are declared as static fields; the backing resources materialize from usage
-(there is no `AddTopic`). The Dapr binding component takes the port's name unchanged
-(`order-extractor-source`), never declared separately:
+Messages and ports are declared as static fields; the backing resources materialize from usage
+(there is no `AddTopic`). A message names its logical identity, its channel (pubsub + topic —
+the topic defaults to the message name), and its contract type. The Dapr binding component
+takes the port's name unchanged (`order-extractor-source`), never declared separately:
 
 ```csharp
-public static class Topics
+public static class Messages
 {
-    public static readonly TopicRef<Order> Orders = TopicRef<Order>.Define("pubsub", "orders");
+    public static readonly MessageRef<Order> Orders = MessageRef<Order>.Define("orders");
 }
 
 public static class Ports
@@ -96,8 +98,10 @@ return args is ["run", ..] or []
 dotnet run --project examples/OrderFlow.SystemHost                     # Aspire dashboard (needs Docker + `dapr init`)
 dotnet run --project examples/OrderFlow.SystemHost -- check            # validate the topology
 dotnet run --project examples/OrderFlow.SystemHost -- graph            # print the topology.intropy.io/v1 JSON document
-# `dotnet run` prints its own build and launch-profile messages before starting the host. For a machine-readable stream:
-dotnet run --no-build --no-launch-profile --project examples/OrderFlow.SystemHost -- graph  # build first, then JSON only on stdout
+# `dotnet run` prints its own build and launch-profile messages before starting the host. For a machine-readable stream (still rebuilds when sources change):
+dotnet run -v q --no-launch-profile --project examples/OrderFlow.SystemHost -- graph  # JSON only on stdout
+# `--no-build` also works on an already-built tree, but can run stale code when sources changed:
+dotnet run --no-build --no-launch-profile --project examples/OrderFlow.SystemHost -- graph
 dotnet run --project examples/OrderFlow.SystemHost -- generate ./out   # write Dapr YAML + per-component config
 ```
 
@@ -124,10 +128,11 @@ builder.AddLoader("l").Subscribes(t).Publishes(t);   // loaders publish nothing
 builder.AddExtractor("e").Subscribes(t);             // extractors read ports, not topics
 ```
 
-Per block: extractors read a port (`From`) and publish one topic; loaders subscribe to one
-topic and may write through a port (a private local destination needs no declared edge);
-transactional integrations read/write ports. Every topic must have both sides: `Build()`
-rejects a published topic nobody subscribes to and a subscription nothing publishes.
+Per block: extractors read a port (`From`) and publish messages; loaders subscribe to one
+message and may write through a port (a private local destination needs no declared edge);
+transactional integrations read/write ports. Every message should have both sides: `Build()`
+warns when a published message has no subscriber or a subscription has no publisher, while
+deployment validation can treat those incomplete channels as errors.
 
 ## Requirements
 
@@ -139,8 +144,11 @@ rejects a published topic nobody subscribes to and a subscription nothing publis
 Full documentation lives in [`docs/`](docs/index.md):
 
 - [Getting Started](docs/getting-started.md) — declare a complete order-flow topology
+- [System Model](docs/concepts/system-model.md) — concepts and relationships, with a diagram
+- [Topology Declaration Language](docs/concepts/declaration-language.md) — allowed statements and rules, independent of implementation
+- [Model and DSL Reference](docs/concepts/model.md) — C# implementation, runtime mappings, and output model
 - [Components](docs/concepts/components.md) — component kinds and block builders
-- [Topics](docs/concepts/topics.md) and [Ports](docs/concepts/ports.md) — refs, materialize-from-usage
+- [Messages](docs/concepts/messages.md) and [Ports](docs/concepts/ports.md) — refs, materialize-from-usage
 - [Validation](docs/concepts/validation.md) — the validation rules and Build/TryBuild/Validate
 - [Materialization](docs/concepts/materialization.md) — the immutable, deterministic output model
 

@@ -6,9 +6,9 @@ namespace Intropy.Topology;
 
 /// <summary>
 /// Entry point for declaring an integration system's topology. Add components, wire
-/// them to topics and ports, then call <see cref="Build"/> to materialize and
-/// validate the immutable <see cref="SystemTopology"/>. Resources (topics, ports)
-/// materialize from usage — there is no <c>AddTopic</c>. Not thread-safe;
+/// them to messages and ports, then call <see cref="Build"/> to materialize and
+/// validate the immutable <see cref="SystemTopology"/>. Resources (messages, ports)
+/// materialize from usage — there is no <c>AddMessage</c>. Not thread-safe;
 /// a second <see cref="Build"/> after further mutation reflects the mutations.
 /// </summary>
 public sealed class SystemBuilder
@@ -23,6 +23,15 @@ public sealed class SystemBuilder
     {
         SystemName = systemName;
     }
+
+    /// <summary>The system's own pubsub component, <c>&lt;system&gt;-pubsub</c>: the channel of every
+    /// message that names no pubsub, and of every transactional integration's internal queue.
+    /// Systems share an environment's namespace and broker, so each owns a component of its own,
+    /// scoped to its components and carrying its broker credentials.</summary>
+    internal string PubSubName => PubSubNameFor(SystemName);
+
+    /// <summary>The pubsub component a system named <paramref name="systemName"/> owns.</summary>
+    internal static string PubSubNameFor(string systemName) => $"{systemName}-pubsub";
 
     internal IReadOnlyList<Component> Components => _components;
 

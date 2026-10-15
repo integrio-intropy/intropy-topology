@@ -77,11 +77,11 @@ public class TopologyGeneratorTests
     {
         // Arrange — a port used by the topology but absent from the development manifest.
         // The manifest is the single validation boundary; the generator trusts it.
-        var topic = TopicRef<string>.Define("orders", "created");
+        var message = MessageRef<string>.Define("created", pubSub: "orders");
         var port = PortRef.Define("erp");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").From(port).Publishes(topic);
-        builder.AddLoader("loader").Subscribes(topic);
+        builder.AddExtractor("extractor").From(port).Publishes(message);
+        builder.AddLoader("loader").Subscribes(message);
         var development = new DevelopmentBuilder(builder.Build(), Directory.GetCurrentDirectory());
 
         // Act & Assert
@@ -102,11 +102,11 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
-    public void Generate_ShouldEmit_InternalPubSubPerTransactionalIntegration_ScopedToItself()
+    public void Generate_ShouldEmit_TheSystemsPubSub_ScopedToTheTransactionalIntegrationItCarries()
     {
-        // Act — the internal hop is minted in the model, not declared as a topic edge, so it
-        // does not emerge from the topic-pubsub loop; generation emits it explicitly.
-        var yaml = Content("components/internal-price-sync.yaml");
+        // Act — the internal queue is minted in the model, not declared as a topic edge, so its
+        // pubsub does not emerge from the topics; generation emits it and scopes it explicitly.
+        var yaml = Content("components/order-fulfillment-pubsub.yaml");
 
         // Assert
         Assert.Contains("type: \"pubsub.redis\"", yaml, StringComparison.Ordinal);
@@ -117,6 +117,33 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
+    public void Generate_WithOnlyTransactionalIntegrations_ShouldEmitOneSystemPubSubScopedToAllOfThem()
+    {
+        // Arrange — no messages, so no topics: the system's pubsub exists only for the queues.
+        var builder = SystemBuilder.Create("tx-flow");
+        builder.AddTransactionalIntegration("order-sync").From(PortRef.Define("order-in")).To(PortRef.Define("order-out"));
+        builder.AddTransactionalIntegration("price-sync").From(PortRef.Define("price-in")).To(PortRef.Define("price-out"));
+        builder.AddTransactionalIntegration("stock-sync").From(PortRef.Define("stock-in")).To(PortRef.Define("stock-out"));
+        PortFileResolution[] resolutions =
+        [
+            new("order-in", "./test/order-in"), new("order-out", "./test/order-out"),
+            new("price-in", "./test/price-in"), new("price-out", "./test/price-out"),
+            new("stock-in", "./test/stock-in"), new("stock-out", "./test/stock-out"),
+        ];
+
+        // Act
+        var files = TopologyGenerator.Generate(builder.Build(), new DevelopmentManifest([], resolutions, []),
+            Directory.GetCurrentDirectory()).Files;
+
+        // Assert
+        var pubSub = Assert.Single(files, f => f.Content.Contains("type: \"pubsub.redis\"", StringComparison.Ordinal));
+        Assert.Equal("components/tx-flow-pubsub.yaml", pubSub.RelativePath);
+        Assert.Contains("- \"order-sync\"", pubSub.Content, StringComparison.Ordinal);
+        Assert.Contains("- \"price-sync\"", pubSub.Content, StringComparison.Ordinal);
+        Assert.Contains("- \"stock-sync\"", pubSub.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Generate_ShouldCarry_InternalQueueInTheRuntimeConfig()
     {
         // Act
@@ -124,8 +151,8 @@ public class TopologyGeneratorTests
 
         // Assert
         Assert.Contains("\"InternalQueue\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"PubSubName\": \"internal-price-sync\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"TopicName\": \"hop\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"PubSubName\": \"order-fulfillment-pubsub\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"TopicName\": \"internal-price-sync\"", json, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -166,13 +193,14 @@ public class TopologyGeneratorTests
     public void Generate_WithOpenApiMock_ShouldEmitScopedHttpEndpoint()
     {
         // Arrange
-        var topic = TopicRef<string>.Define("orders", "created");
+        var message = MessageRef<string>.Define("created", pubSub: "orders");
         var service = ServiceRef.Define("idempotency-service");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").Publishes(topic).Uses(service);
-        builder.AddLoader("loader").Subscribes(topic).Uses(service);
+        builder.AddExtractor("extractor").Publishes(message).Calls(service);
+        builder.AddLoader("loader").Subscribes(message).Calls(service);
         var manifest = new DevelopmentManifest(
             [new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency Service", "1.0/rc")],
+            [],
             []);
 
         // Act
@@ -184,6 +212,35 @@ public class TopologyGeneratorTests
         Assert.Contains("baseUrl: \"http://localhost:8585/rest/Idempotency%20Service/1.0%2Frc\"", yaml, StringComparison.Ordinal);
         Assert.Contains("- \"extractor\"", yaml, StringComparison.Ordinal);
         Assert.Contains("- \"loader\"", yaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generate_WithABatchingLoader_ShouldEmitItsBulkSettingsInTheRuntimeConfig()
+    {
+        // Arrange
+        var topic = MessageRef<string>.Define("product-changed", pubSub: "catalog");
+        var builder = SystemBuilder.Create("catalog");
+        builder.AddExtractor("extractor").Publishes(topic);
+        builder.AddLoader("loader").Subscribes(topic, configure: sub => sub.InBatches(200, TimeSpan.FromSeconds(2)));
+        var manifest = new DevelopmentManifest([], [], []);
+
+        // Act
+        var json = TopologyGenerator.Generate(builder.Build(), manifest, Directory.GetCurrentDirectory()).Files
+            .Single(file => file.RelativePath == "config/loader.intropy.json").Content;
+
+        // Assert
+        Assert.Contains("\"MaxMessages\": 200", json, StringComparison.Ordinal);
+        Assert.Contains("\"MaxWaitMilliseconds\": 2000", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generate_WithALoaderReceivingOneMessageAtATime_ShouldEmitNoBulkSettings()
+    {
+        // Act
+        var json = Content("config/order-loader.intropy.json");
+
+        // Assert
+        Assert.DoesNotContain("Bulk", json, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -204,15 +261,16 @@ public class TopologyGeneratorTests
     {
         // Arrange — local generation resolves every port to localstorage; the deployed
         // binding type is deployment-owned and never declared in the topology.
-        var topic = TopicRef<string>.Define("orders", "created");
+        var message = MessageRef<string>.Define("created", pubSub: "orders");
         var port = PortRef.Define("placeholder");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").From(port).Publishes(topic);
-        builder.AddLoader("loader").Subscribes(topic);
+        builder.AddExtractor("extractor").From(port).Publishes(message);
+        builder.AddLoader("loader").Subscribes(message);
         var topology = builder.Build();
         var manifest = new DevelopmentManifest(
             [],
-            [new PortFileResolution("placeholder", "./test/placeholder")]);
+            [new PortFileResolution("placeholder", "./test/placeholder")],
+            []);
 
         // Act
         var artifacts = TopologyGenerator.Generate(topology, manifest, Directory.GetCurrentDirectory());

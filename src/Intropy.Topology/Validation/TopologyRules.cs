@@ -9,13 +9,12 @@ internal static class TopologyRules
     [
         new Rules.DuplicateComponentNameRule(),
         new Rules.EmptySystemRule(),
-        new Rules.DuplicatePublishRule(),
-        new Rules.DuplicateSubscriptionRule(),
         new Rules.MissingRequiredOutputRule(),
         new Rules.MissingRequiredSubscriptionRule(),
         new Rules.MissingRequiredPortRule(),
         new Rules.UnconsumedTopicRule(),
         new Rules.UnproducedTopicRule(),
+        new Rules.UnhandledChannelMessagesRule(),
         new Rules.NoEdgesRule(),
         new Rules.PubSubPortNameCollisionRule(),
         new Rules.ServiceAppIdCollisionRule(),
@@ -23,8 +22,8 @@ internal static class TopologyRules
 
     private static readonly IDeclarationRule[] DeclarationRules =
     [
-        new Rules.TopicContractConflictRule(),
-        new Rules.DuplicateServiceUsageRule(),
+        new Rules.MessageChannelConflictRule(),
+        new Rules.MessageContractConflictRule(),
     ];
 
     public static IReadOnlyList<TopologyDiagnostic> Run(SystemBuilder builder, SystemTopology topology)

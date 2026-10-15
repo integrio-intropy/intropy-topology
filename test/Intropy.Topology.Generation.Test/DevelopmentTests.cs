@@ -9,10 +9,10 @@ public class DevelopmentBuilderTests
 
     private static SystemTopology TopologyWithPort()
     {
-        var topic = TopicRef<string>.Define("orders", "created");
+        var message = MessageRef<string>.Define("created", pubSub: "orders");
         var builder = SystemBuilder.Create("orders");
-        builder.AddExtractor("extractor").From(s_port).Publishes(topic);
-        builder.AddLoader("loader").Subscribes(topic);
+        builder.AddExtractor("extractor").From(s_port).Publishes(message);
+        builder.AddLoader("loader").Subscribes(message);
         return builder.Build();
     }
 
@@ -144,5 +144,99 @@ public class DevelopmentBuilderTests
         {
             workspace.Delete(recursive: true);
         }
+    }
+
+    [Fact]
+    public void Build_WithRerun_ShouldProduceManifestEntry()
+    {
+        // Arrange
+        var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
+        builder.Files(s_port).RootPath("./test/erp");
+        builder.Rerun("extractor").AfterEachRun(TimeSpan.FromSeconds(30));
+
+        // Act
+        var manifest = builder.Build();
+
+        // Assert
+        var rerun = Assert.Single(manifest.Reruns);
+        Assert.Equal("extractor", rerun.ComponentName);
+        Assert.Equal(TimeSpan.FromSeconds(30), rerun.Delay);
+    }
+
+    [Fact]
+    public void Rerun_WithUnknownComponent_ShouldThrow()
+    {
+        // Arrange
+        var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
+
+        // Act & Assert
+        var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Rerun("ghost"));
+        Assert.Contains("ghost", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("not declared by the system topology", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Rerun_WithResidentComponent_ShouldThrow()
+    {
+        // Arrange — a loader stays resident on its subscription; there is no run to repeat.
+        var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
+
+        // Act & Assert
+        var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Rerun("loader"));
+        Assert.Contains("loader", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("stays resident", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Rerun_WithDuplicateDeclaration_ShouldThrow()
+    {
+        // Arrange
+        var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
+        builder.Rerun("extractor").AfterEachRun(TimeSpan.FromSeconds(30));
+
+        // Act & Assert
+        var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Rerun("extractor"));
+        Assert.Contains("more than one re-run declaration", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AfterEachRun_WithSecondDelay_ShouldThrow()
+    {
+        // Arrange
+        var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
+        var rerun = builder.Rerun("extractor");
+        rerun.AfterEachRun(TimeSpan.FromSeconds(30));
+
+        // Act & Assert
+        var exception = Assert.Throws<DevelopmentValidationException>(() => rerun.AfterEachRun(TimeSpan.FromMinutes(5)));
+        Assert.Contains("more than one re-run delay", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void AfterEachRun_WithNonPositiveDelay_ShouldThrow(int seconds)
+    {
+        // Arrange
+        var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
+
+        // Act & Assert
+        var exception = Assert.Throws<DevelopmentValidationException>(
+            () => builder.Rerun("extractor").AfterEachRun(TimeSpan.FromSeconds(seconds)));
+        Assert.Contains("must be positive", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_WithRerunMissingDelay_ShouldThrow()
+    {
+        // Arrange: Rerun() declared but AfterEachRun() never called
+        var builder = new DevelopmentBuilder(TopologyWithPort(), Directory.GetCurrentDirectory());
+        builder.Files(s_port).RootPath("./test/erp");
+        builder.Rerun("extractor");
+
+        // Act & Assert
+        var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Build());
+        Assert.Contains("extractor", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("do not declare a delay", exception.Message, StringComparison.Ordinal);
     }
 }

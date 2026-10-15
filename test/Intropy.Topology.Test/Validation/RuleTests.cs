@@ -4,13 +4,15 @@ using Intropy.Topology.Validation.Rules;
 
 namespace Intropy.Topology.Test.Validation;
 
+public sealed record OrderShipped;
+
 internal static class ValidationTestHelper
 {
     /// <summary>A publisher/subscriber pair that on its own violates nothing.</summary>
     public static SystemBuilder WithValidComponent(this SystemBuilder s)
     {
-        s.AddExtractor("valid-extractor").Publishes(TestTopics.Raw);
-        s.AddLoader("valid-sink").Subscribes(TestTopics.Raw);
+        s.AddExtractor("valid-extractor").Publishes(TestMessages.Raw);
+        s.AddLoader("valid-sink").Subscribes(TestMessages.Raw);
         return s;
     }
 
@@ -32,8 +34,8 @@ public class DuplicateComponentNameRuleTests
     {
         // Arrange: two components sharing one name
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("dup").Publishes(TestTopics.Raw);
-        s.AddLoader("dup").Subscribes(TestTopics.Raw);
+        s.AddExtractor("dup").Publishes(TestMessages.Raw);
+        s.AddLoader("dup").Subscribes(TestMessages.Raw);
 
         // Act
         var diagnostic = Assert.Single(s.DiagnosticsFor<DuplicateComponentNameRule>());
@@ -59,55 +61,51 @@ public class EmptySystemRuleTests
     }
 }
 
-public class MultiplePublishesRuleTests
+public class PublishDeclarationTests
 {
     [Fact]
-    public void Validate_WithTwoPublishes_ShouldReportError()
+    public void Publishes_WithTheSameMessageTwice_ShouldThrowAtTheDeclaration()
     {
-        // Arrange: a component publishes exactly one topic
+        // Arrange: the same message declared twice — a redundant edge, not fan-out
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("extractor")
-            .Publishes(TestTopics.Raw)
-            .Publishes(TestTopics.Enriched);
-
-        // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor<DuplicatePublishRule>());
-
-        // Assert
-        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
-        Assert.Equal("extractor", diagnostic.Target);
-        Assert.Equal(
-            "The component declares 2 Publishes calls; a component publishes exactly one topic.",
-            diagnostic.Message);
-    }
-
-    [Fact]
-    public void Validate_WithSinglePublish_ShouldReportNothing()
-    {
-        // Arrange
-        var s = SystemBuilder.Create("test-system").WithValidComponent();
 
         // Act & Assert
-        Assert.Empty(s.DiagnosticsFor<DuplicatePublishRule>());
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            s.AddExtractor("extractor")
+                .Publishes(TestMessages.Raw)
+                .Publishes(TestMessages.Raw));
+        Assert.Contains("extractor", exception.Message);
+        Assert.Contains("raw-events", exception.Message);
     }
-}
 
-public class DuplicateSubscriptionRuleTests
-{
     [Fact]
-    public void Validate_WithDuplicateSubscription_ShouldReportError()
+    public void Publishes_WithASecondMessageOnTheSameChannel_ShouldMaterializeBothMessagesOnTheTopic()
     {
-        // Arrange
+        // Arrange: several published messages may share one channel, as handled messages do
         var s = SystemBuilder.Create("test-system");
-        s.AddLoader("loader")
-            .Subscribes(TestTopics.Raw)
-            .Subscribes(TestTopics.Raw);
+        s.AddExtractor("extractor")
+            .Publishes(MessageRef<RawEvent>.Define("raw-created", pubSub: "test-pubsub", topic: "shared"))
+            .Publishes(MessageRef<EnrichedEvent>.Define("raw-cancelled", pubSub: "test-pubsub", topic: "shared"));
 
         // Act
-        var diagnostic = Assert.Single(s.DiagnosticsFor<DuplicateSubscriptionRule>());
+        var topology = s.Build();
 
         // Assert
-        Assert.Equal("loader", diagnostic.Target);
+        var topic = Assert.Single(topology.Topics);
+        Assert.Equal(["raw-cancelled", "raw-created"], topic.Messages);
+        Assert.Equal(2, topology.Components[0].Publishes.Count);
+    }
+
+    [Fact]
+    public void Publishes_WithDistinctMessagesOnDistinctChannels_ShouldDeclare()
+    {
+        // Arrange: several messages per extractor are legal — each resolving to its own channel
+        var otherMessage = MessageRef<EnrichedEvent>.Define("other-topic", pubSub: "test-pubsub");
+        var thirdMessage = MessageRef<RawEvent>.Define("third-topic", pubSub: "test-pubsub");
+        var s = SystemBuilder.Create("test-system");
+
+        // Act & Assert (no throw)
+        s.AddExtractor("extractor").Publishes(otherMessage).Publishes(thirdMessage);
     }
 }
 
@@ -209,22 +207,188 @@ public class MissingRequiredPortRuleTests
     }
 }
 
-public class TopicContractConflictRuleTests
+public class TopicCarryingSeveralContractsTests
 {
     [Fact]
-    public void Validate_WithSameTopicUnderTwoContracts_ShouldReportError()
+    public void Build_WithOneTopicCarryingTwoMessagesWithTheirOwnContracts_ShouldSucceed()
     {
-        // Arrange: identical (pubsub, topic) declared with two contract types
+        // Arrange: a channel carries several messages, each with its own contract
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("first")
-            .Publishes(TopicRef<RawEvent>.Define("test-pubsub", "shared-topic"));
-        s.AddExtractor("second")
-            .Publishes(TopicRef<EnrichedEvent>.Define("test-pubsub", "shared-topic"));
+        var raw = MessageRef<RawEvent>.Define("shared-raw", pubSub: "test-pubsub", topic: "shared-topic");
+        var enriched = MessageRef<EnrichedEvent>.Define("shared-enriched", pubSub: "test-pubsub", topic: "shared-topic");
+        s.AddExtractor("first").Publishes(raw);
+        s.AddExtractor("second").Publishes(enriched);
+        s.AddLoader("consumer").Subscribes(raw, configure: sub => sub.AlsoHandles(enriched));
 
         // Act
-        var diagnostic = Assert.Single(s.DeclarationDiagnosticsFor<TopicContractConflictRule>());
+        var topology = s.Build();
 
         // Assert
+        var topic = Assert.Single(topology.Topics);
+        Assert.Equal(["shared-enriched", "shared-raw"], topic.Messages);
+    }
+}
+
+public class UnhandledChannelMessagesRuleTests
+{
+    private static readonly MessageRef<OrderPlaced> s_placed =
+        MessageRef<OrderPlaced>.Define("fluxia.orders.order-placed", topic: "orders");
+
+    private static readonly MessageRef<OrderCancelled> s_cancelled =
+        MessageRef<OrderCancelled>.Define("fluxia.orders.order-cancelled", topic: "orders");
+
+    private static readonly MessageRef<OrderShipped> s_shipped =
+        MessageRef<OrderShipped>.Define("fluxia.orders.order-shipped", topic: "orders");
+
+    private static SystemBuilder System(Action<LoaderBuilder> firstLoader, Action<LoaderBuilder>? secondLoader = null)
+    {
+        // One extractor per published message; the channel carries three messages with
+        // their own contracts.
+        var builder = SystemBuilder.Create("orders");
+        builder.AddExtractor("placed-extractor").Publishes(s_placed);
+        builder.AddExtractor("cancelled-extractor").Publishes(s_cancelled);
+        builder.AddExtractor("shipped-extractor").Publishes(s_shipped);
+        firstLoader(builder.AddLoader("fulfillment"));
+        secondLoader?.Invoke(builder.AddLoader("archival"));
+        return builder;
+    }
+
+    [Fact]
+    public void Validate_WithUnhandledChannelMates_ShouldWarnWithTheirNamesAndTheComponentTarget()
+    {
+        // Arrange
+        var builder = System(l => l.Subscribes(s_placed));
+
+        // Act
+        var diagnostic = Assert.Single(builder.DiagnosticsFor<UnhandledChannelMessagesRule>());
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.Equal("fulfillment", diagnostic.Target);
+        Assert.Contains("handles 1 of 3 messages on topic 'orders' (pubsub 'orders-pubsub')", diagnostic.Message);
+        Assert.Contains("'fluxia.orders.order-cancelled', 'fluxia.orders.order-shipped'", diagnostic.Message);
+    }
+
+    [Fact]
+    public void Build_WithOnlyThisWarning_ShouldSucceedAndTryBuildShouldCarryIt()
+    {
+        // Arrange
+        var builder = System(l => l.Subscribes(s_placed));
+
+        // Act & Assert: a warning does not fail Build
+        builder.Build();
+
+        Assert.True(builder.TryBuild(out _, out var diagnostics));
+        Assert.Contains(diagnostics, d => d.Severity is DiagnosticSeverity.Warning
+            && d.Message.Contains("will dead-letter"));
+        Assert.Contains(builder.Validate(), d => d.Message.Contains("will dead-letter"));
+    }
+
+    [Fact]
+    public void Validate_WithIgnoreOthers_ShouldReportNothing()
+    {
+        // Arrange: acknowledging the channel's other messages is the deliberate choice
+        var builder = System(l => l.Subscribes(s_placed, configure: sub => sub.IgnoreOthers()));
+
+        // Act & Assert
+        Assert.Empty(builder.DiagnosticsFor<UnhandledChannelMessagesRule>());
+    }
+
+    [Fact]
+    public void Validate_WhenTheSubscriptionHandlesEveryMessage_ShouldReportNothing()
+    {
+        // Arrange
+        var builder = System(l => l.Subscribes(s_placed, configure: sub => sub
+            .AlsoHandles(s_cancelled)
+            .AlsoHandles(s_shipped)));
+
+        // Act & Assert
+        Assert.Empty(builder.DiagnosticsFor<UnhandledChannelMessagesRule>());
+    }
+
+    [Fact]
+    public void Validate_WithASingleMessageChannel_ShouldReportNothing()
+    {
+        // Arrange: the common case — the required message is the channel's only one
+        var builder = SystemBuilder.Create("single");
+        builder.AddExtractor("extractor").Publishes(TestMessages.Raw);
+        builder.AddLoader("sink").Subscribes(TestMessages.Raw);
+
+        // Act & Assert
+        Assert.Empty(builder.DiagnosticsFor<UnhandledChannelMessagesRule>());
+    }
+
+    [Fact]
+    public void Validate_WithTwoLoadersOnOneChannel_ShouldWarnEachForItsOwnUnhandledMessages()
+    {
+        // Arrange: Dapr delivers every message to each consuming component's own group,
+        // so each loader's channel-mate warnings are independent
+        var builder = System(
+            l => l.Subscribes(s_placed),
+            l => l.Subscribes(s_shipped));
+
+        // Act
+        var diagnostics = builder.DiagnosticsFor<UnhandledChannelMessagesRule>();
+
+        // Assert
+        Assert.Equal(2, diagnostics.Count);
+        var fulfillment = diagnostics.Single(d => d.Target == "fulfillment");
+        Assert.Contains("'fluxia.orders.order-cancelled', 'fluxia.orders.order-shipped'", fulfillment.Message);
+        var archival = diagnostics.Single(d => d.Target == "archival");
+        Assert.Contains("'fluxia.orders.order-cancelled', 'fluxia.orders.order-placed'", archival.Message);
+    }
+}
+
+public class MessageChannelConflictRuleTests
+{
+    [Fact]
+    public void Validate_WithSameMessageOnTwoChannels_ShouldReportError()
+    {
+        // Arrange: one message identity declared on two transport channels
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("first")
+            .Publishes(MessageRef<RawEvent>.Define("shared", pubSub: "test-pubsub", topic: "first-topic"));
+        s.AddLoader("second")
+            .Subscribes(MessageRef<RawEvent>.Define("shared", pubSub: "test-pubsub", topic: "second-topic"));
+
+        // Act
+        var diagnostic = Assert.Single(s.DeclarationDiagnosticsFor<MessageChannelConflictRule>());
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("shared", diagnostic.Target);
+        Assert.Contains("conflicting channels", diagnostic.Message);
+    }
+
+    [Fact]
+    public void Validate_WithDistinctMessageNames_ShouldReportNothing()
+    {
+        // Arrange: different names may live on different channels freely
+        var s = SystemBuilder.Create("test-system").WithValidComponent();
+
+        // Act & Assert
+        Assert.Empty(s.DeclarationDiagnosticsFor<MessageChannelConflictRule>());
+    }
+}
+
+public class MessageContractConflictRuleTests
+{
+    [Fact]
+    public void Validate_WithSameMessageUnderTwoContracts_ShouldReportError()
+    {
+        // Arrange: one message identity declared with two contract types
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("first")
+            .Publishes(MessageRef<RawEvent>.Define("shared", pubSub: "test-pubsub"));
+        s.AddLoader("second")
+            .Subscribes(MessageRef<EnrichedEvent>.Define("shared", pubSub: "test-pubsub"));
+
+        // Act
+        var diagnostic = Assert.Single(s.DeclarationDiagnosticsFor<MessageContractConflictRule>());
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("shared", diagnostic.Target);
         Assert.Contains(typeof(RawEvent).FullName!, diagnostic.Message);
         Assert.Contains(typeof(EnrichedEvent).FullName!, diagnostic.Message);
     }
@@ -240,7 +404,7 @@ public class PubSubPortNameCollisionRuleTests
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("extractor")
             .From(PortRef.Define("shared"))
-            .Publishes(TopicRef<RawEvent>.Define("shared", "some-topic"));
+            .Publishes(MessageRef<RawEvent>.Define("some-topic", pubSub: "shared", topic: "some-topic"));
 
         // Act
         var diagnostic = Assert.Single(s.DiagnosticsFor<PubSubPortNameCollisionRule>());
@@ -248,6 +412,23 @@ public class PubSubPortNameCollisionRuleTests
         // Assert
         Assert.Equal("shared", diagnostic.Target);
         Assert.Contains("shared", diagnostic.Message);
+    }
+
+    [Fact]
+    public void Validate_WithPortNamedLikeTheInternalQueuesPubSub_ShouldReportError()
+    {
+        // Arrange: a system of only transactional integrations has no topics, yet its internal
+        // queues ride the system's pubsub, which still becomes a Dapr Component.
+        var s = SystemBuilder.Create("test-system");
+        s.AddTransactionalIntegration("ti")
+            .From(PortRef.Define("test-system-pubsub"))
+            .To(TestPorts.Erp);
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor<PubSubPortNameCollisionRule>());
+
+        // Assert
+        Assert.Equal("test-system-pubsub", diagnostic.Target);
     }
 }
 

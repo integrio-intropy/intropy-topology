@@ -8,7 +8,7 @@ public class BuildValidationTests
         // Extractor with no Publishes; duplicate component name; published topic nobody
         // subscribes to.
         s.AddExtractor("dup").From(TestPorts.Pim);
-        s.AddExtractor("dup").Publishes(TestTopics.Raw);
+        s.AddExtractor("dup").Publishes(TestMessages.Raw);
         return s;
     }
 
@@ -65,7 +65,7 @@ public class BuildValidationTests
         // Arrange: a valid system plus a topic nobody subscribes to yet — an unconsumed
         // topic is a warning (the consumer may simply not exist), so the build succeeds.
         var s = SystemBuilder.Create("test-system").WithValidComponent();
-        s.AddExtractor("extra-source").Publishes(TestTopics.Enriched);
+        s.AddExtractor("extra-source").Publishes(TestMessages.Enriched);
 
         // Act
         var ok = s.TryBuild(out var topology, out var diagnostics);

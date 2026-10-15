@@ -15,7 +15,7 @@ public sealed class IntropyAspireTests : IDisposable
 {
     private sealed record RawOrder(string OrderNumber);
 
-    private static readonly TopicRef<RawOrder> s_raw = TopicRef<RawOrder>.Define("pubsub-a", "order-raw");
+    private static readonly MessageRef<RawOrder> s_raw = MessageRef<RawOrder>.Define("order-raw", pubSub: "pubsub-a");
     private static readonly PortRef s_webshop = PortRef.Define("webshop");
     private static readonly PortRef s_erp = PortRef.Define("erp");
 
@@ -83,7 +83,6 @@ public sealed class IntropyAspireTests : IDisposable
                 {
                     PubSubName = "pubsub-a",
                     TopicName = "order-raw",
-                    ContractTypeName = "Test.RawOrder",
                     Publishers = ["order-extractor"],
                     Subscribers = ["order-loader"],
                 },
@@ -91,7 +90,6 @@ public sealed class IntropyAspireTests : IDisposable
                 {
                     PubSubName = "pubsub-b",
                     TopicName = "order-processed",
-                    ContractTypeName = "Test.RawOrder",
                     Publishers = ["order-loader"],
                     Subscribers = ["order-extractor"],
                 },
@@ -139,6 +137,35 @@ public sealed class IntropyAspireTests : IDisposable
     }
 
     [Fact]
+    public void RunToCompletionComponentsFor_ShouldUseManifestCadenceAndDefaultOtherwise()
+    {
+        // Arrange — the extractor gets a declared cadence; nothing else does.
+        var development = new DevelopmentManifest(
+            [], [], [new ComponentRerun("order-extractor", TimeSpan.FromSeconds(30))]);
+
+        // Act
+        var scheduled = IntropyAspire.RunToCompletionComponentsFor(Topology(), development);
+
+        // Assert — the resident loader is never scheduled; an undeclared run-to-completion
+        // component would get the host default (covered by the scheduler tests' fixture).
+        Assert.Equal(
+            new Dictionary<string, TimeSpan> { ["order-extractor"] = TimeSpan.FromSeconds(30) },
+            scheduled.RestartDelays);
+    }
+
+    [Fact]
+    public void RunToCompletionComponentsFor_WithoutManifestCadence_ShouldUseTheHostDefault()
+    {
+        // Act
+        var scheduled = IntropyAspire.RunToCompletionComponentsFor(Topology(), new DevelopmentManifest([], [], []));
+
+        // Assert
+        Assert.Equal(
+            RunToCompletionComponents.DefaultRestartDelay,
+            scheduled.RestartDelays["order-extractor"]);
+    }
+
+    [Fact]
     public void Apply_ShouldAddRedisBackend()
     {
         // Arrange
@@ -166,6 +193,7 @@ public sealed class IntropyAspireTests : IDisposable
         var builder = CreateBuilder();
         var development = new DevelopmentManifest(
             [new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency", "1")],
+            [],
             []);
 
         // Act
@@ -297,6 +325,8 @@ public sealed class IntropyAspireTests : IDisposable
 
         // Assert
         Assert.Equal("order-extractor", env["INTROPY__COMPONENT"]);
+        // The framework derives the system's pubsub from it, as a deployment does.
+        Assert.Equal(Topology().SystemName, env["INTROPY_SYSTEM_NAME"]);
         Assert.Equal(
             Path.Combine(GeneratedRoot, GeneratedArtifacts.ConfigDir, "order-extractor.intropy.json"),
             env["INTROPY__CONFIG"]);
@@ -315,7 +345,8 @@ public sealed class IntropyAspireTests : IDisposable
         // resolve to local folders.
         var development = new DevelopmentManifest(
             [],
-            [new PortFileResolution("webshop", "./test/webshop"), new PortFileResolution("erp", "./test/erp")]);
+            [new PortFileResolution("webshop", "./test/webshop"), new PortFileResolution("erp", "./test/erp")],
+            []);
         var builder = CreateBuilder();
         IntropyAspire.Apply(builder, Topology(), GeneratedRoot, development);
 
@@ -520,6 +551,66 @@ public sealed class IntropyAspireTests : IDisposable
         // Assert
         Assert.False(env.ContainsKey("OTEL_EXPORTER_OTLP_HEADERS"));
     }
+    [Fact]
+    public async Task Apply_WithALoader_ShouldGiveItsSidecarAGrpcAppChannel()
+    {
+        // Arrange
+        var builder = CreateBuilder();
+
+        // Act
+        IntropyAspire.Apply(builder, Topology(), GeneratedRoot);
+
+        // Assert — the sidecar pushes the loader's messages to its gRPC callback, whose port the
+        // loader reads from APP_PORT.
+        var options = SidecarOptions(builder, "order-loader");
+        Assert.Equal("grpc", options.AppProtocol);
+        Assert.Equal(IntropyAspire.GrpcAppEndpoint, options.AppEndpoint);
+        var loader = builder.Resources.Single(r => r.Name == "order-loader");
+        Assert.Equal(IntropyAspire.GrpcAppEndpoint, Assert.Single(loader.Annotations.OfType<EndpointAnnotation>()).Name);
+        var variables = new Dictionary<string, object>();
+        var context = new EnvironmentCallbackContext(
+            new DistributedApplicationExecutionContext(DistributedApplicationOperation.Publish), variables,
+            CancellationToken.None);
+        foreach (var callback in loader.Annotations.OfType<EnvironmentCallbackAnnotation>())
+            await callback.Callback(context);
+        Assert.Contains("APP_PORT", variables.Keys);
+    }
+
+    [Fact]
+    public void Apply_WithATransactionalIntegration_ShouldGiveItsSidecarAGrpcAppChannel()
+    {
+        // Arrange — the integration's sidecar pushes its internal hop to its callback
+        var system = SystemBuilder.Create("order-flow");
+        system.AddTransactionalIntegration("order-sync").From(s_webshop).To(s_erp);
+        WriteProject("order-sync");
+        var builder = CreateBuilder();
+
+        // Act
+        IntropyAspire.Apply(builder, system.Build(), GeneratedRoot);
+
+        // Assert
+        var options = SidecarOptions(builder, "order-sync");
+        Assert.Equal("grpc", options.AppProtocol);
+        Assert.Equal(IntropyAspire.GrpcAppEndpoint, options.AppEndpoint);
+    }
+
+    [Fact]
+    public void Apply_WithAnExtractor_ShouldKeepTheDefaultAppChannel()
+    {
+        // Arrange — an extractor receives no messages
+        var builder = CreateBuilder();
+
+        // Act
+        IntropyAspire.Apply(builder, Topology(), GeneratedRoot);
+
+        // Assert
+        var options = SidecarOptions(builder, "order-extractor");
+        Assert.Null(options.AppProtocol);
+        Assert.Null(options.AppEndpoint);
+        Assert.Equal("http", Assert.Single(builder.Resources.Single(r => r.Name == "order-extractor")
+            .Annotations.OfType<EndpointAnnotation>()).Name);
+    }
+
     private static DaprSidecarOptions SidecarOptions(IDistributedApplicationBuilder builder, string componentName)
     {
         var resource = builder.Resources.Single(r => r.Name == componentName);

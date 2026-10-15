@@ -14,12 +14,13 @@ internal static class TopologyMaterializer
     {
         var components = new List<ComponentModel>();
         var topics = new Dictionary<(string PubSub, string Topic), TopicAccumulator>();
+        var messages = new Dictionary<string, MessageAccumulator>(StringComparer.Ordinal);
         var ports = new Dictionary<string, PortAccumulator>();
         var services = new Dictionary<string, ServiceAccumulator>(StringComparer.Ordinal);
 
         foreach (var component in builder.Components)
         {
-            components.Add(MaterializeComponent(component, topics, ports, services));
+            components.Add(MaterializeComponent(component, builder.PubSubName, topics, messages, ports, services));
         }
 
         return new SystemTopology
@@ -33,11 +34,33 @@ internal static class TopologyMaterializer
                 {
                     PubSubName = t.Key.PubSub,
                     TopicName = t.Key.Topic,
-                    ContractTypeName = t.Value.ContractTypeName,
+                    Messages = [.. t.Value.Messages],
                     Publishers = [.. t.Value.Publishers],
                     Subscribers = [.. t.Value.Subscribers],
                 })
                 .ToArray(),
+            MessageGroups =
+            [
+                new MessageGroupResource
+                {
+                    Name = builder.SystemName,
+                    Messages = messages
+                        .OrderBy(m => m.Key, StringComparer.Ordinal)
+                        .Select(m => new MessageResource
+                        {
+                            Name = m.Key,
+                            ContractTypeName = m.Value.ContractTypeName,
+                            Channel = new MessageChannel
+                            {
+                                PubSubName = m.Value.PubSubName,
+                                TopicName = m.Value.TopicName,
+                            },
+                            Publishers = [.. m.Value.Publishers],
+                            Subscribers = [.. m.Value.Subscribers],
+                        })
+                        .ToArray(),
+                },
+            ],
             Ports = ports
                 .OrderBy(c => c.Key, StringComparer.Ordinal)
                 .Select(c => new PortResource
@@ -57,30 +80,48 @@ internal static class TopologyMaterializer
 
     private static ComponentModel MaterializeComponent(
         Component component,
+        string systemPubSub,
         Dictionary<(string PubSub, string Topic), TopicAccumulator> topics,
+        Dictionary<string, MessageAccumulator> messages,
         Dictionary<string, PortAccumulator> ports,
         Dictionary<string, ServiceAccumulator> services)
     {
         var subscribes = new List<TopicSubscription>();
-        foreach (var topic in component.SubscribeCalls)
+        foreach (var subscription in component.SubscriptionCalls)
         {
+            // A subscription's channel is its first message's; the declaration site enforces
+            // that every handled message travels on that one channel.
+            var channel = subscription.Messages[0];
             subscribes.Add(new TopicSubscription
             {
-                PubSubName = topic.PubSubName,
-                TopicName = topic.TopicName,
+                PubSubName = channel.PubSubName ?? systemPubSub,
+                TopicName = channel.TopicName,
+                Messages = [.. subscription.Messages.Select(m => m.Name).Distinct(StringComparer.Ordinal)],
+                Conditions = subscription.Conditions.Count == 0
+                    ? null
+                    : new Dictionary<string, string>(subscription.Conditions, StringComparer.Ordinal),
+                Unhandled = subscription.Unhandled,
+                Bulk = (component as LoaderComponent)?.Bulk,
             });
-            AccumulateTopic(topics, topic).Subscribers.Add(component.Name);
+
+            foreach (var message in subscription.Messages)
+            {
+                AccumulateTopic(topics, message, systemPubSub).Subscribers.Add(component.Name);
+                AccumulateMessage(messages, message, systemPubSub).Subscribers.Add(component.Name);
+            }
         }
 
         var publishes = new List<PublishEdge>();
-        foreach (var topic in component.PublishCalls)
+        foreach (var message in component.PublishCalls)
         {
             publishes.Add(new PublishEdge
             {
-                PubSubName = topic.PubSubName,
-                TopicName = topic.TopicName,
+                PubSubName = message.PubSubName ?? systemPubSub,
+                TopicName = message.TopicName,
+                Message = message.Name,
             });
-            AccumulateTopic(topics, topic).Publishers.Add(component.Name);
+            AccumulateTopic(topics, message, systemPubSub).Publishers.Add(component.Name);
+            AccumulateMessage(messages, message, systemPubSub).Publishers.Add(component.Name);
         }
 
         var portEdges = new List<PortEdge>();
@@ -118,11 +159,14 @@ internal static class TopologyMaterializer
             Publishes = publishes,
             Ports = portEdges,
             Uses = serviceAppIds,
+            // The queue rides the system's pubsub on a topic of its own: brokers name exchanges and
+            // topics after the topic, so a topic shared by several integrations would deliver each
+            // one's files to all of them, whatever Dapr component they publish through.
             InternalQueue = component.Kind is ComponentKind.TransactionalIntegration
                 ? new InternalQueue
                 {
-                    PubSubName = $"internal-{component.Name}",
-                    TopicName = "hop",
+                    PubSubName = systemPubSub,
+                    TopicName = InternalQueue.TopicNameFor(component.Name),
                 }
                 : null,
         };
@@ -130,13 +174,34 @@ internal static class TopologyMaterializer
 
     private static TopicAccumulator AccumulateTopic(
         Dictionary<(string PubSub, string Topic), TopicAccumulator> topics,
-        TopicRef topic)
+        MessageRef message,
+        string systemPubSub)
     {
-        var key = (topic.PubSubName, topic.TopicName);
+        var key = (message.PubSubName ?? systemPubSub, message.TopicName);
         if (!topics.TryGetValue(key, out var accumulator))
         {
-            accumulator = new TopicAccumulator(topic.ContractType.FullName ?? topic.ContractType.Name);
+            accumulator = new TopicAccumulator();
             topics[key] = accumulator;
+        }
+
+        accumulator.Messages.Add(message.Name);
+        return accumulator;
+    }
+
+    // First-seen-wins on channel/contract conflicts: materialization never fails, and
+    // the declaration rules report the conflicts against the raw MessageRef usages.
+    private static MessageAccumulator AccumulateMessage(
+        Dictionary<string, MessageAccumulator> messages,
+        MessageRef message,
+        string systemPubSub)
+    {
+        if (!messages.TryGetValue(message.Name, out var accumulator))
+        {
+            accumulator = new MessageAccumulator(
+                message.ContractType.FullName ?? message.ContractType.Name,
+                message.PubSubName ?? systemPubSub,
+                message.TopicName);
+            messages[message.Name] = accumulator;
         }
 
         return accumulator;
@@ -157,9 +222,18 @@ internal static class TopologyMaterializer
         return accumulator;
     }
 
-    private sealed class TopicAccumulator(string contractTypeName)
+    private sealed class TopicAccumulator
+    {
+        public SortedSet<string> Messages { get; } = new(StringComparer.Ordinal);
+        public SortedSet<string> Publishers { get; } = new(StringComparer.Ordinal);
+        public SortedSet<string> Subscribers { get; } = new(StringComparer.Ordinal);
+    }
+
+    private sealed class MessageAccumulator(string contractTypeName, string pubSubName, string topicName)
     {
         public string ContractTypeName { get; } = contractTypeName;
+        public string PubSubName { get; } = pubSubName;
+        public string TopicName { get; } = topicName;
         public SortedSet<string> Publishers { get; } = new(StringComparer.Ordinal);
         public SortedSet<string> Subscribers { get; } = new(StringComparer.Ordinal);
     }

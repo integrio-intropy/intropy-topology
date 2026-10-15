@@ -9,9 +9,9 @@ public class MaterializationTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("extractor").Publishes(TestTopics.Raw);
+        s.AddExtractor("extractor").Publishes(TestMessages.Raw);
         s.AddTransactionalIntegration("ti").From(TestPorts.Pim).To(TestPorts.Erp);
-        s.AddLoader("loader").Subscribes(TestTopics.Raw).To(TestPorts.Erp);
+        s.AddLoader("loader").Subscribes(TestMessages.Raw).To(TestPorts.Erp);
 
         // Act
         var topology = s.Build();
@@ -25,8 +25,8 @@ public class MaterializationTests
     {
         // Arrange
         var s = SystemBuilder.Create("test-system");
-        s.AddExtractor("extractor").Publishes(TestTopics.Raw);
-        s.AddLoader("sink").Subscribes(TestTopics.Raw);
+        s.AddExtractor("extractor").Publishes(TestMessages.Raw);
+        s.AddLoader("sink").Subscribes(TestMessages.Raw);
 
         // Act
         var topology = s.Build();
@@ -35,9 +35,32 @@ public class MaterializationTests
         var raw = Assert.Single(topology.Topics);
         Assert.Equal("test-pubsub", raw.PubSubName);
         Assert.Equal("raw-events", raw.TopicName);
-        Assert.Equal(typeof(RawEvent).FullName, raw.ContractTypeName);
+        Assert.Equal(["raw-events"], raw.Messages);
         Assert.Equal(["extractor"], raw.Publishers);
         Assert.Equal(["sink"], raw.Subscribers);
+    }
+
+    [Fact]
+    public void Build_WithSharedMessage_ShouldMaterializeOneMessageGroupWithBothSides()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("extractor").Publishes(TestMessages.Raw);
+        s.AddLoader("sink").Subscribes(TestMessages.Raw);
+
+        // Act
+        var topology = s.Build();
+
+        // Assert
+        var group = Assert.Single(topology.MessageGroups);
+        Assert.Equal("test-system", group.Name);
+        var message = Assert.Single(group.Messages);
+        Assert.Equal("raw-events", message.Name);
+        Assert.Equal(typeof(RawEvent).FullName, message.ContractTypeName);
+        Assert.Equal("test-pubsub", message.Channel.PubSubName);
+        Assert.Equal("raw-events", message.Channel.TopicName);
+        Assert.Equal(["extractor"], message.Publishers);
+        Assert.Equal(["sink"], message.Subscribers);
     }
 
     [Fact]
@@ -87,13 +110,13 @@ public class MaterializationTests
         var erp = PortRef.Define("erp");
         var s = SystemBuilder.Create("test-system");
         s.AddExtractor("zeta")
-            .Publishes(TopicRef<RawEvent>.Define("test-pubsub", "zzz-topic"))
+            .Publishes(MessageRef<RawEvent>.Define("zzz-topic", pubSub: "test-pubsub"))
             .From(TestPorts.Pim);
         s.AddExtractor("alpha")
-            .Publishes(TopicRef<RawEvent>.Define("test-pubsub", "aaa-topic"))
+            .Publishes(MessageRef<RawEvent>.Define("aaa-topic", pubSub: "test-pubsub"))
             .From(erp);
-        s.AddLoader("sink-a").Subscribes(TopicRef<RawEvent>.Define("test-pubsub", "aaa-topic"));
-        s.AddLoader("sink-z").Subscribes(TopicRef<RawEvent>.Define("test-pubsub", "zzz-topic"));
+        s.AddLoader("sink-a").Subscribes(MessageRef<RawEvent>.Define("aaa-topic", pubSub: "test-pubsub"));
+        s.AddLoader("sink-z").Subscribes(MessageRef<RawEvent>.Define("zzz-topic", pubSub: "test-pubsub"));
 
         // Act
         var topology = s.Build();
@@ -109,21 +132,43 @@ public class MaterializationTests
         // Arrange
         var s = SystemBuilder.Create("test-system");
         s.AddTransactionalIntegration("price-sync").From(TestPorts.Pim).To(TestPorts.Erp);
-        s.AddExtractor("extractor").Publishes(TestTopics.Raw);
-        s.AddLoader("loader").Subscribes(TestTopics.Raw);
+        s.AddExtractor("extractor").Publishes(TestMessages.Raw);
+        s.AddLoader("loader").Subscribes(TestMessages.Raw);
 
         // Act
         var topology = s.Build();
 
         // Assert
         var ti = topology.Components.Single(c => c.Name == "price-sync");
-        Assert.Equal("internal-price-sync", ti.InternalQueue?.PubSubName);
-        Assert.Equal("hop", ti.InternalQueue?.TopicName);
+        Assert.Equal("test-system-pubsub", ti.InternalQueue?.PubSubName);
+        Assert.Equal("internal-price-sync", ti.InternalQueue?.TopicName);
         Assert.Null(topology.Components.Single(c => c.Name == "extractor").InternalQueue);
         Assert.Null(topology.Components.Single(c => c.Name == "loader").InternalQueue);
 
-        // The hop is workload shape, not an inter-component edge: it never enters Topics.
-        Assert.DoesNotContain(topology.Topics, t => t.PubSubName == "internal-price-sync");
+        // The queue is workload shape, not an inter-component edge: it never enters Topics.
+        Assert.DoesNotContain(topology.Topics, t => t.TopicName == "internal-price-sync");
+    }
+
+    [Fact]
+    public void Build_WithAMessageNamingNoPubSub_ShouldResolveItToTheSystemsPubSub()
+    {
+        // Arrange
+        var orders = MessageRef<RawEvent>.Define("orders");
+        var s = SystemBuilder.Create("order-flow");
+        s.AddExtractor("extractor").Publishes(orders);
+        s.AddLoader("loader").Subscribes(orders);
+
+        // Act
+        var topology = s.Build();
+
+        // Assert
+        Assert.Equal("order-flow-pubsub", Assert.Single(topology.Topics).PubSubName);
+        Assert.Equal("order-flow-pubsub",
+            Assert.Single(topology.Components.Single(c => c.Name == "extractor").Publishes).PubSubName);
+        Assert.Equal("order-flow-pubsub",
+            Assert.Single(topology.Components.Single(c => c.Name == "loader").Subscribes).PubSubName);
+        Assert.Equal("order-flow-pubsub",
+            Assert.Single(Assert.Single(topology.MessageGroups).Messages).Channel.PubSubName);
     }
 
     // A second edge that a block cannot legally have is a compile error: the block
