@@ -325,8 +325,10 @@ public sealed class IntropyAspireTests : IDisposable
 
         // Assert
         Assert.Equal("order-extractor", env["INTROPY__COMPONENT"]);
-        // The framework derives the system's pubsub from it, as a deployment does.
-        Assert.Equal(Topology().SystemName, env["INTROPY_SYSTEM_NAME"]);
+        // The channel the topology settled, as a deployment passes it; the framework derives none.
+        Assert.Equal("pubsub-a", env["INTROPY_PUBSUB_NAME"]);
+        Assert.Equal("order-raw", env["INTROPY_TOPIC_NAME"]);
+        Assert.False(env.ContainsKey("INTROPY_SYSTEM_NAME"));
         Assert.Equal(
             Path.Combine(GeneratedRoot, GeneratedArtifacts.ConfigDir, "order-extractor.intropy.json"),
             env["INTROPY__CONFIG"]);
@@ -592,6 +594,25 @@ public sealed class IntropyAspireTests : IDisposable
         var options = SidecarOptions(builder, "order-sync");
         Assert.Equal("grpc", options.AppProtocol);
         Assert.Equal(IntropyAspire.GrpcAppEndpoint, options.AppEndpoint);
+    }
+
+    [Fact]
+    public async Task Apply_WithATransactionalIntegration_ShouldInjectItsInternalQueue()
+    {
+        // Arrange
+        var system = SystemBuilder.Create("order-flow");
+        system.AddTransactionalIntegration("order-sync").From(s_webshop).To(s_erp);
+        WriteProject("order-sync");
+        var builder = CreateBuilder();
+        IntropyAspire.Apply(builder, system.Build(), GeneratedRoot);
+        var resource = builder.Resources.OfType<IResourceWithEnvironment>().Single(r => r.Name == "order-sync");
+
+        // Act
+        var env = await resource.GetEnvironmentVariableValuesAsync(DistributedApplicationOperation.Publish);
+
+        // Assert
+        Assert.Equal("order-flow-pubsub", env["INTROPY_PUBSUB_NAME"]);
+        Assert.Equal("internal-order-sync", env["INTROPY_TOPIC_NAME"]);
     }
 
     [Fact]
