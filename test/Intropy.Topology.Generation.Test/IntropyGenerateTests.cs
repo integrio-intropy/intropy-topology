@@ -168,6 +168,25 @@ public class IntropyGenerateTests
     }
 
     [Fact]
+    public void Run_Graph_ShouldEmit_TheChannelEachComponentRunsOn()
+    {
+        // Act
+        var (_, output, _) = Capture(() => IntropyGenerate.Run(s_assembly, ["graph"]));
+        using var json = JsonDocument.Parse(output);
+        var channels = json.RootElement.GetProperty("components").EnumerateArray().ToDictionary(
+            c => c.GetProperty("name").GetString()!,
+            c => c.GetProperty("channel"));
+
+        // Assert — what a deployment passes in INTROPY_PUBSUB_NAME and INTROPY_TOPIC_NAME
+        Assert.Equal("pubsub-a", channels["order-extractor"].GetProperty("pubsub").GetString());
+        Assert.Equal("order-raw", channels["order-extractor"].GetProperty("topic").GetString());
+        Assert.Equal("pubsub-b", channels["fulfillment-loader"].GetProperty("pubsub").GetString());
+        Assert.Equal("order-fulfillment", channels["fulfillment-loader"].GetProperty("topic").GetString());
+        Assert.Equal("order-fulfillment-pubsub", channels["price-sync"].GetProperty("pubsub").GetString());
+        Assert.Equal("internal-price-sync", channels["price-sync"].GetProperty("topic").GetString());
+    }
+
+    [Fact]
     public void Run_Graph_WithoutDevelopmentFlag_ShouldOmitDevelopmentSection()
     {
         // Act
