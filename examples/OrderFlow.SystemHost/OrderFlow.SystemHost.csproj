@@ -1,12 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-    <Sdk Name="Aspire.AppHost.Sdk" Version="13.5.3" />
+    <Sdk Name="Aspire.AppHost.Sdk" Version="13.6.1" />
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <RootNamespace>OrderFlow.SystemHost</RootNamespace>
         <IsAspireHost>true</IsAspireHost>
         <IsPackable>false</IsPackable>
+        <!-- The host intentionally runs without the Aspire CLI bundle; the warning
+             would otherwise land on stdout ahead of `graph` JSON output. -->
+        <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
         <UserSecretsId>order-flow-systemhost</UserSecretsId>
     </PropertyGroup>
 
