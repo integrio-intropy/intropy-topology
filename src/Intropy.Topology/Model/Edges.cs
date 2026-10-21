@@ -68,6 +68,16 @@ public sealed record PortEdge
     public required PortDirection Direction { get; init; }
 }
 
+/// <summary>A gateway serving an endpoint.</summary>
+public sealed record EndpointEdge
+{
+    /// <summary>The endpoint's name.</summary>
+    public required string EndpointName { get; init; }
+
+    /// <summary>The path callers post to.</summary>
+    public required string Path { get; init; }
+}
+
 /// <summary>
 /// A transactional integration's internal receive-to-send queue. Not a user-declared topic: the
 /// names are minted at materialization — the system's pubsub and a topic named after the

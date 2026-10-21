@@ -11,6 +11,9 @@ public enum ComponentKind
 
     /// <summary>End-to-end transactional integration.</summary>
     TransactionalIntegration,
+
+    /// <summary>Serves an HTTP endpoint callers push items to, and publishes each one.</summary>
+    Gateway,
 }
 
 /// <summary>What happens to the messages on a subscribed channel that the subscription does not

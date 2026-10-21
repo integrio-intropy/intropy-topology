@@ -20,7 +20,7 @@ dotnet run --project examples/OrderFlow.SystemHost -- generate ./out
 
 ## Architecture
 
-A typed, fluent DSL for declaring Intropy integration-system topologies in .NET 10. A SystemHost project declares a system's components (Extractor, Loader, TransactionalIntegration) and the edges between them; `Build()` validates the declaration and produces an immutable, serializable `SystemTopology` that downstream Kubernetes/Dapr generation tooling consumes. The core library has zero external runtime dependencies. This is the minimal model; the full model (aggregators, APIs, named ports, more transports) lives on the `full-topology` branch — cherry-pick from there rather than re-adding features piecemeal.
+A typed, fluent DSL for declaring Intropy integration-system topologies in .NET 10. A SystemHost project declares a system's components (Extractor, Loader, TransactionalIntegration, Gateway) and the edges between them; `Build()` validates the declaration and produces an immutable, serializable `SystemTopology` that downstream Kubernetes/Dapr generation tooling consumes. The core library has zero external runtime dependencies. This is the minimal model; the full model (aggregators, APIs, named ports, more transports) lives on the `full-topology` branch — cherry-pick from there rather than re-adding features piecemeal.
 
 | Package | Purpose |
 |---------|---------|

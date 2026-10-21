@@ -148,6 +148,34 @@ public class IntropyGenerateTests
     }
 
     [Fact]
+    public void GraphJson_ShouldEmitAGatewaysKindAndEndpoints()
+    {
+        // Arrange
+        var placed = MessageRef<OrderPlaced>.Define("order-placed");
+        var builder = SystemBuilder.Create("orders");
+        builder.AddGateway("order-gateway")
+            .Exposes(EndpointRef.Define("order-gateway-endpoint", "/order-placed"))
+            .Publishes(placed);
+        builder.AddLoader("order-loader").Subscribes(placed);
+
+        // Act
+        using var json = JsonDocument.Parse(IntropyGenerate.GraphJson(builder.Build(), development: null));
+        var components = json.RootElement.GetProperty("components").EnumerateArray().ToArray();
+        var gateway = components.Single(c => c.GetProperty("name").GetString() == "order-gateway");
+        var loader = components.Single(c => c.GetProperty("name").GetString() == "order-loader");
+
+        // Assert
+        Assert.Equal("gateway", gateway.GetProperty("kind").GetString());
+        var endpoint = Assert.Single(gateway.GetProperty("endpoints").EnumerateArray());
+        Assert.Equal("order-gateway-endpoint", endpoint.GetProperty("name").GetString());
+        Assert.Equal("/order-placed", endpoint.GetProperty("path").GetString());
+        Assert.Equal("order-placed", gateway.GetProperty("channel").GetProperty("topic").GetString());
+        Assert.False(gateway.TryGetProperty("ports", out _));
+        Assert.False(loader.TryGetProperty("endpoints", out _));
+        Assert.False(json.RootElement.TryGetProperty("ports", out _));
+    }
+
+    [Fact]
     public void Run_Graph_ShouldEmit_InternalQueueForTransactionalIntegrationsOnly()
     {
         // Act

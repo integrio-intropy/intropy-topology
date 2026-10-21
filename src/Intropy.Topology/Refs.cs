@@ -122,3 +122,35 @@ public sealed record PortRef
         new(NameRules.RequireLabel(name, nameof(name)));
 }
 
+
+/// <summary>
+/// An endpoint — the named HTTP interface callers push items into the system through. A gateway
+/// serves it itself, so unlike a <see cref="PortRef"/> it has no Dapr binding and no local file
+/// resolution. The name is its identity and shares the ports' namespace, since both name a
+/// resource of the system; the path is where callers <c>POST</c>, and the ingress in front of the
+/// gateway routes it. Endpoints are declared in the SystemHost (typically a scaffolded
+/// <c>Endpoints.cs</c>); they are system-owned and never shared across systems.
+/// </summary>
+public sealed record EndpointRef
+{
+    /// <summary>The endpoint's name (DNS-1123 label, e.g. <c>order-gateway-endpoint</c>).</summary>
+    public string Name { get; }
+
+    /// <summary>The path callers post to, starting with <c>/</c> (e.g. <c>/orders</c>).</summary>
+    public string Path { get; }
+
+    private EndpointRef(string name, string path)
+    {
+        Name = name;
+        Path = path;
+    }
+
+    /// <summary>Declares an endpoint.</summary>
+    /// <param name="name">The endpoint's name (DNS-1123 label).</param>
+    /// <param name="path">The path callers post to: <c>/</c> followed by ASCII letters, digits,
+    /// <c>/</c>, <c>.</c>, <c>_</c> and <c>-</c>.</param>
+    /// <exception cref="ArgumentException">The name is not a valid DNS-1123 label, or the path is
+    /// not a valid endpoint path.</exception>
+    public static EndpointRef Define([ConstantExpected] string name, [ConstantExpected] string path) =>
+        new(NameRules.RequireLabel(name, nameof(name)), NameRules.RequirePath(path, nameof(path)));
+}

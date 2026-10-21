@@ -12,12 +12,14 @@ internal static class TopologyRules
         new Rules.MissingRequiredOutputRule(),
         new Rules.MissingRequiredSubscriptionRule(),
         new Rules.MissingRequiredPortRule(),
+        new Rules.MissingRequiredEndpointRule(),
         new Rules.UnconsumedTopicRule(),
         new Rules.UnproducedTopicRule(),
         new Rules.UnhandledChannelMessagesRule(),
         new Rules.NoEdgesRule(),
         new Rules.PubSubPortNameCollisionRule(),
         new Rules.ServiceAppIdCollisionRule(),
+        new Rules.EndpointNameCollisionRule(),
     ];
 
     private static readonly IDeclarationRule[] DeclarationRules =

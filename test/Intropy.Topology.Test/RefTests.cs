@@ -142,3 +142,37 @@ public class MessageRefTests
         Assert.NotEqual(first, second);
     }
 }
+
+public class EndpointRefTests
+{
+    [Fact]
+    public void Define_WithValidNameAndPath_ShouldExposeProperties()
+    {
+        // Act
+        var endpoint = EndpointRef.Define("order-gateway-endpoint", "/api/orders.v1");
+
+        // Assert
+        Assert.Equal("order-gateway-endpoint", endpoint.Name);
+        Assert.Equal("/api/orders.v1", endpoint.Path);
+    }
+
+    [Theory]
+    [InlineData("orders")]
+    [InlineData("")]
+    [InlineData("/orders?x=1")]
+    [InlineData("/order s")]
+    public void Define_WithInvalidPath_ShouldThrowArgumentException(string path)
+    {
+        // Act & Assert
+#pragma warning disable CA1857
+        Assert.Throws<ArgumentException>(() => EndpointRef.Define("orders", path));
+#pragma warning restore CA1857
+    }
+
+    [Fact]
+    public void Define_WithInvalidLabel_ShouldThrowArgumentException()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => EndpointRef.Define("Orders", "/orders"));
+    }
+}

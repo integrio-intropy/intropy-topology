@@ -447,3 +447,82 @@ public class AllowedPatternsTests
         Assert.Empty(s.Validate());
     }
 }
+
+public class GatewayRuleTests
+{
+    private static readonly EndpointRef s_orders = EndpointRef.Define("order-gateway-endpoint", "/orders");
+
+    [Fact]
+    public void Validate_WithGatewayThatPublishesNothing_ShouldReportError()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system").WithValidComponent();
+        s.AddGateway("order-gateway").Exposes(s_orders);
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor<MissingRequiredOutputRule>());
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("order-gateway", diagnostic.Target);
+    }
+
+    [Fact]
+    public void Validate_WithGatewayThatExposesNoEndpoint_ShouldReportError()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system").WithValidComponent();
+        s.AddGateway("order-gateway").Publishes(TestMessages.Raw);
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor<MissingRequiredEndpointRule>());
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("order-gateway", diagnostic.Target);
+        Assert.Throws<TopologyValidationException>(() => s.Build());
+    }
+
+    [Fact]
+    public void Validate_WithEndpointServedByTwoGateways_ShouldReportError()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system").WithValidComponent();
+        s.AddGateway("gateway-a").Exposes(s_orders).Publishes(TestMessages.Raw);
+        s.AddGateway("gateway-b").Exposes(s_orders).Publishes(TestMessages.Raw);
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor<EndpointNameCollisionRule>());
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("order-gateway-endpoint", diagnostic.Target);
+    }
+
+    [Fact]
+    public void Validate_WithEndpointNamedLikeAPort_ShouldReportError()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system").WithValidComponent();
+        s.AddGateway("order-gateway").Exposes(EndpointRef.Define("pim", "/orders")).Publishes(TestMessages.Raw);
+        s.AddExtractor("pim-extractor").From(TestPorts.Pim).Publishes(TestMessages.Raw);
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor<EndpointNameCollisionRule>());
+
+        // Assert
+        Assert.Equal("pim", diagnostic.Target);
+    }
+
+    [Fact]
+    public void Validate_WithCompleteGateway_ShouldReportNothing()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddGateway("order-gateway").Exposes(s_orders).Publishes(TestMessages.Raw);
+        s.AddLoader("sink").Subscribes(TestMessages.Raw);
+
+        // Act & Assert
+        Assert.Empty(s.Validate());
+    }
+}

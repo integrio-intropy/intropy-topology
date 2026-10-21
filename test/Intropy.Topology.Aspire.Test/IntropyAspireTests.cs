@@ -118,6 +118,7 @@ public sealed class IntropyAspireTests : IDisposable
     [InlineData(ComponentKind.Extractor, true)]
     [InlineData(ComponentKind.TransactionalIntegration, true)]
     [InlineData(ComponentKind.Loader, false)]
+    [InlineData(ComponentKind.Gateway, false)]
     public void IsRunToCompletion_ShouldFollowTheKindsSingleLegitimateHost(
         ComponentKind kind, bool expected)
     {
@@ -630,6 +631,35 @@ public sealed class IntropyAspireTests : IDisposable
         Assert.Null(options.AppEndpoint);
         Assert.Equal("http", Assert.Single(builder.Resources.Single(r => r.Name == "order-extractor")
             .Annotations.OfType<EndpointAnnotation>()).Name);
+    }
+
+    [Fact]
+    public void Apply_WithAGatewayLaunchProfile_ShouldServeItOnTheProfilesPort()
+    {
+        // Arrange — the gateway's launch profile fixes the port callers post to
+        var system = SystemBuilder.Create("order-flow");
+        system.AddGateway("order-gateway").Exposes(EndpointRef.Define("order-gateway-endpoint", "/orders"))
+            .Publishes(s_raw);
+        system.AddLoader("order-loader").Subscribes(s_raw).To(s_erp);
+        WriteProject("order-gateway");
+        var properties = Directory.CreateDirectory(Path.Combine(_workspace, "order-gateway", "Properties")).FullName;
+        File.WriteAllText(Path.Combine(properties, "launchSettings.json"), """
+            {
+              "profiles": {
+                "http": { "commandName": "Project", "applicationUrl": "http://localhost:5080" }
+              }
+            }
+            """);
+        var builder = CreateBuilder();
+
+        // Act
+        IntropyAspire.Apply(builder, system.Build(), GeneratedRoot);
+
+        // Assert
+        var endpoint = Assert.Single(builder.Resources.Single(r => r.Name == "order-gateway")
+            .Annotations.OfType<EndpointAnnotation>());
+        Assert.Equal("http", endpoint.Name);
+        Assert.Equal(5080, endpoint.Port);
     }
 
     private static DaprSidecarOptions SidecarOptions(IDistributedApplicationBuilder builder, string componentName)
