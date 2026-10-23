@@ -159,3 +159,53 @@ public class BuilderMappingTests
         Assert.Throws<ArgumentException>(() => s.AddExtractor(name));
     }
 }
+
+public class GatewayBuilderTests
+{
+    private static readonly EndpointRef s_orders = EndpointRef.Define("order-gateway-endpoint", "/orders");
+
+    [Fact]
+    public void AddGateway_ShouldMaterializeKindEndpointsAndPublishes()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddGateway("order-gateway").Exposes(s_orders).Publishes(TestMessages.Raw);
+        s.AddLoader("sink").Subscribes(TestMessages.Raw);
+
+        // Act
+        var topology = s.Build();
+        var gateway = topology.Components[0];
+
+        // Assert
+        Assert.Equal(ComponentKind.Gateway, gateway.Kind);
+        var endpoint = Assert.Single(gateway.Endpoints!);
+        Assert.Equal(("order-gateway-endpoint", "/orders"), (endpoint.EndpointName, endpoint.Path));
+        Assert.Equal("raw-events", Assert.Single(gateway.Publishes).TopicName);
+        Assert.Equal(new ComponentChannel("test-pubsub", "raw-events"), ComponentChannel.For(gateway));
+        // An endpoint is served over HTTP, never a Dapr binding, so it is no port.
+        Assert.Empty(gateway.Ports);
+        Assert.Empty(topology.Ports);
+        Assert.Null(topology.Components[1].Endpoints);
+    }
+
+    [Fact]
+    public void Exposes_WithSameEndpointTwice_ShouldThrow()
+    {
+        // Arrange
+        var gateway = SystemBuilder.Create("test-system").AddGateway("order-gateway").Exposes(s_orders);
+
+        // Act & Assert
+        Assert.Throws<InvalidOperationException>(() => gateway.Exposes(s_orders));
+    }
+
+    [Fact]
+    public void Exposes_WithAPathAlreadyServed_ShouldThrow()
+    {
+        // Arrange
+        var gateway = SystemBuilder.Create("test-system").AddGateway("order-gateway").Exposes(s_orders);
+
+        // Act & Assert
+        Assert.Throws<InvalidOperationException>(
+            () => gateway.Exposes(EndpointRef.Define("other-endpoint", "/orders")));
+    }
+}

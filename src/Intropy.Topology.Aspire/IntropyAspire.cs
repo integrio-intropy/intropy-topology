@@ -168,6 +168,8 @@ public static class IntropyAspire
             var project = builder.AddProject(component.Name, projectPath);
             // The endpoint makes Aspire allocate a port and inject ASPNETCORE_URLS (without it
             // every Kestrel binds the 5000 default) and gives the Dapr sidecar its app-port. A
+            // project whose launch profile names an http URL keeps that port: a gateway's callers
+            // need a stable address, so the gateway template pins one there. A
             // component that receives messages serves the Dapr gRPC app callback: its endpoint's
             // port reaches the app as APP_PORT, where the framework listens.
             project = ReceivesMessages(component)

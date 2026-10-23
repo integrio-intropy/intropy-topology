@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Intropy.Topology.Model;
 
 /// <summary>
@@ -33,4 +35,12 @@ public sealed record ComponentModel
     /// every consumer — local generation, Aspire, deployment tooling — agrees on the name.
     /// </summary>
     public required InternalQueue? InternalQueue { get; init; }
+
+    /// <summary>
+    /// The endpoints a gateway serves, in declaration order; <see langword="null"/> for other
+    /// kinds, and then omitted when serializing, so the models of systems without a gateway
+    /// serialize unchanged.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<EndpointEdge>? Endpoints { get; init; }
 }

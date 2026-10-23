@@ -237,3 +237,35 @@ public sealed class TransactionalIntegrationBuilder
         return this;
     }
 }
+
+/// <summary>Fluent builder for a gateway: an edge block that serves HTTP endpoints callers push
+/// items to, and publishes each item it accepts. It stays resident, and the caller is its retry
+/// mechanism. There are deliberately no <c>From</c>/<c>To</c> methods: a gateway reaches the
+/// outside world only through the endpoints it serves, never through a Dapr binding.</summary>
+public sealed class GatewayBuilder : ComponentBuilder<GatewayBuilder, GatewayComponent>
+{
+    internal GatewayBuilder(GatewayComponent component) : base(component) { }
+
+    private protected override GatewayBuilder Self => this;
+
+    /// <summary>Declares an endpoint the gateway serves.</summary>
+    /// <param name="endpoint">The endpoint callers post to.</param>
+    /// <exception cref="InvalidOperationException">The gateway already exposes an endpoint with
+    /// <paramref name="endpoint"/>'s name or path.</exception>
+    public GatewayBuilder Exposes(EndpointRef endpoint)
+    {
+        Component.AddEndpoint(endpoint);
+        return this;
+    }
+
+    /// <summary>Declares that the gateway publishes a message. Several published messages may
+    /// travel on the same channel.</summary>
+    /// <param name="message">The message the gateway publishes.</param>
+    /// <exception cref="InvalidOperationException">The component already declares publishing
+    /// <paramref name="message"/>; a component publishes a message at most once.</exception>
+    public GatewayBuilder Publishes(MessageRef message)
+    {
+        Component.AddPublish(message);
+        return this;
+    }
+}

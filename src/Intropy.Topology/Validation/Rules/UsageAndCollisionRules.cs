@@ -12,13 +12,14 @@ internal sealed class NoEdgesRule : IModelRule
             var hasEdges =
                 component.Subscribes.Count > 0
                 || component.Publishes.Count > 0
-                || component.Ports.Count > 0;
+                || component.Ports.Count > 0
+                || component.Endpoints is { Count: > 0 };
 
             if (!hasEdges)
             {
                 yield return new TopologyDiagnostic(
                     DiagnosticSeverity.Warning,
-                    "The component has no edges (no subscriptions, publishes, or ports); it is likely unfinished.",
+                    "The component has no edges (no subscriptions, publishes, ports, or endpoints); it is likely unfinished.",
                     component.Name);
             }
         }
@@ -45,6 +46,41 @@ internal sealed class PubSubPortNameCollisionRule : IModelRule
                 DiagnosticSeverity.Error,
                 $"The pubsub name '{port.DaprComponentName}' equals port '{port.Name}'s Dapr binding component name; both become Dapr Component names in the same namespace.",
                 port.DaprComponentName);
+        }
+    }
+}
+
+/// <summary>
+/// An endpoint's name is its identity across the system: one gateway serves it, and it must not
+/// equal a port's name — both name a resource of the system, and tooling keys them in one
+/// namespace.
+/// </summary>
+internal sealed class EndpointNameCollisionRule : IModelRule
+{
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
+    {
+        var portNames = topology.Ports.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+        var servers = topology.Components
+            .SelectMany(c => (c.Endpoints ?? []).Select(e => (e.EndpointName, Component: c.Name)))
+            .GroupBy(e => e.EndpointName, StringComparer.Ordinal);
+
+        foreach (var endpoint in servers)
+        {
+            if (endpoint.Count() > 1)
+            {
+                yield return new TopologyDiagnostic(
+                    DiagnosticSeverity.Error,
+                    $"The endpoint '{endpoint.Key}' is served by {string.Join(", ", endpoint.Select(e => $"'{e.Component}'"))}; one gateway serves each endpoint.",
+                    endpoint.Key);
+            }
+
+            if (portNames.Contains(endpoint.Key))
+            {
+                yield return new TopologyDiagnostic(
+                    DiagnosticSeverity.Error,
+                    $"The endpoint '{endpoint.Key}' has the same name as a port; endpoints and ports share one namespace.",
+                    endpoint.Key);
+            }
         }
     }
 }

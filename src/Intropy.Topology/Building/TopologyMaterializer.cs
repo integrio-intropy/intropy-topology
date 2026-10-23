@@ -169,6 +169,9 @@ internal static class TopologyMaterializer
                     TopicName = InternalQueue.TopicNameFor(component.Name),
                 }
                 : null,
+            Endpoints = component.Kind is ComponentKind.Gateway
+                ? [.. component.EndpointCalls.Select(e => new EndpointEdge { EndpointName = e.Name, Path = e.Path })]
+                : null,
         };
     }
 

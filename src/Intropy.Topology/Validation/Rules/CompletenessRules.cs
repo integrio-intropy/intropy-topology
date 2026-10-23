@@ -3,7 +3,7 @@ using Intropy.Topology.Model;
 namespace Intropy.Topology.Validation.Rules;
 
 /// <summary>
-/// Block kinds with a required output must declare it — extractors must publish.
+/// Block kinds with a required output must declare it — extractors and gateways must publish.
 /// The block builders prevent illegal calls but cannot force missing ones. A loader's
 /// destination may stay a private local component, so a loader without a <c>To</c> call
 /// is legal.
@@ -18,6 +18,8 @@ internal sealed class MissingRequiredOutputRule : IModelRule
             {
                 ComponentKind.Extractor when component.Publishes.Count == 0 =>
                     "Extractor components must publish to at least one topic; add a Publishes call.",
+                ComponentKind.Gateway when component.Publishes.Count == 0 =>
+                    "Gateway components must publish to at least one topic; add a Publishes call.",
                 _ => null,
             };
 
@@ -89,6 +91,25 @@ internal sealed class MissingRequiredPortRule : IModelRule
                     "Transactional integration components must write to at least one port; add a To call.",
                     component.Name);
             }
+        }
+    }
+}
+
+/// <summary>
+/// A gateway must serve at least one endpoint: without one, nothing can reach it. The builder
+/// exposes <c>Exposes</c> but cannot force the call.
+/// </summary>
+internal sealed class MissingRequiredEndpointRule : IModelRule
+{
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
+    {
+        foreach (var component in topology.Components
+            .Where(c => c.Kind is ComponentKind.Gateway && (c.Endpoints is null || c.Endpoints.Count == 0)))
+        {
+            yield return new TopologyDiagnostic(
+                DiagnosticSeverity.Error,
+                "Gateway components must expose at least one endpoint; add an Exposes call.",
+                component.Name);
         }
     }
 }

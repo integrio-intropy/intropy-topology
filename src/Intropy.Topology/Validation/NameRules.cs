@@ -62,6 +62,21 @@ internal static class NameRules
         return value;
     }
 
+    /// <summary>An HTTP path an ingress can route as declared: a leading <c>/</c>, then only
+    /// characters that need no escaping.</summary>
+    public static string RequirePath(string value, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(value, paramName);
+        if (!value.StartsWith('/') || !value.All(c => char.IsAsciiLetterOrDigit(c) || c is '/' or '.' or '_' or '-'))
+        {
+            throw new ArgumentException(
+                $"'{value}' is not a valid endpoint path: must start with '/' and contain only ASCII letters, digits, '/', '.', '_' and '-'.",
+                paramName);
+        }
+
+        return value;
+    }
+
     private static bool IsLabelChunk(string value)
     {
         if (!char.IsAsciiLetterLower(value[0]) && !char.IsAsciiDigit(value[0]))

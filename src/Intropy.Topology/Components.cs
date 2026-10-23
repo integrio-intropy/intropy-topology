@@ -13,6 +13,7 @@ public abstract class Component
     private readonly List<MessageRef> _publishes = [];
     private readonly HashSet<string> _publishedMessages = new(StringComparer.Ordinal);
     private readonly List<(PortRef Port, PortDirection Direction)> _ports = [];
+    private readonly List<EndpointRef> _endpoints = [];
     private readonly List<ServiceRef> _services = [];
     private readonly HashSet<string> _serviceAppIds = new(StringComparer.Ordinal);
 
@@ -40,6 +41,8 @@ public abstract class Component
 
     internal IReadOnlyList<ServiceRef> ServiceCalls => _services;
 
+    internal IReadOnlyList<EndpointRef> EndpointCalls => _endpoints;
+
     internal SubscriptionDeclaration AddSubscription(string componentName)
     {
         var subscription = new SubscriptionDeclaration(componentName);
@@ -63,6 +66,24 @@ public abstract class Component
     {
         ArgumentNullException.ThrowIfNull(port);
         _ports.Add((port, direction));
+    }
+
+    internal void AddEndpoint(EndpointRef endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        if (_endpoints.Any(e => e.Name == endpoint.Name))
+        {
+            throw new InvalidOperationException(
+                $"Component '{Name}' already exposes the endpoint '{endpoint.Name}'.");
+        }
+
+        if (_endpoints.Any(e => e.Path == endpoint.Path))
+        {
+            throw new InvalidOperationException(
+                $"Component '{Name}' already serves the path '{endpoint.Path}'; each endpoint needs a path of its own.");
+        }
+
+        _endpoints.Add(endpoint);
     }
 
     internal void AddService(ServiceRef service)
@@ -111,6 +132,14 @@ public sealed class TransactionalIntegrationComponent : Component
 {
     internal TransactionalIntegrationComponent(string name)
         : base(name, ComponentKind.TransactionalIntegration) { }
+}
+
+/// <summary>The declared gateway: an edge block that serves HTTP endpoints callers push items to,
+/// and publishes each item it accepts. Obtained from the gateway builder's <c>Component</c>
+/// property.</summary>
+public sealed class GatewayComponent : Component
+{
+    internal GatewayComponent(string name) : base(name, ComponentKind.Gateway) { }
 }
 
 /// <summary>One declared subscription: the messages a component handles from one channel, and

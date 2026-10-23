@@ -13,6 +13,8 @@
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Dapr" />
+    <!-- Keep the toolkit's transitive serializer on its patched 2.5 release. -->
+    <PackageReference Include="MessagePack" />
   </ItemGroup>
 
 </Project>

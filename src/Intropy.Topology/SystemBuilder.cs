@@ -59,6 +59,11 @@ public sealed class SystemBuilder
     public TransactionalIntegrationBuilder AddTransactionalIntegration(string name) =>
         new(Register(new TransactionalIntegrationComponent(NameRules.RequireLabel(name, nameof(name)))));
 
+    /// <summary>Adds a gateway: serves HTTP endpoints callers push items to, and publishes them.</summary>
+    /// <param name="name">The component's name (DNS-1123 label).</param>
+    public GatewayBuilder AddGateway(string name) =>
+        new(Register(new GatewayComponent(NameRules.RequireLabel(name, nameof(name)))));
+
     /// <summary>
     /// Declares the OTLP endpoint the whole system (every component and its Dapr sidecar)
     /// exports telemetry to, in place of each runtime's default sink. A topology that

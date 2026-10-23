@@ -136,6 +136,7 @@ public static class IntropyGenerate
         IReadOnlyList<GraphSubscription>? Subscribes,
         IReadOnlyList<GraphPublication>? Publishes,
         IReadOnlyList<GraphPortUse>? Ports,
+        IReadOnlyList<GraphEndpoint>? Endpoints,
         IReadOnlyList<string>? Uses,
         GraphInternalQueue? InternalQueue,
         GraphChannel? Channel)
@@ -148,6 +149,7 @@ public static class IntropyGenerate
                 p.PubSubName, p.TopicName, string.IsNullOrEmpty(p.Message) ? null : p.Message))),
             Optional(component.Ports.Select(c => new GraphPortUse(
                 c.PortName, Direction(c.Direction)))),
+            component.Endpoints is null ? null : Optional(component.Endpoints.Select(e => new GraphEndpoint(e.EndpointName, e.Path))),
             Optional(component.Uses),
             component.InternalQueue is null
                 ? null
@@ -223,6 +225,9 @@ public static class IntropyGenerate
         string? Message);
 
     private sealed record GraphPortUse(string Port, string Direction);
+
+    /// <summary>An endpoint a gateway serves: its name, and the path an ingress routes to it.</summary>
+    private sealed record GraphEndpoint(string Name, string Path);
 
     private sealed record GraphTopic(
         [property: JsonPropertyName("pubsub")] string PubSub,
