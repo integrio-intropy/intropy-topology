@@ -1,21 +1,30 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Intropy.Topology.Generation;
+using Intropy.Topology.Model;
 using Microsoft.Extensions.Logging;
 
 namespace Intropy.Topology.Aspire;
 
-/// <summary>Service-specific readiness gates completed only after Microcks imports each contract.</summary>
+/// <summary>Per-mock readiness gates — one per mocked service and per mocked port — completed only
+/// after Microcks imports each contract.</summary>
 internal sealed class MockReadiness(DevelopmentManifest development)
 {
-    private readonly Dictionary<string, TaskCompletionSource> _gates = development.Mocks.ToDictionary(
-        mock => mock.AppId,
-        _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously),
-        StringComparer.Ordinal);
+    private readonly Dictionary<(MockTarget Target, string Name), TaskCompletionSource> _gates = development.Mocks.ToDictionary(
+        mock => (mock.Target, mock.Name),
+        _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
 
-    public async Task WaitForAsync(IEnumerable<string> appIds, TimeSpan timeout, CancellationToken cancellationToken)
+    /// <summary>Whether any of the component's ports is mocked.</summary>
+    public bool MocksAnyPortOf(ComponentModel component) =>
+        component.Ports.Any(port => _gates.ContainsKey((MockTarget.Port, port.PortName)));
+
+    /// <summary>Waits until the contracts of every mocked service the component calls and every
+    /// mocked port it uses are imported.</summary>
+    public async Task WaitForAsync(ComponentModel component, TimeSpan timeout, CancellationToken cancellationToken)
     {
-        var waits = appIds.Where(_gates.ContainsKey).Select(appId => _gates[appId].Task).ToArray();
+        var subjects = component.Uses.Select(appId => (MockTarget.Service, appId))
+            .Concat(component.Ports.Select(port => (MockTarget.Port, port.PortName)));
+        var waits = subjects.Where(_gates.ContainsKey).Select(subject => _gates[subject].Task).ToArray();
         if (waits.Length == 0)
         {
             return;
@@ -26,9 +35,9 @@ internal sealed class MockReadiness(DevelopmentManifest development)
         await Task.WhenAll(waits).WaitAsync(deadline.Token).ConfigureAwait(false);
     }
 
-    public void Complete(string appId) => _gates[appId].TrySetResult();
+    public void Complete(OpenApiMock mock) => _gates[(mock.Target, mock.Name)].TrySetResult();
 
-    public void Fail(string appId, Exception exception) => _gates[appId].TrySetException(exception);
+    public void Fail(OpenApiMock mock, Exception exception) => _gates[(mock.Target, mock.Name)].TrySetException(exception);
 }
 
 /// <summary>Imports and verifies all local mock contracts before their consumers start.</summary>
@@ -49,13 +58,14 @@ internal sealed class MicrocksImporter(
             try
             {
                 await ImportAndVerifyAsync(client, mock, cancellationToken).ConfigureAwait(false);
-                readiness.Complete(mock.AppId);
+                readiness.Complete(mock);
             }
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
-                readiness.Fail(mock.AppId, new InvalidOperationException(
-                    $"Microcks could not import or verify service '{mock.AppId}' from '{mock.ArtifactPath}'.", ex));
-                logger.LogError(ex, "intropy-microcks: could not prepare {Service} from {Artifact}", mock.AppId, mock.ArtifactPath);
+                var subject = mock.Target == MockTarget.Port ? "port" : "service";
+                readiness.Fail(mock, new InvalidOperationException(
+                    $"Microcks could not import or verify {subject} '{mock.Name}' from '{mock.ArtifactPath}'.", ex));
+                logger.LogError(ex, "intropy-microcks: could not prepare {Subject} {Name} from {Artifact}", subject, mock.Name, mock.ArtifactPath);
             }
         }
     }

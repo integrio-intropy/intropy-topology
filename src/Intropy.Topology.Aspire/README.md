@@ -37,6 +37,8 @@ A component's standalone Dapr resources live at `../<component>/local/dapr-compo
 ## Runtime behavior
 
 - Redis backs development pub/sub. It is published at host port `6380` because generated Dapr resources target `localhost:6380`; `dapr init` commonly reserves Redis's default `6379`.
+- When the development definition mocks a platform service (`development.Mock(Services.Idempotency).FromOpenApi("mocks/idempotency-service.openapi.yaml")`), the host runs a Microcks Uber container at host port `8585`, imports each OpenAPI 3.0.x contract once Microcks is healthy, and verifies Microcks registered exactly one matching REST service. A component that `Calls` a mocked service starts only after that service's contract is imported. Generation emits a Dapr `HTTPEndpoint` named after the service's app ID, scoped to its callers, so service invocation reaches the mock unchanged. Without mocks, no Microcks container starts.
+- A port whose deployed binding reaches an HTTP API can be mocked the same way instead of resolved to a folder (`development.Mock(Ports.InvoiceApi).FromOpenApi("mocks/invoice-api.openapi.yaml")`). Generation emits the port's binding as `bindings.http` with the mock's Microcks base URI as its `url`, under the port's own name, so component code invokes the binding (`post`, `get`, … with a `path`) exactly as it does deployed. A component using a mocked port starts only after the port's contract is imported.
 - Components receive `INTROPY__COMPONENT` and `INTROPY__CONFIG` environment variables. The latter points to that component's generated `.intropy.json` file.
 - Every component that receives messages — a loader through its subscription, a transactional integration through its internal queue — gets a gRPC app channel: its sidecar pushes messages to the Dapr app callback the framework serves on `APP_PORT`, under the component's generated `Subscription`. Extractors keep the default HTTP endpoint.
 - A publisher waits for its subscribers during startup when the topic graph is acyclic. Dapr sidecars also wait for Redis readiness before they start.
@@ -52,4 +54,4 @@ A component's standalone Dapr resources live at `../<component>/local/dapr-compo
 
 ## Scope
 
-This package implements the repository's minimal topology model. Development overrides, external-system mocks, Microcks, API mocking, and additional transport/runtime backends remain on the `full-topology` branch; they are not supported here.
+This package implements the repository's minimal topology model. Microcks mocks platform services reached through `Calls` and HTTP APIs behind ports; every other port resolves to a local folder. Additional transport/runtime backends remain on the `full-topology` branch; they are not supported here.

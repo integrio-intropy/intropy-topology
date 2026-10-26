@@ -126,7 +126,7 @@ public static class IntropyAspire
 
             if (mockReadiness is not null)
             {
-                await mockReadiness.WaitForAsync(component.Uses, TimeSpan.FromMinutes(3), cancellationToken)
+                await mockReadiness.WaitForAsync(component, TimeSpan.FromMinutes(3), cancellationToken)
                     .ConfigureAwait(false);
             }
 
@@ -176,7 +176,8 @@ public static class IntropyAspire
                 ? project.WithHttpEndpoint(name: GrpcAppEndpoint, env: "APP_PORT")
                 : project.WithHttpEndpoint();
 
-            Wire(project, component, stagedPath, configDir, redis, microcks,
+            Wire(project, component, stagedPath, configDir, redis,
+                microcks is not null && (component.Uses.Count > 0 || mockReadiness!.MocksAnyPortOf(component)) ? microcks : null,
                 PortRootPaths(builder.AppHostDirectory, component, development), topology.Otlp);
             resources[component.Name] = project;
             waiters[component.Name] = dependency => project.WaitFor(dependency);
@@ -369,7 +370,9 @@ public static class IntropyAspire
     /// these calls are the sole source of OTEL_EXPORTER_OTLP_* values this host injects.
     /// INTROPY_PUBSUB_NAME and INTROPY_TOPIC_NAME name the <see cref="ComponentChannel"/> the
     /// component runs on, as deployment does; the framework derives neither. Each is left unset
-    /// when the topology settles no single name for it.
+    /// when the topology settles no single name for it. <paramref name="microcks"/> is passed only
+    /// to a component that calls a mocked service or uses a mocked port; it then starts after
+    /// Microcks.
     /// </summary>
     private static void Wire(
         IResourceBuilder<ProjectResource> project,
@@ -424,7 +427,7 @@ public static class IntropyAspire
         {
             project.WithEnvironment($"Ports__{portName}__RootPath", rootPath);
         }
-        if (microcks is not null && component.Uses.Count > 0)
+        if (microcks is not null)
         {
             project.WaitFor(microcks);
         }

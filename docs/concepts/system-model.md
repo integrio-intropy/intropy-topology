@@ -60,6 +60,6 @@ For example, an extractor and a loader can both use an idempotency service. The 
 
 The topology owns component names, message contracts, channels, port names, and service dependencies. Deployment owns schedules, connection settings, credentials, replicas, and resource limits.
 
-A system can also select a telemetry export destination. Local development declarations can map ports to folders and services to contract-backed mocks. These settings do not introduce additional components or connections into the topology.
+A system can also select a telemetry export destination. Local development declarations can map ports to folders, and services and HTTP-API ports to contract-backed mocks. These settings do not introduce additional components or connections into the topology.
 
 The [Topology Declaration Language](declaration-language.md) describes what can be stated and which combinations are valid, without code examples. The [implementation reference](model.md) describes the C# syntax and runtime mappings.

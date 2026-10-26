@@ -80,7 +80,7 @@ public class DevelopmentBuilderTests
         // Act & Assert
         var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Build());
         Assert.Contains("erp", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("no local file resolution", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("no local resolution", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -238,5 +238,165 @@ public class DevelopmentBuilderTests
         var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Build());
         Assert.Contains("extractor", exception.Message, StringComparison.Ordinal);
         Assert.Contains("do not declare a delay", exception.Message, StringComparison.Ordinal);
+    }
+
+    private static readonly PortRef s_apiPort = PortRef.Define("invoice-api");
+    private static readonly ServiceRef s_idempotency = ServiceRef.Define("idempotency-service");
+
+    private static SystemTopology TopologyWithApiPort()
+    {
+        var message = MessageRef<string>.Define("created", pubSub: "orders");
+        var builder = SystemBuilder.Create("orders");
+        builder.AddExtractor("extractor").From(s_port).Publishes(message).Calls(s_idempotency);
+        builder.AddLoader("loader").Subscribes(message).To(s_apiPort).Calls(s_idempotency);
+        return builder.Build();
+    }
+
+    private static string WriteContract(DirectoryInfo workspace, string fileName, string title, string version)
+    {
+        File.WriteAllText(Path.Combine(workspace.FullName, fileName), $$"""
+            openapi: 3.0.3
+            info:
+              title: {{title}}
+              version: {{version}}
+            paths: {}
+            """);
+        return fileName;
+    }
+
+    [Fact]
+    public void Build_WithPortMock_ShouldResolveThePortWithoutAFolder()
+    {
+        // Arrange
+        var workspace = Directory.CreateTempSubdirectory("intropy-devtest-");
+        try
+        {
+            var builder = new DevelopmentBuilder(TopologyWithApiPort(), workspace.FullName);
+            builder.Files(s_port).RootPath("./test/erp");
+            builder.Mock(s_apiPort).FromOpenApi(WriteContract(workspace, "invoice-api.yaml", "Invoice API", "1.0.0"));
+
+            // Act
+            var manifest = builder.Build();
+
+            // Assert
+            var mock = Assert.Single(manifest.Mocks);
+            Assert.Equal(MockTarget.Port, mock.Target);
+            Assert.Equal("invoice-api", mock.Name);
+            Assert.Equal(("Invoice API", "1.0.0"), (mock.Title, mock.Version));
+            Assert.Equal("erp", Assert.Single(manifest.Files).PortName);
+        }
+        finally
+        {
+            workspace.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Build_WithServiceAndPortMocks_ShouldOrderServicesFirst()
+    {
+        // Arrange
+        var workspace = Directory.CreateTempSubdirectory("intropy-devtest-");
+        try
+        {
+            var builder = new DevelopmentBuilder(TopologyWithApiPort(), workspace.FullName);
+            builder.Files(s_port).RootPath("./test/erp");
+            builder.Mock(s_apiPort).FromOpenApi(WriteContract(workspace, "invoice-api.yaml", "Invoice API", "1.0.0"));
+            builder.Mock(s_idempotency).FromOpenApi(WriteContract(workspace, "idempotency.yaml", "Idempotency Service", "1.0.0"));
+
+            // Act
+            var manifest = builder.Build();
+
+            // Assert
+            Assert.Equal(
+                [(MockTarget.Service, "idempotency-service"), (MockTarget.Port, "invoice-api")],
+                manifest.Mocks.Select(mock => (mock.Target, mock.Name)));
+        }
+        finally
+        {
+            workspace.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Mock_WithUnknownPort_ShouldThrow()
+    {
+        // Arrange
+        var builder = new DevelopmentBuilder(TopologyWithApiPort(), Directory.GetCurrentDirectory());
+
+        // Act & Assert
+        var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Mock(PortRef.Define("unknown")));
+        Assert.Contains("Port 'unknown' is not used by the system topology", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Mock_WithDuplicatePortMock_ShouldThrow()
+    {
+        // Arrange
+        var builder = new DevelopmentBuilder(TopologyWithApiPort(), Directory.GetCurrentDirectory());
+        builder.Mock(s_apiPort);
+
+        // Act & Assert
+        var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Mock(s_apiPort));
+        Assert.Contains("Port 'invoice-api' has more than one mock declaration", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Mock_WithPortThatHasAFileResolution_ShouldThrow()
+    {
+        // Arrange
+        var builder = new DevelopmentBuilder(TopologyWithApiPort(), Directory.GetCurrentDirectory());
+        builder.Files(s_apiPort).RootPath("./test/invoice-api");
+
+        // Act & Assert
+        var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Mock(s_apiPort));
+        Assert.Contains("a folder or a mock, not both", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Files_WithPortThatHasAMock_ShouldThrow()
+    {
+        // Arrange
+        var builder = new DevelopmentBuilder(TopologyWithApiPort(), Directory.GetCurrentDirectory());
+        builder.Mock(s_apiPort);
+
+        // Act & Assert
+        var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Files(s_apiPort));
+        Assert.Contains("a folder or a mock, not both", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_WithPortMockMissingArtifact_ShouldNameThePort()
+    {
+        // Arrange
+        var builder = new DevelopmentBuilder(TopologyWithApiPort(), Directory.GetCurrentDirectory());
+        builder.Files(s_port).RootPath("./test/erp");
+        builder.Mock(s_apiPort);
+
+        // Act & Assert
+        var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Build());
+        Assert.Contains("Mock for port 'invoice-api' does not declare an OpenAPI artifact", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_WithPortAndServiceMocksSharingAMicrocksIdentity_ShouldThrow()
+    {
+        // Arrange: one Microcks instance serves both kinds, so their identities must not collide.
+        var workspace = Directory.CreateTempSubdirectory("intropy-devtest-");
+        try
+        {
+            var builder = new DevelopmentBuilder(TopologyWithApiPort(), workspace.FullName);
+            builder.Files(s_port).RootPath("./test/erp");
+            builder.Mock(s_apiPort).FromOpenApi(WriteContract(workspace, "a.yaml", "Shared", "1"));
+            builder.Mock(s_idempotency).FromOpenApi(WriteContract(workspace, "b.yaml", "Shared", "1"));
+
+            // Act & Assert
+            var exception = Assert.Throws<DevelopmentValidationException>(() => builder.Build());
+            Assert.Contains("service 'idempotency-service', port 'invoice-api'", exception.Message, StringComparison.Ordinal);
+            Assert.Contains("same Microcks identity 'Shared' version '1'", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            workspace.Delete(recursive: true);
+        }
     }
 }

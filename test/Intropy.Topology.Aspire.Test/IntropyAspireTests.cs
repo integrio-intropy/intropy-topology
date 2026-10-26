@@ -189,6 +189,63 @@ public sealed class IntropyAspireTests : IDisposable
     }
 
     [Fact]
+    public void Apply_WithPortMock_ShouldMakeOnlyThePortsUsersWaitForMicrocks()
+    {
+        // Arrange — order-loader writes through the mocked erp port; order-extractor neither
+        // calls a mocked service nor uses a mocked port.
+        var builder = CreateBuilder();
+        var development = new DevelopmentManifest(
+            [new OpenApiMock("erp", "/tmp/erp.yaml", "ERP", "1", MockTarget.Port)],
+            [new PortFileResolution("webshop", "test/webshop")],
+            []);
+
+        // Act
+        IntropyAspire.Apply(builder, Topology(), GeneratedRoot, development);
+
+        // Assert
+        var loader = builder.Resources.Single(r => r.Name == "order-loader");
+        Assert.Contains(loader.Annotations.OfType<WaitAnnotation>(), w => w.Resource.Name == "microcks");
+        var extractor = builder.Resources.Single(r => r.Name == "order-extractor");
+        Assert.DoesNotContain(extractor.Annotations.OfType<WaitAnnotation>(), w => w.Resource.Name == "microcks");
+    }
+
+    [Fact]
+    public async Task WaitForAsync_WithMockedPort_ShouldHoldTheComponentUntilItsContractIsImported()
+    {
+        // Arrange
+        var mock = new OpenApiMock("erp", "/tmp/erp.yaml", "ERP", "1", MockTarget.Port);
+        var readiness = new MockReadiness(new DevelopmentManifest([mock], [], []));
+        var loader = Topology().Components.Single(c => c.Name == "order-loader");
+
+        // Act
+        var wait = readiness.WaitForAsync(loader, TimeSpan.FromSeconds(30), CancellationToken.None);
+        var heldBeforeImport = !wait.IsCompleted;
+        readiness.Complete(mock);
+        await wait;
+
+        // Assert
+        Assert.True(heldBeforeImport);
+        Assert.True(readiness.MocksAnyPortOf(loader));
+        Assert.False(readiness.MocksAnyPortOf(Topology().Components.Single(c => c.Name == "order-extractor")));
+    }
+
+    [Fact]
+    public async Task WaitForAsync_WithServiceMockOfTheSameName_ShouldNotHoldAComponentUsingThePort()
+    {
+        // Arrange — gates are per subject: a service mock never gates a port of the same name.
+        var readiness = new MockReadiness(new DevelopmentManifest(
+            [new OpenApiMock("erp", "/tmp/erp.yaml", "ERP", "1")], [], []));
+        var loader = Topology().Components.Single(c => c.Name == "order-loader");
+
+        // Act
+        var wait = readiness.WaitForAsync(loader, TimeSpan.FromSeconds(30), CancellationToken.None);
+
+        // Assert
+        Assert.True(wait.IsCompleted);
+        await wait;
+    }
+
+    [Fact]
     public void Apply_WithDevelopmentMocks_ShouldAddOneMicrocksResource()
     {
         // Arrange

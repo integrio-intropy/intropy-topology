@@ -73,7 +73,7 @@ An implementation must distinguish errors from warnings and report the affected 
 Two supporting declarations accompany the topology:
 
 - **Telemetry export:** a system may select one export destination, with a protocol and request headers. With no selection, runtime defaults remain in effect. The declaration does not resolve secret values.
-- **Local development:** used ports may be mapped to local folders, and used services may be replaced by contract-backed mocks. A local development declaration resolves every used port. It cannot introduce topology connections or change component kinds.
+- **Local development:** used ports may be mapped to local folders, and used services, and ports that reach an HTTP API, may be replaced by contract-backed mocks. A local development declaration resolves every used port. It cannot introduce topology connections or change component kinds.
 
 Schedules, connection credentials, deployment addresses, replicas, and resource limits are not relationship declarations. They belong to workload or environment configuration.
 

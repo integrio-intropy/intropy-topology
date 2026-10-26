@@ -7,8 +7,10 @@ profile. Backend-agnostic and dependency-free (YAML is emitted by a small intern
 It produces, deterministically:
 
 - one Dapr **pub/sub** component per distinct `PubSubName` (Redis Streams backed),
-- one Dapr **binding** per port (`bindings.localstorage` rooted at the port's
-  development-manifest folder, `scopes` from `UsedBy`),
+- one Dapr **binding** per port, named after the port, `scopes` from `UsedBy`:
+  `bindings.localstorage` rooted at the port's development-manifest folder, or, for a port the
+  development definition mocks (`development.Mock(Ports.X).FromOpenApi(...)`), `bindings.http`
+  whose `url` is the mock's local Microcks base URI — a port resolves to one or the other,
 - one Dapr **HTTPEndpoint** per development-mocked platform service, named after the service's
   app-id so service invocation resolves to the mock,
 - one declarative Dapr **Subscription** per subscribing component (`<component>-subscription`):

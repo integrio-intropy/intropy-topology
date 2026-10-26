@@ -16,7 +16,7 @@ public interface IDevelopmentDefinition
     void Define(DevelopmentBuilder development);
 }
 
-/// <summary>Records local development substitutions: service mocks, port file resolutions, and re-run cadences. Not thread-safe.</summary>
+/// <summary>Records local development substitutions: service and port mocks, port file resolutions, and re-run cadences. Not thread-safe.</summary>
 public sealed class DevelopmentBuilder
 {
     private readonly SystemTopology _topology;
@@ -41,12 +41,41 @@ public sealed class DevelopmentBuilder
             throw new DevelopmentValidationException($"Service '{service.AppId}' is not used by the system topology.");
         }
 
-        if (_mocks.Any(candidate => candidate.AppId == service.AppId))
+        return AddMock(MockTarget.Service, service.AppId);
+    }
+
+    /// <summary>
+    /// Declares a local mock for a port used by this topology: an HTTP API the port reaches when
+    /// deployed. The port resolves locally to an HTTP output binding (<c>bindings.http</c>) of the
+    /// port's own name whose url is the mock, so component code addresses the port unchanged. A
+    /// port resolves to a mock or to a folder (<see cref="Files"/>), never both.
+    /// </summary>
+    /// <param name="port">The port to resolve locally.</param>
+    public MockBuilder Mock(PortRef port)
+    {
+        ArgumentNullException.ThrowIfNull(port);
+        if (!_topology.Ports.Any(candidate => candidate.Name == port.Name))
         {
-            throw new DevelopmentValidationException($"Service '{service.AppId}' has more than one mock declaration.");
+            throw new DevelopmentValidationException($"Port '{port.Name}' is not used by the system topology.");
         }
 
-        var declaration = new MockDeclaration(service.AppId);
+        if (_files.Any(candidate => candidate.PortName == port.Name))
+        {
+            throw new DevelopmentValidationException(
+                $"Port '{port.Name}' already has a file resolution; a port resolves locally to a folder or a mock, not both.");
+        }
+
+        return AddMock(MockTarget.Port, port.Name);
+    }
+
+    private MockBuilder AddMock(MockTarget target, string name)
+    {
+        if (_mocks.Any(candidate => candidate.Target == target && candidate.Name == name))
+        {
+            throw new DevelopmentValidationException($"{MockSubject.Describe(target, name)} has more than one mock declaration.");
+        }
+
+        var declaration = new MockDeclaration(target, name);
         _mocks.Add(declaration);
         return new MockBuilder(declaration);
     }
@@ -64,6 +93,12 @@ public sealed class DevelopmentBuilder
         if (_files.Any(candidate => candidate.PortName == port.Name))
         {
             throw new DevelopmentValidationException($"Port '{port.Name}' has more than one file resolution.");
+        }
+
+        if (_mocks.Any(candidate => candidate.Target == MockTarget.Port && candidate.Name == port.Name))
+        {
+            throw new DevelopmentValidationException(
+                $"Port '{port.Name}' already has a mock; a port resolves locally to a folder or a mock, not both.");
         }
 
         var declaration = new FileDeclaration(port.Name);
@@ -101,23 +136,26 @@ public sealed class DevelopmentBuilder
     internal DevelopmentManifest Build()
     {
         var mocks = _mocks.Select(mock => OpenApiArtifact.Inspect(_root, mock)).ToArray();
+        // Service and port mocks share one Microcks instance, so their identities collide across
+        // both kinds.
         var duplicateIdentity = mocks.GroupBy(mock => (mock.Title, mock.Version))
-            .FirstOrDefault(group => group.Select(mock => mock.AppId).Distinct(StringComparer.Ordinal).Count() > 1);
+            .FirstOrDefault(group => group.Count() > 1);
         if (duplicateIdentity is not null)
         {
             throw new DevelopmentValidationException(
-                $"Mocks for services '{string.Join("', '", duplicateIdentity.Select(mock => mock.AppId))}' resolve to the same Microcks identity '{duplicateIdentity.Key.Title}' version '{duplicateIdentity.Key.Version}'.");
+                $"Mocks for {string.Join(", ", duplicateIdentity.OrderBy(mock => mock.Target).ThenBy(mock => mock.Name, StringComparer.Ordinal).Select(MockSubject.InSentence))} resolve to the same Microcks identity '{duplicateIdentity.Key.Title}' version '{duplicateIdentity.Key.Version}'.");
         }
 
         var unresolved = _topology.Ports
-            .Where(port => !_files.Any(file => file.PortName == port.Name))
+            .Where(port => !_files.Any(file => file.PortName == port.Name)
+                && !_mocks.Any(mock => mock.Target == MockTarget.Port && mock.Name == port.Name))
             .Select(port => port.Name)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
         if (unresolved.Length > 0)
         {
             throw new DevelopmentValidationException(
-                $"Ports '{string.Join("', '", unresolved)}' have no local file resolution.");
+                $"Ports '{string.Join("', '", unresolved)}' have no local resolution; declare Files(port).RootPath(...) or Mock(port).FromOpenApi(...).");
         }
 
         var files = _files.Select(file => FileRootPath.Inspect(_root, file)).ToArray();
@@ -133,13 +171,13 @@ public sealed class DevelopmentBuilder
         }
 
         return new DevelopmentManifest(
-            mocks.OrderBy(mock => mock.AppId, StringComparer.Ordinal).ToArray(),
+            mocks.OrderBy(mock => mock.Target).ThenBy(mock => mock.Name, StringComparer.Ordinal).ToArray(),
             files.OrderBy(file => file.PortName, StringComparer.Ordinal).ToArray(),
             _reruns.Select(rerun => new ComponentRerun(rerun.ComponentName, rerun.Delay!.Value))
                 .OrderBy(rerun => rerun.ComponentName, StringComparer.Ordinal).ToArray());
     }
 
-    /// <summary>Configures the OpenAPI artifact for one service mock.</summary>
+    /// <summary>Configures the OpenAPI artifact for one service or port mock.</summary>
     public sealed class MockBuilder
     {
         private readonly MockDeclaration _declaration;
@@ -152,7 +190,8 @@ public sealed class DevelopmentBuilder
             ArgumentException.ThrowIfNullOrWhiteSpace(path);
             if (_declaration.Path is not null)
             {
-                throw new DevelopmentValidationException($"Service '{_declaration.AppId}' has more than one OpenAPI artifact.");
+                throw new DevelopmentValidationException(
+                    $"{MockSubject.Describe(_declaration.Target, _declaration.Name)} has more than one OpenAPI artifact.");
             }
 
             _declaration.Path = path;
@@ -181,9 +220,10 @@ public sealed class DevelopmentBuilder
         }
     }
 
-    internal sealed class MockDeclaration(string appId)
+    internal sealed class MockDeclaration(MockTarget target, string name)
     {
-        public string AppId { get; } = appId;
+        public MockTarget Target { get; } = target;
+        public string Name { get; } = name;
         public string? Path { get; set; }
     }
 
@@ -248,8 +288,62 @@ public sealed record ComponentRerun(string ComponentName, TimeSpan Delay);
 /// <param name="RootPath">The folder path relative to the SystemHost directory.</param>
 public sealed record PortFileResolution(string PortName, string RootPath);
 
-/// <summary>One OpenAPI-backed platform-service mock with a verified Microcks identity.</summary>
-public sealed record OpenApiMock(string AppId, string ArtifactPath, string Title, string Version);
+/// <summary>What a development mock stands in for.</summary>
+public enum MockTarget
+{
+    /// <summary>A platform service a component calls; resolved locally to a Dapr <c>HTTPEndpoint</c> named after its app ID.</summary>
+    Service,
+
+    /// <summary>A port whose deployed binding reaches an HTTP API; resolved locally to a <c>bindings.http</c> output binding named after the port.</summary>
+    Port
+}
+
+/// <summary>One OpenAPI-backed mock with a verified Microcks identity.</summary>
+/// <param name="Name">The mocked service's app ID, or the mocked port's name.</param>
+/// <param name="ArtifactPath">The absolute path of the OpenAPI 3.0.x contract.</param>
+/// <param name="Title">The contract's <c>info.title</c>: its Microcks service name.</param>
+/// <param name="Version">The contract's <c>info.version</c>: its Microcks service version.</param>
+/// <param name="Target">Whether the mock stands in for a service or a port.</param>
+public sealed record OpenApiMock(string Name, string ArtifactPath, string Title, string Version, MockTarget Target)
+{
+    /// <summary>Creates a platform-service mock. Kept with its original four parameters so code
+    /// compiled against a version without port mocks still binds.</summary>
+    public OpenApiMock(string Name, string ArtifactPath, string Title, string Version)
+        : this(Name, ArtifactPath, Title, Version, MockTarget.Service)
+    {
+    }
+
+    /// <summary>The mocked service's app ID: <see cref="Name"/>, which for a port mock is the port's name.</summary>
+    [Obsolete("Use Name, with Target to tell a service mock from a port mock.")]
+    public string AppId => Name;
+
+    /// <summary>Deconstructs into the four original components, without <see cref="Target"/>.</summary>
+    public void Deconstruct(out string Name, out string ArtifactPath, out string Title, out string Version)
+    {
+        Name = this.Name;
+        ArtifactPath = this.ArtifactPath;
+        Title = this.Title;
+        Version = this.Version;
+    }
+}
+
+internal static class MockSubject
+{
+    public static string Describe(MockTarget target, string name) => target switch
+    {
+        MockTarget.Port => $"Port '{name}'",
+        _ => $"Service '{name}'"
+    };
+
+    /// <summary>The subject inside a sentence: "port 'x'" or "service 'x'".</summary>
+    public static string InSentence(MockTarget target, string name)
+    {
+        var subject = Describe(target, name);
+        return char.ToLowerInvariant(subject[0]) + subject[1..];
+    }
+
+    public static string InSentence(OpenApiMock mock) => InSentence(mock.Target, mock.Name);
+}
 
 /// <summary>Thrown when a development definition or its artifacts are invalid.</summary>
 public sealed class DevelopmentValidationException : IntropyException
@@ -365,18 +459,18 @@ internal static class OpenApiArtifact
 
     public static OpenApiMock Inspect(string root, DevelopmentBuilder.MockDeclaration declaration)
     {
-        var appId = declaration.AppId;
+        var forSubject = "for " + MockSubject.InSentence(declaration.Target, declaration.Name);
         var relativePath = declaration.Path;
         if (relativePath is null)
         {
-            throw new DevelopmentValidationException($"Mock for service '{appId}' does not declare an OpenAPI artifact.");
+            throw new DevelopmentValidationException($"Mock {forSubject} does not declare an OpenAPI artifact.");
         }
 
         var rootPath = PathContainment.ResolveRoot(root);
         var artifactPath = PathContainment.Resolve(rootPath, relativePath, out var escaped);
         if (escaped)
         {
-            throw new DevelopmentValidationException($"Mock artifact '{relativePath}' for service '{appId}' escapes the SystemHost directory.");
+            throw new DevelopmentValidationException($"Mock artifact '{relativePath}' {forSubject} escapes the SystemHost directory.");
         }
 
         try
@@ -385,12 +479,12 @@ internal static class OpenApiArtifact
         }
         catch (IOException ex)
         {
-            throw new DevelopmentValidationException($"Mock artifact '{relativePath}' for service '{appId}' cannot be resolved: {ex.Message}");
+            throw new DevelopmentValidationException($"Mock artifact '{relativePath}' {forSubject} cannot be resolved: {ex.Message}");
         }
 
         if (!PathContainment.IsWithin(rootPath, artifactPath))
         {
-            throw new DevelopmentValidationException($"Mock artifact '{relativePath}' for service '{appId}' escapes the SystemHost directory through a symlink.");
+            throw new DevelopmentValidationException($"Mock artifact '{relativePath}' {forSubject} escapes the SystemHost directory through a symlink.");
         }
 
         string text;
@@ -400,18 +494,18 @@ internal static class OpenApiArtifact
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            throw new DevelopmentValidationException($"Mock artifact '{relativePath}' for service '{appId}' cannot be read: {ex.Message}");
+            throw new DevelopmentValidationException($"Mock artifact '{relativePath}' {forSubject} cannot be read: {ex.Message}");
         }
 
         var version = s_openApiVersion.Match(text).Groups["version"].Value;
         if (!Version.TryParse(version, out var parsedVersion) || parsedVersion.Major != 3 || parsedVersion.Minor != 0)
         {
-            throw new DevelopmentValidationException($"Mock artifact '{relativePath}' for service '{appId}' must be an OpenAPI 3.0.x document.");
+            throw new DevelopmentValidationException($"Mock artifact '{relativePath}' {forSubject} must be an OpenAPI 3.0.x document.");
         }
 
         if (s_externalRef.IsMatch(text))
         {
-            throw new DevelopmentValidationException($"Mock artifact '{relativePath}' for service '{appId}' contains an external $ref.");
+            throw new DevelopmentValidationException($"Mock artifact '{relativePath}' {forSubject} contains an external $ref.");
         }
 
         try
@@ -419,14 +513,14 @@ internal static class OpenApiArtifact
             var settings = new OpenApiReaderSettings();
             settings.AddYamlReader();
             var document = OpenApiDocument.LoadAsync(artifactPath, settings).GetAwaiter().GetResult().Document
-                ?? throw new DevelopmentValidationException($"Mock artifact '{relativePath}' for service '{appId}' could not be parsed.");
+                ?? throw new DevelopmentValidationException($"Mock artifact '{relativePath}' {forSubject} could not be parsed.");
             var info = document.Info;
             if (info is null || string.IsNullOrWhiteSpace(info.Title) || string.IsNullOrWhiteSpace(info.Version))
             {
-                throw new DevelopmentValidationException($"Mock artifact '{relativePath}' for service '{appId}' must define non-empty info.title and info.version.");
+                throw new DevelopmentValidationException($"Mock artifact '{relativePath}' {forSubject} must define non-empty info.title and info.version.");
             }
 
-            return new OpenApiMock(appId, artifactPath, info.Title, info.Version);
+            return new OpenApiMock(declaration.Name, artifactPath, info.Title, info.Version, declaration.Target);
         }
         catch (DevelopmentValidationException)
         {
@@ -434,7 +528,7 @@ internal static class OpenApiArtifact
         }
         catch (Exception ex)
         {
-            throw new DevelopmentValidationException($"Mock artifact '{relativePath}' for service '{appId}' is not a valid OpenAPI document: {ex.Message}");
+            throw new DevelopmentValidationException($"Mock artifact '{relativePath}' {forSubject} is not a valid OpenAPI document: {ex.Message}");
         }
     }
 }

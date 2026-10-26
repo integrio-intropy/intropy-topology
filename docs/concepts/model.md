@@ -444,11 +444,12 @@ public sealed class OrderFlowDevelopment : IDevelopmentDefinition
 
 | Method | Meaning | Validation |
 |--------|---------|------------|
-| `Mock(service).FromOpenApi(path)` | Resolves a used service to a local OpenAPI-backed mock. | Service must be used by the topology; artifact must be OpenAPI 3.0.x, self-contained, readable, and inside the SystemHost directory. |
-| `Files(port).RootPath(path)` | Resolves a used port to a local folder. | Port must be used by the topology; path must stay inside the SystemHost directory. |
+| `Mock(service).FromOpenApi(path)` | Resolves a used service to a local OpenAPI-backed mock, reached through a Dapr `HTTPEndpoint` named after its app ID. | Service must be used by the topology; artifact must be OpenAPI 3.0.x, self-contained, readable, and inside the SystemHost directory. |
+| `Mock(port).FromOpenApi(path)` | Resolves a used port whose deployed binding reaches an HTTP API to a local OpenAPI-backed mock: the port's binding becomes `bindings.http` on the mock, under the port's own name. | Port must be used by the topology and have no file resolution; same artifact rules as a service mock. Service and port mocks must not share a contract `info.title` and `info.version`. |
+| `Files(port).RootPath(path)` | Resolves a used port to a local folder. | Port must be used by the topology and have no mock; path must stay inside the SystemHost directory. |
 | `Rerun(name).AfterEachRun(delay)` | Re-runs a run-to-completion component (extractor, transactional integration or job) once `delay` has passed after a run completes. | Name must be declared by the topology and belong to a run-to-completion component; delay must be positive and declared at most once. |
 
-Every used port must have a local file resolution when a development definition is built. The re-run delay is local host mechanism only: it is never written into generated artifacts, so it cannot drift with the deployed schedule that deployment configuration owns.
+Every used port must resolve locally to a folder or a mock, never both, when a development definition is built. The re-run delay is local host mechanism only: it is never written into generated artifacts, so it cannot drift with the deployed schedule that deployment configuration owns.
 
 ## What consumers can rely on
 

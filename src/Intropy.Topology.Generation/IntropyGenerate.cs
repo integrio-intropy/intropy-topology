@@ -119,10 +119,13 @@ public static class IntropyGenerate
             Optional(development.Files.Select(GraphFilePort.From)));
     }
 
-    private sealed record GraphMock(string AppId, string Artifact, string Title, string Version, string BaseUri)
+    // A service mock keeps its appId key; a port mock names its port instead.
+    private sealed record GraphMock(string? AppId, string? Port, string Artifact, string Title, string Version, string BaseUri)
     {
         public static GraphMock From(OpenApiMock mock) => new(
-            mock.AppId, mock.ArtifactPath, mock.Title, mock.Version, LocalMockEndpoints.BaseUri(mock));
+            mock.Target == MockTarget.Service ? mock.Name : null,
+            mock.Target == MockTarget.Port ? mock.Name : null,
+            mock.ArtifactPath, mock.Title, mock.Version, LocalMockEndpoints.BaseUri(mock));
     }
 
     private sealed record GraphFilePort(string Port, string RootPath)
