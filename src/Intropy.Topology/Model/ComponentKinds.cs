@@ -12,5 +12,5 @@ internal static class ComponentKinds
 {
     /// <summary>Whether a component of <paramref name="kind"/> runs to completion.</summary>
     public static bool IsRunToCompletion(this ComponentKind kind) =>
-        kind is ComponentKind.Extractor or ComponentKind.TransactionalIntegration;
+        kind is ComponentKind.Extractor or ComponentKind.TransactionalIntegration or ComponentKind.Job;
 }

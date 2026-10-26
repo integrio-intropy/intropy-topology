@@ -176,6 +176,26 @@ public class IntropyGenerateTests
     }
 
     [Fact]
+    public void GraphJson_ShouldEmitAJobsKindWithoutAChannel()
+    {
+        // Arrange
+        var builder = SystemBuilder.Create("orders");
+        builder.AddJob("nightly-cleanup").Calls(ServiceRef.Define("business-incident-service"));
+
+        // Act
+        using var json = JsonDocument.Parse(IntropyGenerate.GraphJson(builder.Build(), development: null));
+        var job = Assert.Single(json.RootElement.GetProperty("components").EnumerateArray());
+
+        // Assert
+        Assert.Equal("job", job.GetProperty("kind").GetString());
+        Assert.Equal(["business-incident-service"], job.GetProperty("uses").EnumerateArray().Select(u => u.GetString()));
+        Assert.False(job.TryGetProperty("channel", out _));
+        Assert.False(job.TryGetProperty("ports", out _));
+        Assert.False(job.TryGetProperty("publishes", out _));
+        Assert.False(job.TryGetProperty("subscribes", out _));
+    }
+
+    [Fact]
     public void Run_Graph_ShouldEmit_InternalQueueForTransactionalIntegrationsOnly()
     {
         // Act
@@ -212,6 +232,35 @@ public class IntropyGenerateTests
         Assert.Equal("order-fulfillment", channels["fulfillment-loader"].GetProperty("topic").GetString());
         Assert.Equal("order-fulfillment-pubsub", channels["price-sync"].GetProperty("pubsub").GetString());
         Assert.Equal("internal-price-sync", channels["price-sync"].GetProperty("topic").GetString());
+    }
+
+    [Fact]
+    public void GraphJson_WithServiceAndPortMocks_ShouldKeyEachBySubject()
+    {
+        // Arrange
+        var message = MessageRef<string>.Define("created", pubSub: "orders");
+        var service = ServiceRef.Define("idempotency-service");
+        var builder = SystemBuilder.Create("orders");
+        builder.AddExtractor("extractor").Publishes(message).Calls(service);
+        builder.AddLoader("loader").Subscribes(message).To(PortRef.Define("invoice-api"));
+        var development = new DevelopmentManifest(
+            [
+                new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency Service", "1.0.0"),
+                new OpenApiMock("invoice-api", "/tmp/invoice-api.yaml", "Invoice API", "1.0.0", MockTarget.Port)
+            ],
+            [],
+            []);
+
+        // Act
+        using var json = JsonDocument.Parse(IntropyGenerate.GraphJson(builder.Build(), development));
+
+        // Assert: a service mock keeps its appId key; a port mock names its port instead.
+        var mocks = json.RootElement.GetProperty("development").GetProperty("mocks").EnumerateArray().ToArray();
+        Assert.Equal("idempotency-service", mocks[0].GetProperty("appId").GetString());
+        Assert.False(mocks[0].TryGetProperty("port", out _));
+        Assert.Equal("invoice-api", mocks[1].GetProperty("port").GetString());
+        Assert.False(mocks[1].TryGetProperty("appId", out _));
+        Assert.Equal("http://localhost:8585/rest/Invoice%20API/1.0.0", mocks[1].GetProperty("baseUri").GetString());
     }
 
     [Fact]

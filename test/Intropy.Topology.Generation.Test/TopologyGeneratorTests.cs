@@ -215,6 +215,66 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
+    public void OpenApiMock_AppId_ShouldStillReadTheServiceAppId()
+    {
+        // Arrange — AppId predates port mocks; callers that read it keep compiling and reading
+        // the service's app ID.
+        var mock = new OpenApiMock("idempotency-service", "/tmp/idempotency.yaml", "Idempotency Service", "1.0.0");
+
+        // Act
+#pragma warning disable CS0618 // The obsolete alias is exactly what is under test.
+        var appId = mock.AppId;
+#pragma warning restore CS0618
+
+        // Assert
+        Assert.Equal("idempotency-service", appId);
+        Assert.Equal(MockTarget.Service, mock.Target);
+    }
+
+    [Fact]
+    public void OpenApiMock_FourValueDeconstruction_ShouldStillBind()
+    {
+        // Arrange
+        var mock = new OpenApiMock("invoice-api", "/tmp/invoice-api.yaml", "Invoice API", "1.0.0", MockTarget.Port);
+
+        // Act
+        var (name, artifact, title, version) = mock;
+        var (_, _, _, _, target) = mock;
+
+        // Assert
+        Assert.Equal(("invoice-api", "/tmp/invoice-api.yaml", "Invoice API", "1.0.0"), (name, artifact, title, version));
+        Assert.Equal(MockTarget.Port, target);
+    }
+
+    [Fact]
+    public void Generate_WithPortMock_ShouldEmitAnHttpBindingNamedAfterThePort()
+    {
+        // Arrange
+        var message = MessageRef<string>.Define("created", pubSub: "orders");
+        var port = PortRef.Define("invoice-api");
+        var builder = SystemBuilder.Create("orders");
+        builder.AddExtractor("extractor").Publishes(message);
+        builder.AddLoader("loader").Subscribes(message).To(port);
+        var manifest = new DevelopmentManifest(
+            [new OpenApiMock("invoice-api", "/tmp/invoice-api.yaml", "Invoice API", "1.0.0", MockTarget.Port)],
+            [],
+            []);
+
+        // Act
+        var files = TopologyGenerator.Generate(builder.Build(), manifest, Directory.GetCurrentDirectory()).Files;
+        var yaml = files.Single(file => file.RelativePath == "components/invoice-api.yaml").Content;
+
+        // Assert: the port keeps its binding name, so component code is unchanged; no
+        // HTTPEndpoint is emitted for a port.
+        Assert.Contains("kind: Component", yaml, StringComparison.Ordinal);
+        Assert.Contains("name: \"invoice-api\"", yaml, StringComparison.Ordinal);
+        Assert.Contains("type: \"bindings.http\"", yaml, StringComparison.Ordinal);
+        Assert.Contains("value: \"http://localhost:8585/rest/Invoice%20API/1.0.0\"", yaml, StringComparison.Ordinal);
+        Assert.Contains("- \"loader\"", yaml, StringComparison.Ordinal);
+        Assert.DoesNotContain(files, file => file.Content.Contains("kind: HTTPEndpoint", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Generate_WithABatchingLoader_ShouldEmitItsBulkSettingsInTheRuntimeConfig()
     {
         // Arrange

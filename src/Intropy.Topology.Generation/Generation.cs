@@ -95,20 +95,24 @@ public static class TopologyGenerator
             files.Add(PubSubComponent(pubSubName, topology));
         }
 
-        // Local runs resolve every port to localstorage, so the declared transport is
-        // deliberately not consulted here: the placeholder default transport must not block
-        // F5. Deployment generation is where an unresolved transport must hard-fail.
-        // The manifest is the single validation boundary: it already rejects unresolved
-        // ports, so a miss here is an invariant violation, not user input.
+        // Local runs resolve every port to a localstorage folder or, for a port whose deployed
+        // binding reaches an HTTP API, to an HTTP binding on its mock; the deployed transport is
+        // deployment-owned and never consulted here. The manifest is the single validation
+        // boundary: it already rejects ports with neither resolution, so a miss here is an
+        // invariant violation, not user input.
         var resolutions = development.Files.ToDictionary(file => file.PortName, StringComparer.Ordinal);
+        var portMocks = development.Mocks.Where(mock => mock.Target == MockTarget.Port)
+            .ToDictionary(mock => mock.Name, StringComparer.Ordinal);
         foreach (var port in topology.Ports)
         {
-            files.Add(BindingComponent(port, resolutions[port.Name], hostRoot));
+            files.Add(portMocks.TryGetValue(port.Name, out var portMock)
+                ? MockedBindingComponent(port, portMock)
+                : BindingComponent(port, resolutions[port.Name], hostRoot));
         }
 
-        foreach (var mock in development.Mocks)
+        foreach (var mock in development.Mocks.Where(mock => mock.Target == MockTarget.Service))
         {
-            var service = topology.Services.Single(service => service.AppId == mock.AppId);
+            var service = topology.Services.Single(service => service.AppId == mock.Name);
             files.Add(HttpEndpoint(mock, service));
         }
 
@@ -189,10 +193,20 @@ public static class TopologyGenerator
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{port.DaprComponentName}.yaml", yaml);
     }
 
+    private static GeneratedFile MockedBindingComponent(PortResource port, OpenApiMock mock)
+    {
+        // The binding keeps the port's name, so component code reaches the mock through the same
+        // binding the deployment renders with the real API's url. bindings.http fails a non-2xx
+        // answer by default, as it does deployed.
+        var metadata = new List<(string, string)> { ("url", LocalMockEndpoints.BaseUri(mock)) };
+        var yaml = DaprYaml.Component(port.DaprComponentName, "bindings.http", metadata, port.UsedBy);
+        return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{port.DaprComponentName}.yaml", yaml);
+    }
+
     private static GeneratedFile HttpEndpoint(OpenApiMock mock, ServiceResource service)
     {
-        var yaml = DaprYaml.HttpEndpoint(mock.AppId, LocalMockEndpoints.BaseUri(mock), service.Consumers);
-        return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{mock.AppId}.yaml", yaml);
+        var yaml = DaprYaml.HttpEndpoint(mock.Name, LocalMockEndpoints.BaseUri(mock), service.Consumers);
+        return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{mock.Name}.yaml", yaml);
     }
 
     private static GeneratedFile ComponentConfig(string systemName, ComponentModel component)

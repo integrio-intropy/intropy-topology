@@ -209,3 +209,39 @@ public class GatewayBuilderTests
             () => gateway.Exposes(EndpointRef.Define("other-endpoint", "/orders")));
     }
 }
+
+public class JobBuilderTests
+{
+    [Fact]
+    public void AddJob_ShouldMaterializeKindWithoutEdges()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddJob("nightly-cleanup").Calls(ServiceRef.Define("business-incident-service"));
+
+        // Act
+        var topology = s.Build();
+        var job = Assert.Single(topology.Components);
+
+        // Assert
+        Assert.Equal(ComponentKind.Job, job.Kind);
+        Assert.Equal(["business-incident-service"], job.Uses);
+        Assert.Empty(job.Subscribes);
+        Assert.Empty(job.Publishes);
+        Assert.Empty(job.Ports);
+        Assert.Null(job.Endpoints);
+        Assert.Null(job.InternalQueue);
+        // A job runs on no channel: the hosts pass it neither INTROPY_PUBSUB_NAME nor INTROPY_TOPIC_NAME.
+        Assert.Equal(new ComponentChannel(null, null), ComponentChannel.For(job));
+    }
+
+    [Fact]
+    public void AddJob_WithInvalidName_ShouldThrow()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => s.AddJob("Nightly_Cleanup"));
+    }
+}

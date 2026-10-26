@@ -269,3 +269,14 @@ public sealed class GatewayBuilder : ComponentBuilder<GatewayBuilder, GatewayCom
         return this;
     }
 }
+
+/// <summary>Fluent builder for a job: a scheduled block that runs to completion — the catch-all
+/// for work no other kind describes, such as a reconciler or a nightly batch. There are
+/// deliberately no <c>Publishes</c>, <c>Subscribes</c>, <c>From</c> or <c>To</c> methods: a
+/// job's work is its own, and the topology records only the platform services it calls.</summary>
+public sealed class JobBuilder : ComponentBuilder<JobBuilder, JobComponent>
+{
+    internal JobBuilder(JobComponent component) : base(component) { }
+
+    private protected override JobBuilder Self => this;
+}
