@@ -12,7 +12,7 @@ graph LR
 
 Each `Add*` call on `SystemBuilder` returns the block's builder directly, whose members are exactly that block's legal edges. A method that would be illegal for the block type does not exist on its builder type, so the compiler rejects it before validation ever runs. All component builders also expose `Calls(service)` for platform-service invocations — synchronous request/response calls through the Dapr sidecar. The topology records the edges *between* components and platform services. Everything about the workload shape (hosting model, activation, ports, process lifetime) lives in the component's own scaffold — a cron schedule is deployment-owned configuration the topology deliberately does not repeat.
 
-Underneath, every declaration is a **`Component`** — the shared substance each builder records into, mirroring `Pipeline`'s role in `intropy-framework`. Each block kind is a sealed subclass (`ExtractorComponent`, `LoaderComponent`, `TransactionalIntegrationComponent`), and the builder exposes it via its `Component` property:
+Underneath, every declaration is a **`Component`** — the shared substance each builder records into, mirroring `Pipeline`'s role in `intropy-framework`. Each block kind is a sealed subclass (`ExtractorComponent`, `LoaderComponent`, `TransactionalIntegrationComponent`, `GatewayComponent`, `JobComponent`), and the builder exposes it via its `Component` property:
 
 ```csharp
 ExtractorComponent orders = s.AddExtractor("order-extractor")

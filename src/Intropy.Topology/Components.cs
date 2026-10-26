@@ -142,6 +142,14 @@ public sealed class GatewayComponent : Component
     internal GatewayComponent(string name) : base(name, ComponentKind.Gateway) { }
 }
 
+/// <summary>The declared job: a scheduled block that runs to completion and declares no topic,
+/// port or endpoint — the catch-all for work no other kind describes. Obtained from the job
+/// builder's <c>Component</c> property.</summary>
+public sealed class JobComponent : Component
+{
+    internal JobComponent(string name) : base(name, ComponentKind.Job) { }
+}
+
 /// <summary>One declared subscription: the messages a component handles from one channel, and
 /// what happens to the channel's other messages. The invariants that hold within one
 /// subscription — one handled message per name, all messages on one channel — are checked

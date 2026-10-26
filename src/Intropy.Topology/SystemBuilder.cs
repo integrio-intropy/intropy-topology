@@ -64,6 +64,11 @@ public sealed class SystemBuilder
     public GatewayBuilder AddGateway(string name) =>
         new(Register(new GatewayComponent(NameRules.RequireLabel(name, nameof(name)))));
 
+    /// <summary>Adds a job: scheduled work that runs to completion and declares no topic or port.</summary>
+    /// <param name="name">The component's name (DNS-1123 label).</param>
+    public JobBuilder AddJob(string name) =>
+        new(Register(new JobComponent(NameRules.RequireLabel(name, nameof(name)))));
+
     /// <summary>
     /// Declares the OTLP endpoint the whole system (every component and its Dapr sidecar)
     /// exports telemetry to, in place of each runtime's default sink. A topology that

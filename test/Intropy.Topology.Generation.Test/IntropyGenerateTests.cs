@@ -176,6 +176,26 @@ public class IntropyGenerateTests
     }
 
     [Fact]
+    public void GraphJson_ShouldEmitAJobsKindWithoutAChannel()
+    {
+        // Arrange
+        var builder = SystemBuilder.Create("orders");
+        builder.AddJob("nightly-cleanup").Calls(ServiceRef.Define("business-incident-service"));
+
+        // Act
+        using var json = JsonDocument.Parse(IntropyGenerate.GraphJson(builder.Build(), development: null));
+        var job = Assert.Single(json.RootElement.GetProperty("components").EnumerateArray());
+
+        // Assert
+        Assert.Equal("job", job.GetProperty("kind").GetString());
+        Assert.Equal(["business-incident-service"], job.GetProperty("uses").EnumerateArray().Select(u => u.GetString()));
+        Assert.False(job.TryGetProperty("channel", out _));
+        Assert.False(job.TryGetProperty("ports", out _));
+        Assert.False(job.TryGetProperty("publishes", out _));
+        Assert.False(job.TryGetProperty("subscribes", out _));
+    }
+
+    [Fact]
     public void Run_Graph_ShouldEmit_InternalQueueForTransactionalIntegrationsOnly()
     {
         // Act

@@ -7,7 +7,8 @@ internal sealed class NoEdgesRule : IModelRule
 {
     public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
     {
-        foreach (var component in topology.Components)
+        // A job declares no edges by design: its work is its own.
+        foreach (var component in topology.Components.Where(c => c.Kind is not ComponentKind.Job))
         {
             var hasEdges =
                 component.Subscribes.Count > 0

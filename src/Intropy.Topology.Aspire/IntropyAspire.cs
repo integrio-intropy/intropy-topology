@@ -259,8 +259,9 @@ public static class IntropyAspire
     /// <summary>
     /// Registers the host's background services and their shared seams. Sidecar repair covers
     /// the interval where a backend passes TCP readiness but daprd's component initialization
-    /// still fails; the run-to-completion scheduler re-runs extractors and transactional
-    /// integrations on their configured cadence so file-driven integrations keep sweeping.
+    /// still fails; the run-to-completion scheduler re-runs extractors, transactional
+    /// integrations and jobs on their configured cadence so file-driven integrations keep
+    /// sweeping.
     /// </summary>
     private static void RegisterHostServices(
         IDistributedApplicationBuilder builder,

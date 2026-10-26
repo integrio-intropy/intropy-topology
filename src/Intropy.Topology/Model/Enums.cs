@@ -14,6 +14,9 @@ public enum ComponentKind
 
     /// <summary>Serves an HTTP endpoint callers push items to, and publishes each one.</summary>
     Gateway,
+
+    /// <summary>Runs scheduled work to completion that no other kind describes.</summary>
+    Job,
 }
 
 /// <summary>What happens to the messages on a subscribed channel that the subscription does not

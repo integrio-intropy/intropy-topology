@@ -526,3 +526,33 @@ public class GatewayRuleTests
         Assert.Empty(s.Validate());
     }
 }
+
+public class JobRuleTests
+{
+    [Fact]
+    public void Validate_WithJobThatDeclaresNoEdges_ShouldReportNothing()
+    {
+        // Arrange: a job's work is its own, so no edges is complete, not unfinished
+        var s = SystemBuilder.Create("test-system");
+        s.AddJob("nightly-cleanup");
+
+        // Act & Assert
+        Assert.Empty(s.Validate());
+    }
+
+    [Fact]
+    public void Validate_WithLoaderThatDeclaresNoEdges_ShouldStillWarn()
+    {
+        // Arrange: the exemption is the job's alone
+        var s = SystemBuilder.Create("test-system");
+        s.AddJob("nightly-cleanup");
+        s.AddLoader("sink");
+
+        // Act
+        var diagnostic = Assert.Single(s.DiagnosticsFor<NoEdgesRule>());
+
+        // Assert
+        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.Equal("sink", diagnostic.Target);
+    }
+}

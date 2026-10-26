@@ -119,11 +119,12 @@ public sealed class IntropyAspireTests : IDisposable
     [InlineData(ComponentKind.TransactionalIntegration, true)]
     [InlineData(ComponentKind.Loader, false)]
     [InlineData(ComponentKind.Gateway, false)]
+    [InlineData(ComponentKind.Job, true)]
     public void IsRunToCompletion_ShouldFollowTheKindsSingleLegitimateHost(
         ComponentKind kind, bool expected)
     {
-        // Extractors and transactional integrations are hosted by the framework's
-        // run-to-completion runners; loaders stay resident on their subscription.
+        // Extractors, transactional integrations and jobs are hosted by the framework's
+        // run-to-completion runners; loaders and gateways stay resident.
         Assert.Equal(expected, IntropyAspire.IsRunToCompletion(kind));
     }
 

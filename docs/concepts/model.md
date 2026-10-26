@@ -214,6 +214,7 @@ public static class Components
 | `AddLoader(name)` | `LoaderBuilder` | `Subscribes(message, when?, configure: sub => …)`, `To(port)`, `Calls(service)` | must subscribe at least once (once — a second `Subscribes` throws); `To` is optional |
 | `Subscribes(message, when?, configure: sub => …)` | `SubscriptionBuilder` | `AlsoHandles(message, when?)`, `IgnoreOthers()`, `InBatches(maxMessages, maxWait)` | every handled message on one channel — checked at the call; see [Subscriptions](subscriptions.md) |
 | `AddTransactionalIntegration(name)` | `TransactionalIntegrationBuilder` | `From(port)`, `To(port)`, `Calls(service)` | must have at least one `From` and at least one `To` |
+| `AddJob(name)` | `JobBuilder` | `Calls(service)` | none: a job declares no topic, port or endpoint, and is exempt from the no-edges warning |
 | `Otlp(endpoint)` | `OtlpBuilder` | `WithProtocol(protocol)`, `WithHeader(name, value)` | only one OTLP declaration per system |
 
 Every component builder also exposes `Component`, an optional typed handle with the declared component's `Name` and `Kind`.
@@ -325,7 +326,7 @@ Each `Add*` call becomes one `ComponentModel` in declaration order.
 | Field | Meaning |
 |-------|---------|
 | `Name` | Component name. |
-| `Kind` | `Extractor`, `Loader`, or `TransactionalIntegration`. |
+| `Kind` | `Extractor`, `Loader`, `TransactionalIntegration`, `Gateway`, or `Job`. |
 | `Subscribes` | Topic subscriptions as `(PubSubName, TopicName)`. |
 | `Publishes` | Published topics as `(PubSubName, TopicName)`. |
 | `Ports` | Used ports as `(PortName, Direction)`, where direction is `In` or `Out`. |
@@ -445,7 +446,7 @@ public sealed class OrderFlowDevelopment : IDevelopmentDefinition
 |--------|---------|------------|
 | `Mock(service).FromOpenApi(path)` | Resolves a used service to a local OpenAPI-backed mock. | Service must be used by the topology; artifact must be OpenAPI 3.0.x, self-contained, readable, and inside the SystemHost directory. |
 | `Files(port).RootPath(path)` | Resolves a used port to a local folder. | Port must be used by the topology; path must stay inside the SystemHost directory. |
-| `Rerun(name).AfterEachRun(delay)` | Re-runs a run-to-completion component (extractor or transactional integration) once `delay` has passed after a run completes. | Name must be declared by the topology and belong to a run-to-completion component; delay must be positive and declared at most once. |
+| `Rerun(name).AfterEachRun(delay)` | Re-runs a run-to-completion component (extractor, transactional integration or job) once `delay` has passed after a run completes. | Name must be declared by the topology and belong to a run-to-completion component; delay must be positive and declared at most once. |
 
 Every used port must have a local file resolution when a development definition is built. The re-run delay is local host mechanism only: it is never written into generated artifacts, so it cannot drift with the deployed schedule that deployment configuration owns.
 

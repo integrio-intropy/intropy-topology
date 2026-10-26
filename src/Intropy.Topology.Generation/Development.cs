@@ -72,7 +72,7 @@ public sealed class DevelopmentBuilder
     }
 
     /// <summary>Declares how often a run-to-completion component is re-run locally.</summary>
-    /// <param name="componentName">The name of an extractor or transactional integration in the topology.</param>
+    /// <param name="componentName">The name of an extractor, transactional integration or job in the topology.</param>
     public RerunBuilder Rerun(string componentName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(componentName);
@@ -85,7 +85,7 @@ public sealed class DevelopmentBuilder
         if (!component.Kind.IsRunToCompletion())
         {
             throw new DevelopmentValidationException(
-                $"Component '{componentName}' is a {component.Kind} and stays resident; only run-to-completion components (extractors and transactional integrations) can be re-run.");
+                $"Component '{componentName}' is a {component.Kind} and stays resident; only run-to-completion components (extractors, transactional integrations and jobs) can be re-run.");
         }
 
         if (_reruns.Any(candidate => candidate.ComponentName == componentName))
