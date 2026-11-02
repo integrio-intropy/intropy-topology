@@ -172,6 +172,21 @@ internal static class TopologyMaterializer
             Endpoints = component.Kind is ComponentKind.Gateway
                 ? [.. component.EndpointCalls.Select(e => new EndpointEdge { EndpointName = e.Name, Path = e.Path })]
                 : null,
+            // Minted per processor, so no two components ever share state. The outbox publishes to
+            // the processor's one publish channel; the declaration site enforces there is only one.
+            State = component.Kind is ComponentKind.Processor
+                ? new ProcessorState
+                {
+                    StateStoreName = ProcessorState.StateStoreNameFor(component.Name),
+                    OutboxStateStoreName = ProcessorState.OutboxStateStoreNameFor(component.Name),
+                    Outbox = publishes.Count == 0
+                        ? null
+                        : new MessageChannel { PubSubName = publishes[0].PubSubName, TopicName = publishes[0].TopicName },
+                }
+                : null,
+            WorkflowState = component is LoaderComponent { KeepsWorkflowState: true }
+                ? new WorkflowState { StateStoreName = WorkflowState.StateStoreNameFor(component.Name) }
+                : null,
         };
     }
 

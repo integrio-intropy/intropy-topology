@@ -20,6 +20,8 @@ internal static class TopologyRules
         new Rules.PubSubPortNameCollisionRule(),
         new Rules.ServiceAppIdCollisionRule(),
         new Rules.EndpointNameCollisionRule(),
+        new Rules.ProcessorRepublishRule(),
+        new Rules.StateStoreNameCollisionRule(),
     ];
 
     private static readonly IDeclarationRule[] DeclarationRules =

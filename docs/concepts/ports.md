@@ -33,7 +33,7 @@ public static class Ports
 }
 ```
 
-Direction is not part of a port's identity — it follows from usage: `From(port)` reads, `To(port)` writes. Because the name is the identity, two declarations with the same name are the same port by construction; there is nothing left to conflict.
+Direction is not part of a port's identity — it follows from usage: `From(port)` reads (the port drives the flow), `To(port)` writes, `LooksUp(port)` consults it mid-flow for enrichment (`Lookup`; at the Dapr level an output-binding invocation such as `get`, never a trigger). Because the name is the identity, two declarations with the same name are the same port by construction; there is nothing left to conflict.
 
 ## Materialized ports
 

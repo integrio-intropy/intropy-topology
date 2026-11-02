@@ -75,6 +75,28 @@ public sealed class TcpReadyHealthCheckTests
     }
 
     [Fact]
+    public async Task CheckHealthAsync_WithThePostgresHandshake_ShouldBeHealthyOnceTheServerAnswersTheSslRequest()
+    {
+        // Arrange — a PostgreSQL server answers an SSLRequest with one byte, 'N' (no TLS) or 'S'.
+        byte[]? received = null;
+        await using var listener = new ScriptedListener(async (client, cancellationToken) =>
+        {
+            var buffer = new byte[8];
+            await client.GetStream().ReadExactlyAsync(buffer, cancellationToken);
+            received = buffer;
+            await client.GetStream().WriteAsync("N"u8.ToArray(), cancellationToken);
+        });
+        var probe = new TcpReadyHealthCheck("localhost", listener.Port, TcpReadyHealthCheck.PostgresHandshake);
+
+        // Act
+        var result = await probe.CheckHealthAsync(new HealthCheckContext());
+
+        // Assert — length 8, request code 80877103.
+        Assert.Equal(HealthStatus.Healthy, result.Status);
+        Assert.Equal(new byte[] { 0, 0, 0, 8, 0x04, 0xD2, 0x16, 0x2F }, received);
+    }
+
+    [Fact]
     public async Task CheckHealthAsync_WhenHandshakeGetsOnlySilence_ShouldBeUnhealthy()
     {
         // Arrange — Aspire's DCP endpoint proxy accepts connections from host start and holds

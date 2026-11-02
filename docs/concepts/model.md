@@ -178,6 +178,7 @@ The port name is the whole identity. The Dapr binding component name is identica
 
 - `From(port)` means the component reads from the port.
 - `To(port)` means the component writes to the port.
+- `LooksUp(port)` means the component consults the port mid-flow, request/response (enrichment); the port neither drives nor receives the flow. Loaders and processors only.
 
 Binding type, address, credentials, and other environment details are deployment configuration, not topology.
 
@@ -211,9 +212,10 @@ public static class Components
 | Entry point | Builder | Legal methods | Build-time requirements |
 |-------------|---------|---------------|-------------------------|
 | `AddExtractor(name)` | `ExtractorBuilder` | `From(port)`, `Publishes(message)`, `Calls(service)` | must publish at least one message |
-| `AddLoader(name)` | `LoaderBuilder` | `Subscribes(message, when?, configure: sub => …)`, `To(port)`, `Calls(service)` | must subscribe at least once (once — a second `Subscribes` throws); `To` is optional |
+| `AddLoader(name)` | `LoaderBuilder` | `Subscribes(message, when?, configure: sub => …)`, `To(port)`, `LooksUp(port)` (enrichment), `WithWorkflowState()`, `Calls(service)` | must subscribe at least once (once — a second `Subscribes` throws); `To` is optional |
 | `Subscribes(message, when?, configure: sub => …)` | `SubscriptionBuilder` | `AlsoHandles(message, when?)`, `IgnoreOthers()`, `InBatches(maxMessages, maxWait)` | every handled message on one channel — checked at the call; see [Subscriptions](subscriptions.md) |
 | `AddTransactionalIntegration(name)` | `TransactionalIntegrationBuilder` | `From(port)`, `To(port)`, `Calls(service)` | must have at least one `From` and at least one `To` |
+| `AddProcessor(name)` | `ProcessorBuilder` | `Subscribes(message, when?, configure: sub => …)`, `Publishes(message)`, `LooksUp(port)` (enrichment), `Calls(service)` | must subscribe (once) and publish; all publications on one channel; never publishes a message it handles |
 | `AddJob(name)` | `JobBuilder` | `Calls(service)` | none: a job declares no topic, port or endpoint, and is exempt from the no-edges warning |
 | `Otlp(endpoint)` | `OtlpBuilder` | `WithProtocol(protocol)`, `WithHeader(name, value)` | only one OTLP declaration per system |
 
@@ -326,12 +328,13 @@ Each `Add*` call becomes one `ComponentModel` in declaration order.
 | Field | Meaning |
 |-------|---------|
 | `Name` | Component name. |
-| `Kind` | `Extractor`, `Loader`, `TransactionalIntegration`, `Gateway`, or `Job`. |
+| `Kind` | `Extractor`, `Loader`, `TransactionalIntegration`, `Gateway`, `Job`, or `Processor`. |
 | `Subscribes` | Topic subscriptions as `(PubSubName, TopicName)`. |
 | `Publishes` | Published topics as `(PubSubName, TopicName)`. |
-| `Ports` | Used ports as `(PortName, Direction)`, where direction is `In` or `Out`. |
+| `Ports` | Used ports as `(PortName, Direction)`, where direction is `In`, `Out`, or `Lookup`. |
 | `Uses` | Service app IDs invoked by this component. |
 | `InternalQueue` | Transactional integration internal queue, otherwise `null`. |
+| `State` | A processor's state: its state components (`StateStoreName`, `OutboxStateStoreName`) and the channel the outbox publishes to (`Outbox`); otherwise `null` and omitted. The component receives the names as `INTROPY_STATESTORE_NAME` and `INTROPY_OUTBOX_STATESTORE_NAME`. |
 
 ### Topics and messages
 

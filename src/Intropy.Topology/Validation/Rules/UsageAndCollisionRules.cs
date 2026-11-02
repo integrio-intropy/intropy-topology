@@ -85,3 +85,56 @@ internal sealed class EndpointNameCollisionRule : IModelRule
         }
     }
 }
+
+/// <summary>
+/// The state components the topology mints — a processor's plain and outbox stores, a loader's
+/// workflow state store — are Dapr components named after their component, so they must not take
+/// the name of a port's binding, of a pubsub, or of another minted state component: all of them
+/// become Dapr Component names in the same namespace, and generation writes each to a file named
+/// after it, so a duplicate silently overwrites the other.
+/// </summary>
+internal sealed class StateStoreNameCollisionRule : IModelRule
+{
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
+    {
+        var taken = topology.Ports.Select(p => (Name: p.DaprComponentName, What: $"port '{p.Name}'s binding"))
+            .Concat(topology.Topics.Select(t => (Name: t.PubSubName, What: "a pubsub")))
+            .Concat(topology.Components.Select(c => c.InternalQueue?.PubSubName).OfType<string>()
+                .Select(n => (Name: n, What: "a pubsub")))
+            .GroupBy(t => t.Name, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First().What, StringComparer.Ordinal);
+
+        var minted = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (store, owner) in MintedStores(topology))
+        {
+            if (taken.TryGetValue(store, out var what) || minted.TryGetValue(store, out what))
+            {
+                yield return new TopologyDiagnostic(
+                    DiagnosticSeverity.Error,
+                    $"{owner} state component '{store}' has the same name as {what}; both become Dapr Component names in the same namespace.",
+                    store);
+                continue;
+            }
+
+            minted[store] = $"{owner} state component";
+        }
+    }
+
+    private static IEnumerable<(string Store, string Owner)> MintedStores(SystemTopology topology)
+    {
+        foreach (var component in topology.Components)
+        {
+            if (component.State is { } state)
+            {
+                var owner = $"{component.Kind} '{component.Name}'s";
+                yield return (state.StateStoreName, owner);
+                yield return (state.OutboxStateStoreName, owner);
+            }
+
+            if (component.WorkflowState is { } workflow)
+            {
+                yield return (workflow.StateStoreName, $"{component.Kind} '{component.Name}'s workflow");
+            }
+        }
+    }
+}

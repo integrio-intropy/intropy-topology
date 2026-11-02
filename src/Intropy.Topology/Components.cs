@@ -43,9 +43,9 @@ public abstract class Component
 
     internal IReadOnlyList<EndpointRef> EndpointCalls => _endpoints;
 
-    internal SubscriptionDeclaration AddSubscription(string componentName)
+    internal SubscriptionDeclaration AddSubscription()
     {
-        var subscription = new SubscriptionDeclaration(componentName);
+        var subscription = new SubscriptionDeclaration($"{Kind} '{Name}'");
         _subscriptions.Add(subscription);
         return subscription;
     }
@@ -113,6 +113,16 @@ public sealed class LoaderComponent : Component
 {
     internal LoaderComponent(string name) : base(name, ComponentKind.Loader) { }
 
+    /// <summary>Whether the loader runs Dapr workflows, declared with <c>WithWorkflowState</c>.</summary>
+    internal bool KeepsWorkflowState { get; private set; }
+
+    internal void SetWorkflowState()
+    {
+        if (KeepsWorkflowState)
+            throw new InvalidOperationException($"Loader '{Name}' already declares its workflow state.");
+        KeepsWorkflowState = true;
+    }
+
     /// <summary>The batching declared with <c>InBatches</c>; null when the loader consumes one
     /// message at a time.</summary>
     internal BulkSubscription? Bulk { get; private set; }
@@ -142,6 +152,14 @@ public sealed class GatewayComponent : Component
     internal GatewayComponent(string name) : base(name, ComponentKind.Gateway) { }
 }
 
+/// <summary>The declared processor: a middle block that subscribes to one channel, decides each
+/// message against the state it keeps, and publishes new messages on one channel, committed
+/// together with that state. Obtained from the processor builder's <c>Component</c> property.</summary>
+public sealed class ProcessorComponent : Component
+{
+    internal ProcessorComponent(string name) : base(name, ComponentKind.Processor) { }
+}
+
 /// <summary>The declared job: a scheduled block that runs to completion and declares no topic,
 /// port or endpoint — the catch-all for work no other kind describes. Obtained from the job
 /// builder's <c>Component</c> property.</summary>
@@ -156,12 +174,13 @@ public sealed class JobComponent : Component
 /// here, at the declaration call that would break them. Mutable during declaration.</summary>
 internal sealed class SubscriptionDeclaration
 {
-    private readonly string _componentName;
+    private readonly string _component;
     private readonly List<MessageRef> _messages = [];
     private readonly HashSet<string> _handledMessages = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _conditions = new(StringComparer.Ordinal);
 
-    public SubscriptionDeclaration(string componentName) => _componentName = componentName;
+    /// <param name="component">The declaring component as errors name it, e.g. <c>Loader 'orders'</c>.</param>
+    public SubscriptionDeclaration(string component) => _component = component;
 
     /// <summary>The messages the subscription handles, in declaration order.</summary>
     public IReadOnlyList<MessageRef> Messages => _messages;
@@ -182,14 +201,14 @@ internal sealed class SubscriptionDeclaration
             var declared = _messages[0].DescribeChannel();
             var incoming = message.DescribeChannel();
             throw new InvalidOperationException(
-                $"Loader '{_componentName}' subscribes to messages on different channels ({declared}, {incoming}); "
+                $"{_component} subscribes to messages on different channels ({declared}, {incoming}); "
                 + "a subscription is to one channel, so all of its messages must travel on it.");
         }
 
         if (!_handledMessages.Add(message.Name))
         {
             throw new InvalidOperationException(
-                $"Loader '{_componentName}' already handles the message '{message.Name}'; each message is handled once.");
+                $"{_component} already handles the message '{message.Name}'; each message is handled once.");
         }
 
         _messages.Add(message);

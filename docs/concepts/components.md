@@ -12,7 +12,7 @@ graph LR
 
 Each `Add*` call on `SystemBuilder` returns the block's builder directly, whose members are exactly that block's legal edges. A method that would be illegal for the block type does not exist on its builder type, so the compiler rejects it before validation ever runs. All component builders also expose `Calls(service)` for platform-service invocations — synchronous request/response calls through the Dapr sidecar. The topology records the edges *between* components and platform services. Everything about the workload shape (hosting model, activation, ports, process lifetime) lives in the component's own scaffold — a cron schedule is deployment-owned configuration the topology deliberately does not repeat.
 
-Underneath, every declaration is a **`Component`** — the shared substance each builder records into, mirroring `Pipeline`'s role in `intropy-framework`. Each block kind is a sealed subclass (`ExtractorComponent`, `LoaderComponent`, `TransactionalIntegrationComponent`, `GatewayComponent`, `JobComponent`), and the builder exposes it via its `Component` property:
+Underneath, every declaration is a **`Component`** — the shared substance each builder records into, mirroring `Pipeline`'s role in `intropy-framework`. Each block kind is a sealed subclass (`ExtractorComponent`, `LoaderComponent`, `TransactionalIntegrationComponent`, `GatewayComponent`, `ProcessorComponent`, `JobComponent`), and the builder exposes it via its `Component` property:
 
 ```csharp
 ExtractorComponent orders = s.AddExtractor("order-extractor")
@@ -30,10 +30,13 @@ Each kind exposes only its own legal edges:
 | Kind | Subscribes | Publishes | Port | Services | Required |
 |------|-----------|-----------|------|----------|----------|
 | Extractor | — | messages | `From(port)` | `Calls(service)` | `Publishes` |
-| Loader | exactly 1 message | — | `To(port)` | `Calls(service)` | `Subscribes` |
+| Loader | exactly 1 message | — | `To(port)`, `LooksUp(port)`, optional | `Calls(service)` | `Subscribes` |
 | Transactional integration | — | — | `From` / `To(port)` | `Calls(service)` | `From` and `To` |
+| Processor | exactly 1 channel | messages on one channel, never one it handles | `LooksUp(port)`, optional | `Calls(service)` | `Subscribes` and `Publishes` |
 
-`Subscribes`/`Publishes` are the asynchronous (message) edges; `From`/`To` are the edges out through ports; `Calls` records Dapr service app IDs the component invokes. A component may publish several distinct messages — several may share one channel; publishing the same message twice throws `InvalidOperationException` at the declaration. See [Messages](messages.md), [Ports](ports.md), and the [Model and DSL Reference](model.md).
+`Subscribes`/`Publishes` are the asynchronous (message) edges; `From`/`To` are the edges out through ports that the flow starts or ends at; `LooksUp` is a port consulted mid-flow, request/response, for enrichment — the subscription, not the port, drives the component; `Calls` records Dapr service app IDs the component invokes. A component may publish several distinct messages — several may share one channel; publishing the same message twice throws `InvalidOperationException` at the declaration. See [Messages](messages.md), [Ports](ports.md), and the [Model and DSL Reference](model.md).
+
+A **processor** keeps state. The topology mints two Dapr state components for each one, named after it: `<name>-state`, and `<name>-state-outbox`, configured with the transactional outbox that publishes on the processor's channel. The processor commits each new state together with the messages it publishes through that outbox, which publishes to one topic, so all of a processor's messages travel on one channel (a second channel throws at `Publishes`). Its subscription does not batch. Locally both state components are PostgreSQL (`state.postgresql` v2 on `localhost:6432`, started by the local host only when the topology has a processor): on Redis the outbox lost updates and published events whose state was lost. Deployment chooses the store.
 
 ## Declaring components
 

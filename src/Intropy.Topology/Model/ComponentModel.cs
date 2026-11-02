@@ -43,4 +43,21 @@ public sealed record ComponentModel
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<EndpointEdge>? Endpoints { get; init; }
+
+    /// <summary>
+    /// The state a processor keeps, minted by the materializer; <see langword="null"/> for other
+    /// kinds, and then omitted when serializing. Like <see cref="InternalQueue"/>, this is workload
+    /// shape no declaration names: it is minted here so every consumer — local generation, Aspire,
+    /// deployment tooling — agrees on the state components' names and on where the outbox publishes.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ProcessorState? State { get; init; }
+
+    /// <summary>
+    /// The state store a loader that runs Dapr workflows keeps its workflow instances in, minted by
+    /// the materializer (<see cref="WorkflowState.StateStoreNameFor"/>); <see langword="null"/>
+    /// otherwise, and then omitted when serializing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkflowState? WorkflowState { get; init; }
 }

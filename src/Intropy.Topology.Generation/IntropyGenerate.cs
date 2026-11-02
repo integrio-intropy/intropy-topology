@@ -142,6 +142,7 @@ public static class IntropyGenerate
         IReadOnlyList<GraphEndpoint>? Endpoints,
         IReadOnlyList<string>? Uses,
         GraphInternalQueue? InternalQueue,
+        GraphState? State,
         GraphChannel? Channel)
     {
         public static GraphComponent From(ComponentModel component) => new(
@@ -158,8 +159,21 @@ public static class IntropyGenerate
                 ? null
                 : new GraphInternalQueue(component.InternalQueue.PubSubName, component.InternalQueue.TopicName,
                     SubscriptionRouting.ResourceNameFor(component.Name), SubscriptionRouting.UnhandledPath),
+            component.State is null
+                ? null
+                : new GraphState(component.State.StateStoreName, component.State.OutboxStateStoreName,
+                    component.State.Outbox is null
+                        ? null
+                        : new GraphChannel(component.State.Outbox.PubSubName, component.State.Outbox.TopicName)),
             GraphChannel.From(ComponentChannel.For(component)));
     }
+
+    /// <summary>A processor's state: the two Dapr state components a deployment renders on one
+    /// table — the plain one, and the one configured with the transactional outbox — and the channel
+    /// the outbox publishes to (its <c>outboxPublishPubsub</c> and <c>outboxPublishTopic</c>). The
+    /// component receives the names as <c>INTROPY_STATESTORE_NAME</c> and
+    /// <c>INTROPY_OUTBOX_STATESTORE_NAME</c>.</summary>
+    private sealed record GraphState(string StateStore, string OutboxStateStore, GraphChannel? Outbox);
 
     /// <summary>The one pubsub and topic the component runs on, as a deployment passes them in
     /// <c>INTROPY_PUBSUB_NAME</c> and <c>INTROPY_TOPIC_NAME</c>. Absent when neither is settled.</summary>
@@ -303,8 +317,13 @@ public static class IntropyGenerate
         return array.Length > 0 ? array : null;
     }
 
-    private static string Direction(PortDirection direction) =>
-        direction == PortDirection.In ? "in" : "out";
+    private static string Direction(PortDirection direction) => direction switch
+    {
+        PortDirection.In => "in",
+        PortDirection.Out => "out",
+        PortDirection.Lookup => "lookup",
+        _ => throw new ArgumentOutOfRangeException(nameof(direction), direction, null),
+    };
 
     private static string KebabCase(string pascal)
     {

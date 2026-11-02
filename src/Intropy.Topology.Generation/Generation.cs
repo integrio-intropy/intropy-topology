@@ -93,6 +93,29 @@ public static class TopologyGenerator
         foreach (var pubSubName in pubSubNames)
         {
             files.Add(PubSubComponent(pubSubName, topology));
+            files.Add(PubSubResiliency(pubSubName, topology));
+        }
+
+        // A processor keeps its state in two components of its own on one table: the plain one,
+        // and the one whose transactional outbox publishes to the processor's one channel. Locally
+        // both are PostgreSQL, which the local host starts when the topology has a processor;
+        // deployment chooses its own store.
+        foreach (var component in topology.Components)
+        {
+            if (component.State is { } state)
+            {
+                files.Add(StateComponent(state.StateStoreName, outbox: null, component.Name));
+                files.Add(StateComponent(state.OutboxStateStoreName, state.Outbox, component.Name));
+            }
+
+            // A component that runs Dapr workflows keeps its instances in a state component of its
+            // own, marked as the sidecar's actor state store. Locally the pubsub's Redis.
+            if (component.WorkflowState is { } workflow)
+            {
+                var yaml = DaprYaml.Component(workflow.StateStoreName, "state.redis",
+                    [("redisHost", "localhost:6380"), ("actorStateStore", "true")], [component.Name]);
+                files.Add(new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{workflow.StateStoreName}.yaml", yaml));
+            }
         }
 
         // Local runs resolve every port to a localstorage folder or, for a port whose deployed
@@ -143,16 +166,32 @@ public static class TopologyGenerator
         return new GeneratedArtifacts(files);
     }
 
-    private static GeneratedFile PubSubComponent(string pubSubName, SystemTopology topology)
-    {
-        // A transactional integration must be in the scopes of the pubsub carrying its internal
-        // queue: a component its sidecar cannot load leaves the queue unreachable.
-        var scopes = topology.Components
+    private static GeneratedFile PubSubComponent(string pubSubName, SystemTopology topology) =>
+        PubSubComponent(pubSubName, PubSubScopes(pubSubName, topology));
+
+    // A transactional integration must be in the scopes of the pubsub carrying its internal
+    // queue: a component its sidecar cannot load leaves the queue unreachable.
+    private static IEnumerable<string> PubSubScopes(string pubSubName, SystemTopology topology) =>
+        topology.Components
             .Where(c => c.Subscribes.Any(s => s.PubSubName == pubSubName)
                 || c.Publishes.Any(p => p.PubSubName == pubSubName)
                 || c.InternalQueue?.PubSubName == pubSubName)
             .Select(c => c.Name);
-        return PubSubComponent(pubSubName, scopes);
+
+    /// <summary>The name of the resiliency policy generated for <paramref name="pubSubName"/>.</summary>
+    internal static string ResiliencyNameFor(string pubSubName) => $"{pubSubName}-resiliency";
+
+    /// <summary>
+    /// The pubsub's inbound retry policy. Without one, a delivery the component answers with RETRY
+    /// (a technical failure: a store that is down, an ETag conflict to decide again) is dropped by the
+    /// sidecar, not redelivered. With it, the sidecar redelivers it with exponential backoff, about a
+    /// minute and a quarter in all, before giving up.
+    /// </summary>
+    private static GeneratedFile PubSubResiliency(string pubSubName, SystemTopology topology)
+    {
+        var name = ResiliencyNameFor(pubSubName);
+        var yaml = DaprYaml.Resiliency(name, pubSubName, PubSubScopes(pubSubName, topology));
+        return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{name}.yaml", yaml);
     }
 
     private static GeneratedFile PubSubComponent(string pubSubName, IEnumerable<string> scopes)
@@ -169,6 +208,31 @@ public static class TopologyGenerator
         var yaml = DaprYaml.Component(pubSubName, "pubsub.redis", metadata, scopes);
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{pubSubName}.yaml", yaml);
     }
+
+    private static GeneratedFile StateComponent(string name, MessageChannel? outbox, string componentName)
+    {
+        // The local PostgreSQL, not the pubsub's Redis. On Redis the outbox applies the state after
+        // the commit returns, a write without an ETag overwrites, and a commit that loses an ETag
+        // race can still publish: a local run lost updates and published events whose state was
+        // lost, even one delivery at a time. PostgreSQL commits the state and the event together and
+        // rejects a stale write. Both components use the store's default table; keys are prefixed
+        // with the app id, so the plain and the outbox component address the same rows and
+        // processors never share one. Port 6432 because a host install commonly holds 5432.
+        var metadata = new List<(string, string)> { ("connectionString", LocalPostgresConnectionString) };
+        if (outbox is not null)
+        {
+            metadata.Add(("outboxPublishPubsub", outbox.PubSubName));
+            metadata.Add(("outboxPublishTopic", outbox.TopicName));
+        }
+
+        var yaml = DaprYaml.Component(name, "state.postgresql", metadata, [componentName], version: "v2");
+        return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{name}.yaml", yaml);
+    }
+
+    /// <summary>The local PostgreSQL the processors' state components connect to: passwordless, as
+    /// the local host starts it.</summary>
+    internal const string LocalPostgresConnectionString =
+        "host=localhost port=6432 user=postgres database=postgres sslmode=disable";
 
     private static GeneratedFile SubscriptionResource(string componentName, string pubSubName, string topicName,
         IReadOnlyList<(string Message, string? Condition)> messages, BulkSubscription? bulk)
@@ -240,6 +304,17 @@ public static class TopologyGenerator
                 InternalQueue = component.InternalQueue is null
                     ? null
                     : new { component.InternalQueue.PubSubName, component.InternalQueue.TopicName },
+                WorkflowStateStoreName = component.WorkflowState?.StateStoreName,
+                State = component.State is null
+                    ? null
+                    : new
+                    {
+                        component.State.StateStoreName,
+                        component.State.OutboxStateStoreName,
+                        Outbox = component.State.Outbox is null
+                            ? null
+                            : new { component.State.Outbox.PubSubName, component.State.Outbox.TopicName },
+                    },
             },
         };
 
@@ -318,11 +393,44 @@ internal static class DaprYaml
         return sb.ToString();
     }
 
+    /// <summary>A Dapr <c>Resiliency</c> resource: an inbound retry, exponential backoff up to 10 s
+    /// between attempts and 10 retries, on the deliveries of <paramref name="pubSubName"/>.</summary>
+    public static string Resiliency(string name, string pubSubName, IEnumerable<string> scopes)
+    {
+        var sb = new StringBuilder();
+        sb.Append("apiVersion: dapr.io/v1alpha1\n");
+        sb.Append("kind: Resiliency\n");
+        sb.Append("metadata:\n");
+        sb.Append("  name: ").Append(Quote(name)).Append('\n');
+        sb.Append("spec:\n");
+        sb.Append("  policies:\n");
+        sb.Append("    retries:\n");
+        sb.Append("      redeliver:\n");
+        sb.Append("        policy: exponential\n");
+        sb.Append("        maxInterval: 10s\n");
+        sb.Append("        maxRetries: 10\n");
+        sb.Append("  targets:\n");
+        sb.Append("    components:\n");
+        sb.Append("      ").Append(Quote(pubSubName)).Append(":\n");
+        sb.Append("        inbound:\n");
+        sb.Append("          retry: redeliver\n");
+        var scopeList = scopes.OrderBy(s => s, StringComparer.Ordinal).ToList();
+        if (scopeList.Count > 0)
+        {
+            sb.Append("scopes:\n");
+            foreach (var scope in scopeList)
+                sb.Append("- ").Append(Quote(scope)).Append('\n');
+        }
+
+        return sb.ToString();
+    }
+
     public static string Component(
         string name,
         string type,
         IEnumerable<(string Key, string Value)> metadata,
-        IEnumerable<string> scopes)
+        IEnumerable<string> scopes,
+        string version = "v1")
     {
         var meta = metadata.ToList();
         var scopeList = scopes.ToList();
@@ -334,7 +442,7 @@ internal static class DaprYaml
         sb.Append("  name: ").Append(Quote(name)).Append('\n');
         sb.Append("spec:\n");
         sb.Append("  type: ").Append(Quote(type)).Append('\n');
-        sb.Append("  version: v1\n");
+        sb.Append("  version: ").Append(version).Append('\n');
         if (meta.Count == 0)
         {
             sb.Append("  metadata: []\n");

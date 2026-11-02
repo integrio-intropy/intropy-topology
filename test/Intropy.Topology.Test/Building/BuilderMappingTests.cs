@@ -245,3 +245,53 @@ public class JobBuilderTests
         Assert.Throws<ArgumentException>(() => s.AddJob("Nightly_Cleanup"));
     }
 }
+
+public class LoaderWorkflowStateTests
+{
+    [Fact]
+    public void WithWorkflowState_ShouldMintTheLoadersWorkflowStateStore()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("source").Publishes(TestMessages.Raw);
+        s.AddLoader("approvals").Subscribes(TestMessages.Raw).To(TestPorts.Erp).WithWorkflowState();
+        s.AddLoader("sink").Subscribes(TestMessages.Raw);
+
+        // Act
+        var topology = s.Build();
+
+        // Assert — minted per component; a loader without workflows has none.
+        Assert.Equal("approvals-workflow-state",
+            topology.Components.Single(c => c.Name == "approvals").WorkflowState!.StateStoreName);
+        Assert.Null(topology.Components.Single(c => c.Name == "sink").WorkflowState);
+    }
+
+    [Fact]
+    public void WithWorkflowState_DeclaredTwice_ShouldThrow()
+    {
+        // Arrange
+        var loader = SystemBuilder.Create("test-system").AddLoader("approvals").WithWorkflowState();
+
+        // Act & Assert
+        Assert.Throws<InvalidOperationException>(() => loader.WithWorkflowState());
+    }
+}
+
+public class LoaderEnrichmentTests
+{
+    [Fact]
+    public void LooksUp_OnALoader_ShouldRecordALookupPortBesideItsDestination()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("source").Publishes(TestMessages.Raw);
+        s.AddLoader("enriching-loader").Subscribes(TestMessages.Raw).LooksUp(TestPorts.Pim).To(TestPorts.Erp);
+
+        // Act
+        var loader = s.Build().Components.Single(c => c.Name == "enriching-loader");
+
+        // Assert
+        Assert.Equal([("erp", PortDirection.Out), ("pim", PortDirection.Lookup)],
+            loader.Ports.Select(p => (p.PortName, p.Direction)).OrderBy(p => p.Direction));
+    }
+}

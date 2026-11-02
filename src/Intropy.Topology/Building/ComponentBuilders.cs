@@ -105,7 +105,7 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
                 $"Loader '{Component.Name}' already declares its subscription; a loader subscribes to one channel.");
         }
 
-        var subscription = new SubscriptionBuilder(Component, Component.AddSubscription(Component.Name));
+        var subscription = new SubscriptionBuilder(Component, Component.AddSubscription());
         subscription.AlsoHandles(message, when);
         configure?.Invoke(subscription);
         return this;
@@ -116,6 +116,30 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
     public LoaderBuilder To(PortRef port)
     {
         Component.AddPort(port, PortDirection.Out);
+        return this;
+    }
+
+    /// <summary>Declares that the loader looks up data in an external system through a port while
+    /// handling a message: enrichment, such as resolving what an event refers to before writing its
+    /// destination. Unlike <c>From</c> on an extractor, the port does not drive the flow — the
+    /// subscription does — it is consulted request/response. Optional.</summary>
+    /// <param name="port">The port to look up through.</param>
+    public LoaderBuilder LooksUp(PortRef port)
+    {
+        Component.AddPort(port, PortDirection.Lookup);
+        return this;
+    }
+
+    /// <summary>
+    /// Declares that the loader runs Dapr workflows: long-running processes it starts and feeds from
+    /// the messages it consumes, and whose activities write through its ports. The topology mints
+    /// the workflow state store (<c>&lt;component&gt;-workflow-state</c>, a Dapr state component
+    /// marked as the sidecar's actor state store) the workflow runtime keeps its instances in.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The loader already declares its workflow state.</exception>
+    public LoaderBuilder WithWorkflowState()
+    {
+        Component.SetWorkflowState();
         return this;
     }
 }
@@ -266,6 +290,115 @@ public sealed class GatewayBuilder : ComponentBuilder<GatewayBuilder, GatewayCom
     public GatewayBuilder Publishes(MessageRef message)
     {
         Component.AddPublish(message);
+        return this;
+    }
+}
+
+/// <summary>Fluent builder for a processor: a middle block that subscribes to one channel,
+/// decides each message against the state it keeps, and publishes new messages, each committed
+/// together with that state through a transactional outbox. The topology mints the processor's state
+/// components (<see cref="Model.ProcessorState"/>); deployment chooses what backs them. It may look
+/// up data in external systems through ports (<c>LooksUp</c>) and call platform services; it never writes to a
+/// port — that is a loader's job. It stays resident, driven by its subscription.</summary>
+public sealed class ProcessorBuilder : ComponentBuilder<ProcessorBuilder, ProcessorComponent>
+{
+    internal ProcessorBuilder(ProcessorComponent component) : base(component) { }
+
+    private protected override ProcessorBuilder Self => this;
+
+    /// <summary>
+    /// Declares the processor's subscription, which handles at least the given message and may
+    /// handle more of the same channel's messages: one channel, one declarative Dapr
+    /// <c>Subscription</c> with one routing rule per handled message, as for a loader. A processor
+    /// consumes one message at a time, so its subscription does not batch.
+    /// </summary>
+    /// <param name="message">The first message the processor consumes; the channel it travels on is
+    /// the subscription's channel.</param>
+    /// <param name="when">A content filter for <paramref name="message"/>: a Dapr CEL expression
+    /// over the event. Null handles all of the message's events.</param>
+    /// <param name="configure">Declares the subscription's remaining behavior
+    /// (<see cref="ProcessorSubscriptionBuilder.AlsoHandles"/>,
+    /// <see cref="ProcessorSubscriptionBuilder.IgnoreOthers"/>).</param>
+    /// <exception cref="ArgumentException"><paramref name="when"/> is empty or whitespace.</exception>
+    /// <exception cref="InvalidOperationException">The processor already declares a subscription; a
+    /// processor subscribes to one channel.</exception>
+    public ProcessorBuilder Subscribes(
+        MessageRef message,
+        string? when = null,
+        Action<ProcessorSubscriptionBuilder>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        if (Component.SubscriptionCalls.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Processor '{Component.Name}' already declares its subscription; a processor subscribes to one channel.");
+        }
+
+        var subscription = new ProcessorSubscriptionBuilder(Component.AddSubscription());
+        subscription.AlsoHandles(message, when);
+        configure?.Invoke(subscription);
+        return this;
+    }
+
+    /// <summary>Declares that the processor publishes a message. Several messages may be published,
+    /// all on one channel: the processor commits each through its state's outbox, which publishes to
+    /// one topic. A processor never publishes a message it handles.</summary>
+    /// <param name="message">The message the processor publishes.</param>
+    /// <exception cref="InvalidOperationException">The processor already publishes
+    /// <paramref name="message"/>, or publishes on another channel.</exception>
+    public ProcessorBuilder Publishes(MessageRef message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        if (Component.PublishCalls.Count > 0
+            && (Component.PublishCalls[0].PubSubName != message.PubSubName
+                || Component.PublishCalls[0].TopicName != message.TopicName))
+        {
+            throw new InvalidOperationException(
+                $"Processor '{Component.Name}' publishes on different channels ({Component.PublishCalls[0].DescribeChannel()}, "
+                + $"{message.DescribeChannel()}); a processor commits its messages through one outbox, which publishes to one channel.");
+        }
+
+        Component.AddPublish(message);
+        return this;
+    }
+
+    /// <summary>Declares that the processor looks up data in an external system through a port while
+    /// deciding a message: enrichment, consulted request/response. The port does not drive the
+    /// flow — the subscription does. Optional.</summary>
+    /// <param name="port">The port to look up through.</param>
+    public ProcessorBuilder LooksUp(PortRef port)
+    {
+        Component.AddPort(port, PortDirection.Lookup);
+        return this;
+    }
+}
+
+/// <summary>Declares what a processor's subscription handles beyond its first message. Unlike a
+/// loader's, it cannot batch: a processor decides one message at a time against fresh state.</summary>
+public sealed class ProcessorSubscriptionBuilder
+{
+    private readonly SubscriptionDeclaration _subscription;
+
+    internal ProcessorSubscriptionBuilder(SubscriptionDeclaration subscription) => _subscription = subscription;
+
+    /// <summary>Also handles <paramref name="message"/>, which must travel on the subscription's channel.</summary>
+    /// <param name="message">The message to handle.</param>
+    /// <param name="when">A content filter for the message (a Dapr CEL expression); null handles all
+    /// of its events.</param>
+    /// <exception cref="InvalidOperationException">The message travels on another channel, or is
+    /// already handled.</exception>
+    public ProcessorSubscriptionBuilder AlsoHandles(MessageRef message, string? when = null)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        _subscription.Add(message, ContentFilters.Trimmed(when));
+        return this;
+    }
+
+    /// <summary>Acknowledges and drops the channel's messages the subscription does not handle,
+    /// instead of leaving them for the broker to dead-letter.</summary>
+    public ProcessorSubscriptionBuilder IgnoreOthers()
+    {
+        _subscription.Unhandled = UnhandledMessages.Ignore;
         return this;
     }
 }

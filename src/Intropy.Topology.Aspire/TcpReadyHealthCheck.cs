@@ -8,6 +8,18 @@ internal interface IBackendReadiness
     Task WaitUntilReadyAsync(TimeSpan timeout, CancellationToken cancellationToken);
 }
 
+/// <summary>Ready when every backend is: what sidecar recovery waits for before a restart.</summary>
+internal sealed class AllBackendsReadiness(IReadOnlyList<IBackendReadiness> backends) : IBackendReadiness
+{
+    public async Task WaitUntilReadyAsync(TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        foreach (var backend in backends)
+        {
+            await backend.WaitUntilReadyAsync(timeout, cancellationToken).ConfigureAwait(false);
+        }
+    }
+}
+
 /// <summary>
 /// Readiness probe for a published container port. A bare TCP connect is not enough: both the
 /// Docker Desktop port proxy and Aspire's DCP endpoint proxy accept connections before the
@@ -24,6 +36,10 @@ internal sealed class TcpReadyHealthCheck(string host, int port, ReadOnlyMemory<
 
     /// <summary>The inline RESP command "PING\r\n"; a ready Redis answers it with +PONG.</summary>
     public static ReadOnlyMemory<byte> RedisHandshake { get; } = "PING\r\n"u8.ToArray();
+
+    /// <summary>A PostgreSQL SSLRequest (length 8, code 80877103); a ready server answers it with a
+    /// single 'S' or 'N'.</summary>
+    public static ReadOnlyMemory<byte> PostgresHandshake { get; } = new byte[] { 0, 0, 0, 8, 0x04, 0xD2, 0x16, 0x2F };
 
     /// <summary>Polls until the port is ready, throwing if it never becomes so.</summary>
     public async Task WaitUntilReadyAsync(TimeSpan timeout, CancellationToken cancellationToken)

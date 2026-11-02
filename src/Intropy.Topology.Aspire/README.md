@@ -6,7 +6,7 @@ It turns a validated `SystemTopology` into a local, F5-able Aspire application w
 
 1. discovers the validated system definition from the supplied assembly;
 2. generates Dapr components and per-component runtime configuration into a temporary directory; and
-3. translates the topology to Aspire resources: one Redis container for pub/sub and one sibling .NET project plus Dapr sidecar for each topology component.
+3. translates the topology to Aspire resources: one Redis container for pub/sub, one PostgreSQL container for processor state when the topology has a processor, and one sibling .NET project plus Dapr sidecar for each topology component.
 
 The adapter is deliberately one-way: Aspire receives ordinary resources; it does not need to understand the topology model.
 
@@ -37,6 +37,7 @@ A component's standalone Dapr resources live at `../<component>/local/dapr-compo
 ## Runtime behavior
 
 - Redis backs development pub/sub. It is published at host port `6380` because generated Dapr resources target `localhost:6380`; `dapr init` commonly reserves Redis's default `6379`.
+- PostgreSQL backs processor state (both of a processor's state components, plain and outbox, on one table). It is started only when the topology declares a processor, passwordless, at host port `6432` because generated state components target `localhost:6432`; a host install commonly holds `5432`. Its data lives as long as the container. Sidecars of processors also wait for PostgreSQL readiness. Not Redis: there the outbox lost updates and published events whose state was lost, even with one delivery at a time.
 - When the development definition mocks a platform service (`development.Mock(Services.Idempotency).FromOpenApi("mocks/idempotency-service.openapi.yaml")`), the host runs a Microcks Uber container at host port `8585`, imports each OpenAPI 3.0.x contract once Microcks is healthy, and verifies Microcks registered exactly one matching REST service. A component that `Calls` a mocked service starts only after that service's contract is imported. Generation emits a Dapr `HTTPEndpoint` named after the service's app ID, scoped to its callers, so service invocation reaches the mock unchanged. Without mocks, no Microcks container starts.
 - A port whose deployed binding reaches an HTTP API can be mocked the same way instead of resolved to a folder (`development.Mock(Ports.InvoiceApi).FromOpenApi("mocks/invoice-api.openapi.yaml")`). Generation emits the port's binding as `bindings.http` with the mock's Microcks base URI as its `url`, under the port's own name, so component code invokes the binding (`post`, `get`, … with a `path`) exactly as it does deployed. A component using a mocked port starts only after the port's contract is imported.
 - Components receive `INTROPY__COMPONENT` and `INTROPY__CONFIG` environment variables. The latter points to that component's generated `.intropy.json` file.

@@ -20,6 +20,8 @@ internal sealed class MissingRequiredOutputRule : IModelRule
                     "Extractor components must publish to at least one topic; add a Publishes call.",
                 ComponentKind.Gateway when component.Publishes.Count == 0 =>
                     "Gateway components must publish to at least one topic; add a Publishes call.",
+                ComponentKind.Processor when component.Publishes.Count == 0 =>
+                    "Processor components must publish to at least one topic; add a Publishes call. A component that only consumes is a loader.",
                 _ => null,
             };
 
@@ -47,6 +49,8 @@ internal sealed class MissingRequiredSubscriptionRule : IModelRule
             {
                 ComponentKind.Loader when component.Subscribes.Count == 0 =>
                     "Loader components must subscribe to a channel; add a Subscribes call.",
+                ComponentKind.Processor when component.Subscribes.Count == 0 =>
+                    "Processor components must subscribe to a channel; add a Subscribes call.",
                 _ => null,
             };
 
@@ -150,6 +154,29 @@ internal sealed class UnproducedTopicRule : IModelRule
                 DiagnosticSeverity.Warning,
                 $"The topic '{topic.TopicName}' on pubsub '{topic.PubSubName}' is subscribed to but no component publishes it.",
                 topic.TopicName);
+        }
+    }
+}
+
+/// <summary>
+/// A processor never publishes a message it handles: every event it published would come back to
+/// it, a loop the sequence guard can only stop if the republished event carries an older
+/// sequence. A new state is a new message.
+/// </summary>
+internal sealed class ProcessorRepublishRule : IModelRule
+{
+    public IEnumerable<TopologyDiagnostic> Evaluate(SystemTopology topology)
+    {
+        foreach (var component in topology.Components.Where(c => c.Kind is ComponentKind.Processor))
+        {
+            var handled = component.Subscribes.SelectMany(s => s.Messages).ToHashSet(StringComparer.Ordinal);
+            foreach (var publish in component.Publishes.Where(p => handled.Contains(p.Message)))
+            {
+                yield return new TopologyDiagnostic(
+                    DiagnosticSeverity.Error,
+                    $"Processor publishes the message '{publish.Message}' it also handles; it would consume its own output. Publish a new message.",
+                    component.Name);
+            }
         }
     }
 }

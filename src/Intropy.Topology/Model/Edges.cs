@@ -99,6 +99,48 @@ public sealed record InternalQueue
 }
 
 /// <summary>
+/// The state a processor keeps: two Dapr state components on one table — a plain one it reads and
+/// writes through when a decision publishes nothing, and one configured with the transactional
+/// outbox it commits through when a decision publishes, so the state write and the event succeed
+/// or fail together. The outbox publishes to exactly one channel, which is why a processor
+/// publishes on one channel only. The names are minted per component, so state is never shared
+/// between components; deployment chooses the backing store.
+/// </summary>
+public sealed record ProcessorState
+{
+    /// <summary>The plain state component's name (<c>&lt;component&gt;-state</c>).</summary>
+    public required string StateStoreName { get; init; }
+
+    /// <summary>The outbox-enabled state component's name (<c>&lt;component&gt;-state-outbox</c>).</summary>
+    public required string OutboxStateStoreName { get; init; }
+
+    /// <summary>The channel the outbox publishes the processor's messages on: the one channel the
+    /// processor publishes to; <see langword="null"/> while it declares no publication (which
+    /// validation rejects).</summary>
+    public required MessageChannel? Outbox { get; init; }
+
+    /// <summary>The plain state component's name for <paramref name="componentName"/>.</summary>
+    public static string StateStoreNameFor(string componentName) => $"{componentName}-state";
+
+    /// <summary>The outbox-enabled state component's name for <paramref name="componentName"/>.</summary>
+    public static string OutboxStateStoreNameFor(string componentName) => $"{componentName}-state-outbox";
+}
+
+/// <summary>
+/// The state a component's Dapr workflows run on: one state component, marked as the sidecar's
+/// actor state store, minted per component so no two components share workflow instances. The
+/// sidecar finds it by that marking; the component never names it.
+/// </summary>
+public sealed record WorkflowState
+{
+    /// <summary>The workflow state component's name (<c>&lt;component&gt;-workflow-state</c>).</summary>
+    public required string StateStoreName { get; init; }
+
+    /// <summary>The workflow state component's name for <paramref name="componentName"/>.</summary>
+    public static string StateStoreNameFor(string componentName) => $"{componentName}-workflow-state";
+}
+
+/// <summary>
 /// The one pubsub and the one topic a component runs on — what the framework reads from
 /// <c>INTROPY_PUBSUB_NAME</c> and <c>INTROPY_TOPIC_NAME</c>, and derives nothing of its own. The
 /// single derivation site, so the local host and deployment tooling pass the same names.

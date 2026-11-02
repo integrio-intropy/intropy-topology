@@ -23,6 +23,12 @@ public static class IntropyAspire
     /// </summary>
     internal const int RedisPort = 6380;
 
+    /// <summary>
+    /// Fixed host port for the local PostgreSQL backend (generated processor state YAML points
+    /// here). 6432 rather than the PostgreSQL default: a host install commonly holds 5432.
+    /// </summary>
+    internal const int PostgresPort = 6432;
+
     /// <summary>Fixed host port for the local Microcks Uber backend.</summary>
     internal const int MicrocksPort = 8585;
 
@@ -104,6 +110,7 @@ public static class IntropyAspire
         var configDir = Path.Combine(generatedRoot, GeneratedArtifacts.ConfigDir);
 
         var (redis, redisReadiness) = AddRedisBackend(builder);
+        var (postgres, postgresReadiness) = AddPostgresBackend(builder, topology);
         var (microcks, mockReadiness) = AddMicrocksBackend(builder, development);
 
         // Filled after the component loop; the hook closure only reads it at runtime.
@@ -137,6 +144,12 @@ public static class IntropyAspire
 
             await redisReadiness.WaitUntilReadyAsync(TimeSpan.FromMinutes(3), cancellationToken)
                 .ConfigureAwait(false);
+            if (postgresReadiness is not null && component.State is not null)
+            {
+                await postgresReadiness.WaitUntilReadyAsync(TimeSpan.FromMinutes(3), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             if (sidecarWaits.TryGetValue(evt.Resource.Name, out var subscriberSidecars))
             {
                 var notifications = evt.Services.GetRequiredService<ResourceNotificationService>();
@@ -176,14 +189,17 @@ public static class IntropyAspire
                 ? project.WithHttpEndpoint(name: GrpcAppEndpoint, env: "APP_PORT")
                 : project.WithHttpEndpoint();
 
-            Wire(project, component, stagedPath, configDir, redis,
+            Wire(project, component, stagedPath, configDir, redis, component.State is null ? null : postgres,
                 microcks is not null && (component.Uses.Count > 0 || mockReadiness!.MocksAnyPortOf(component)) ? microcks : null,
                 PortRootPaths(builder.AppHostDirectory, component, development), topology.Otlp);
             resources[component.Name] = project;
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
 
-        RegisterHostServices(builder, redisReadiness, RunToCompletionSidecarsFor(topology), RunToCompletionComponentsFor(topology, development));
+        IBackendReadiness backendReadiness = postgresReadiness is null
+            ? redisReadiness
+            : new AllBackendsReadiness([redisReadiness, postgresReadiness]);
+        RegisterHostServices(builder, backendReadiness, RunToCompletionSidecarsFor(topology), RunToCompletionComponentsFor(topology, development));
 
         if (unresolved.Count > 0)
         {
@@ -304,6 +320,33 @@ public static class IntropyAspire
     }
 
     /// <summary>
+    /// The local PostgreSQL behind every processor's state components, when the topology has a
+    /// processor; both results are null otherwise. A plain container rather than AddPostgres, for
+    /// the same reason as Redis: the generated state YAML speaks passwordless to localhost:6432.
+    /// The data lives as long as the container: a local run starts from empty state.
+    /// </summary>
+    private static (IResourceBuilder<ContainerResource>? Postgres, TcpReadyHealthCheck? Readiness) AddPostgresBackend(
+        IDistributedApplicationBuilder builder, SystemTopology topology)
+    {
+        if (!topology.Components.Any(c => c.State is not null))
+        {
+            return (null, null);
+        }
+
+        EnsureHostPortAvailable(PostgresPort, "PostgreSQL");
+        var postgres = builder
+            .AddContainer("postgres", "docker.io/library/postgres", "16-alpine")
+            .WithEnvironment("POSTGRES_HOST_AUTH_METHOD", "trust")
+            .WithEndpoint(port: PostgresPort, targetPort: 5432);
+        // Ready means the server answers, not that the proxy accepts: daprd fails a state component
+        // whose store is not up. The image's init server listens on the socket only, so a TCP answer
+        // comes from the final server.
+        var readiness = new TcpReadyHealthCheck("localhost", PostgresPort, TcpReadyHealthCheck.PostgresHandshake);
+        WithTcpReadiness(builder, postgres, readiness);
+        return (postgres, readiness);
+    }
+
+    /// <summary>
     /// The local Microcks Uber backend and its contract importer, when the development
     /// manifest declares mocks; both results are null otherwise.
     /// </summary>
@@ -369,7 +412,8 @@ public static class IntropyAspire
     /// declaration nothing is written: Aspire's own dashboard wiring remains the default, and
     /// these calls are the sole source of OTEL_EXPORTER_OTLP_* values this host injects.
     /// INTROPY_PUBSUB_NAME and INTROPY_TOPIC_NAME name the <see cref="ComponentChannel"/> the
-    /// component runs on, as deployment does; the framework derives neither. Each is left unset
+    /// component runs on, as deployment does; the framework derives neither. A processor also gets
+    /// INTROPY_STATESTORE_NAME and INTROPY_OUTBOX_STATESTORE_NAME, its minted state components. Each is left unset
     /// when the topology settles no single name for it. <paramref name="microcks"/> is passed only
     /// to a component that calls a mocked service or uses a mocked port; it then starts after
     /// Microcks.
@@ -380,6 +424,7 @@ public static class IntropyAspire
         string resourcesPath,
         string configDir,
         IResourceBuilder<ContainerResource> redis,
+        IResourceBuilder<ContainerResource>? postgres,
         IResourceBuilder<ContainerResource>? microcks,
         IReadOnlyDictionary<string, string> portRootPaths,
         OtlpSettings? otlp)
@@ -397,6 +442,11 @@ public static class IntropyAspire
                     AppEndpoint = receives ? GrpcAppEndpoint : null,
                 });
                 sidecar.WaitFor(redis);
+                if (postgres is not null)
+                {
+                    sidecar.WaitFor(postgres);
+                }
+
                 if (otlp is not null)
                 {
                     sidecar.WithAnnotation(OtlpVariables(otlp));
@@ -415,6 +465,12 @@ public static class IntropyAspire
         if (channel.TopicName is not null)
         {
             project.WithEnvironment("INTROPY_TOPIC_NAME", channel.TopicName);
+        }
+        // A processor's state components, by the names the topology minted, as deployment passes them.
+        if (component.State is { } state)
+        {
+            project.WithEnvironment("INTROPY_STATESTORE_NAME", state.StateStoreName);
+            project.WithEnvironment("INTROPY_OUTBOX_STATESTORE_NAME", state.OutboxStateStoreName);
         }
         if (otlp is not null)
         {

@@ -120,6 +120,7 @@ public sealed class IntropyAspireTests : IDisposable
     [InlineData(ComponentKind.Loader, false)]
     [InlineData(ComponentKind.Gateway, false)]
     [InlineData(ComponentKind.Job, true)]
+    [InlineData(ComponentKind.Processor, false)]
     public void IsRunToCompletion_ShouldFollowTheKindsSingleLegitimateHost(
         ComponentKind kind, bool expected)
     {
@@ -178,6 +179,63 @@ public sealed class IntropyAspireTests : IDisposable
 
         // Assert
         Assert.Contains(builder.Resources, r => r.Name == "redis");
+    }
+
+    [Fact]
+    public void Apply_WithoutAProcessor_ShouldStartNoPostgresBackend()
+    {
+        // Arrange
+        var builder = CreateBuilder();
+
+        // Act
+        IntropyAspire.Apply(builder, Topology(), GeneratedRoot);
+
+        // Assert — only a processor keeps state.
+        Assert.DoesNotContain(builder.Resources, r => r.Name == "postgres");
+    }
+
+    [Fact]
+    public void Apply_WithAProcessor_ShouldStartAPostgresBackendThatOnlyTheProcessorWaitsFor()
+    {
+        // Arrange
+        var totals = MessageRef<RawOrder>.Define("order-totals", pubSub: "pubsub-a");
+        var system = SystemBuilder.Create("order-flow");
+        system.AddExtractor("order-extractor").From(s_webshop).Publishes(s_raw);
+        system.AddProcessor("order-totals").Subscribes(s_raw).Publishes(totals);
+        system.AddLoader("order-loader").Subscribes(totals).To(s_erp);
+        WriteProject("order-totals");
+        var builder = CreateBuilder();
+
+        // Act
+        IntropyAspire.Apply(builder, system.Build(), GeneratedRoot);
+
+        // Assert — at the host port the generated state components connect to; full concurrency.
+        var postgres = Assert.Single(builder.Resources, r => r.Name == "postgres");
+        var endpoint = Assert.Single(postgres.Annotations.OfType<EndpointAnnotation>());
+        Assert.Equal(IntropyAspire.PostgresPort, endpoint.Port);
+        Assert.Equal(5432, endpoint.TargetPort);
+        Assert.Contains($"port={IntropyAspire.PostgresPort} ", TopologyGenerator.LocalPostgresConnectionString, StringComparison.Ordinal);
+        Assert.Contains(SidecarResource(builder, "order-totals").Annotations.OfType<WaitAnnotation>(), w => w.Resource.Name == "postgres");
+        Assert.DoesNotContain(SidecarResource(builder, "order-loader").Annotations.OfType<WaitAnnotation>(), w => w.Resource.Name == "postgres");
+        Assert.Null(SidecarOptions(builder, "order-totals").AppMaxConcurrency);
+    }
+
+    [Fact]
+    public void Apply_WithAProcessor_WhenPostgresPortIsOccupied_ShouldExplainHowToRecover()
+    {
+        // Arrange
+        using var listener = new TcpListener(IPAddress.Loopback, IntropyAspire.PostgresPort);
+        listener.Start();
+        var system = SystemBuilder.Create("order-flow");
+        system.AddExtractor("order-extractor").From(s_webshop).Publishes(s_raw);
+        system.AddProcessor("order-totals").Subscribes(s_raw).Publishes(MessageRef<RawOrder>.Define("order-totals"));
+        var builder = CreateBuilder();
+
+        // Act
+        var ex = Assert.Throws<InvalidOperationException>(() => IntropyAspire.Apply(builder, system.Build(), GeneratedRoot));
+
+        // Assert
+        Assert.Contains("PostgreSQL requires host port 6432", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -423,6 +481,26 @@ public sealed class IntropyAspireTests : IDisposable
             Path.GetFullPath(Path.Combine(AppHostDir, "./test/webshop")),
             extractorEnv["Ports__webshop__RootPath"]);
         Assert.False(loaderEnv.ContainsKey("Ports__erp__RootPath"));
+    }
+
+    [Fact]
+    public void PortRootPaths_WithALookupPort_ShouldResolveNoRootPath()
+    {
+        // Arrange — a lookup is consulted through the binding, never scanned as a folder.
+        var s = SystemBuilder.Create("lookup-system");
+        s.AddExtractor("source").Publishes(s_raw);
+        s.AddProcessor("enricher")
+            .Subscribes(s_raw)
+            .Publishes(MessageRef<RawOrder>.Define("order-enriched", pubSub: "pubsub-a"))
+            .LooksUp(PortRef.Define("ladok"));
+        var enricher = s.Build().Components.Single(c => c.Name == "enricher");
+        var development = new DevelopmentManifest([], [new PortFileResolution("ladok", "./test/ladok")], []);
+
+        // Act
+        var paths = IntropyAspire.PortRootPaths(AppHostDir, enricher, development);
+
+        // Assert
+        Assert.Empty(paths);
     }
 
     [Fact]
@@ -672,6 +750,50 @@ public sealed class IntropyAspireTests : IDisposable
         // Assert
         Assert.Equal("order-flow-pubsub", env["INTROPY_PUBSUB_NAME"]);
         Assert.Equal("internal-order-sync", env["INTROPY_TOPIC_NAME"]);
+    }
+
+    [Fact]
+    public async Task Apply_WithAProcessor_ShouldInjectItsStateStoresAndReceiveOverGrpc()
+    {
+        // Arrange
+        var totals = MessageRef<RawOrder>.Define("order-totals", pubSub: "pubsub-a");
+        var system = SystemBuilder.Create("order-flow");
+        system.AddExtractor("order-extractor").From(s_webshop).Publishes(s_raw);
+        system.AddProcessor("order-totals").Subscribes(s_raw).Publishes(totals);
+        system.AddLoader("order-loader").Subscribes(totals).To(s_erp);
+        WriteProject("order-totals");
+        var builder = CreateBuilder();
+        IntropyAspire.Apply(builder, system.Build(), GeneratedRoot);
+        var resource = builder.Resources.OfType<IResourceWithEnvironment>().Single(r => r.Name == "order-totals");
+
+        // Act
+        var env = await resource.GetEnvironmentVariableValuesAsync(DistributedApplicationOperation.Publish);
+
+        // Assert — the state components the topology minted, as deployment passes them.
+        Assert.Equal("order-totals-state", env["INTROPY_STATESTORE_NAME"]);
+        Assert.Equal("order-totals-state-outbox", env["INTROPY_OUTBOX_STATESTORE_NAME"]);
+        Assert.Equal("pubsub-a", env["INTROPY_PUBSUB_NAME"]);
+        // Two topics: the input comes from the rendered Subscription, so no single topic is passed.
+        Assert.False(env.ContainsKey("INTROPY_TOPIC_NAME"));
+        var options = SidecarOptions(builder, "order-totals");
+        Assert.Equal("grpc", options.AppProtocol);
+        Assert.Equal(IntropyAspire.GrpcAppEndpoint, options.AppEndpoint);
+    }
+
+    [Fact]
+    public async Task Apply_WithALoader_ShouldInjectNoStateStores()
+    {
+        // Arrange
+        var builder = CreateBuilder();
+        IntropyAspire.Apply(builder, Topology(), GeneratedRoot);
+        var resource = builder.Resources.OfType<IResourceWithEnvironment>().Single(r => r.Name == "order-loader");
+
+        // Act
+        var env = await resource.GetEnvironmentVariableValuesAsync(DistributedApplicationOperation.Publish);
+
+        // Assert
+        Assert.False(env.ContainsKey("INTROPY_STATESTORE_NAME"));
+        Assert.False(env.ContainsKey("INTROPY_OUTBOX_STATESTORE_NAME"));
     }
 
     [Fact]

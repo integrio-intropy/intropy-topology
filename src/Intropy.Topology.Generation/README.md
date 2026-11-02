@@ -7,6 +7,16 @@ profile. Backend-agnostic and dependency-free (YAML is emitted by a small intern
 It produces, deterministically:
 
 - one Dapr **pub/sub** component per distinct `PubSubName` (Redis Streams backed),
+- one Dapr **Resiliency** per pubsub (`<pubsub>-resiliency`): an inbound retry with exponential
+  backoff, so a delivery a component answers with RETRY is redelivered, not dropped,
+- two Dapr **state** components per processor, scoped to it (`state.postgresql` v2 on the local
+  host's PostgreSQL, `localhost:6432`, one table; on Redis the outbox lost updates even one delivery
+  at a time): `<processor>-state`, and
+  `<processor>-state-outbox`, whose `outboxPublishPubsub`/`outboxPublishTopic` name the processor's
+  publish channel,
+- one Dapr **state** component per loader that declares `WithWorkflowState()`
+  (`<loader>-workflow-state`, on the pubsub's Redis, `actorStateStore: "true"`), which the
+  sidecar's workflow runtime keeps its instances in,
 - one Dapr **binding** per port, named after the port, `scopes` from `UsedBy`:
   `bindings.localstorage` rooted at the port's development-manifest folder, or, for a port the
   development definition mocks (`development.Mock(Ports.X).FromOpenApi(...)`), `bindings.http`

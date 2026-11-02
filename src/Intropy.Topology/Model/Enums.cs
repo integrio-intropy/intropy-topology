@@ -17,6 +17,10 @@ public enum ComponentKind
 
     /// <summary>Runs scheduled work to completion that no other kind describes.</summary>
     Job,
+
+    /// <summary>Consumes a topic, decides each message against the state it keeps, and publishes
+    /// new messages committed together with that state.</summary>
+    Processor,
 }
 
 /// <summary>What happens to the messages on a subscribed channel that the subscription does not
@@ -41,4 +45,9 @@ public enum PortDirection
 
     /// <summary>Writes to the external system (<c>To</c>).</summary>
     Out,
+
+    /// <summary>Consults the external system mid-flow, request/response, without it driving or
+    /// receiving the flow (<c>LooksUp</c>): enrichment, such as resolving what an event refers to.
+    /// At the Dapr level an output-binding invocation (e.g. <c>get</c>), never a trigger.</summary>
+    Lookup,
 }

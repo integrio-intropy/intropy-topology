@@ -64,6 +64,14 @@ public sealed class SystemBuilder
     public GatewayBuilder AddGateway(string name) =>
         new(Register(new GatewayComponent(NameRules.RequireLabel(name, nameof(name)))));
 
+    /// <summary>Declares a processor: consumes one channel, decides each message against the state
+    /// it keeps, and publishes new messages on one channel, committed together with that state.</summary>
+    /// <param name="name">The component's name (DNS-1123 label; K8s resource name / Dapr app-id).</param>
+    /// <returns>The processor's builder.</returns>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is not a valid DNS-1123 label.</exception>
+    public ProcessorBuilder AddProcessor(string name) =>
+        new(Register(new ProcessorComponent(NameRules.RequireLabel(name, nameof(name)))));
+
     /// <summary>Adds a job: scheduled work that runs to completion and declares no topic or port.</summary>
     /// <param name="name">The component's name (DNS-1123 label).</param>
     public JobBuilder AddJob(string name) =>
