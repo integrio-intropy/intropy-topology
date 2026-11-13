@@ -93,7 +93,7 @@ public sealed class OrderFlowSystem : ISystemDefinition
 }
 ```
 
-A method that would be illegal for the block type does not exist on its builder — `AddLoader(...).Publishes(topic)` is a compile error, because loaders publish nothing, and `AddExtractor(...).Subscribes(topic)` does not compile, because extractors don't subscribe.
+A method that would be illegal for the block type does not exist on its builder — `AddExtractor(...).Subscribes(topic)` does not compile, because extractors don't subscribe. A loader *can* publish (`AddLoader(...).Publishes(topic)`) — most often a **receipt**: an id or confirmation the destination system assigned, published for a different component to pick up. A rarer shape is a **self-trigger**: the loader publishes a message and also `AlsoHandles` it on the same channel it subscribes to, so the trigger runs through the same ack/retry-backed pipeline as everything else.
 
 ## Build and inspect
 

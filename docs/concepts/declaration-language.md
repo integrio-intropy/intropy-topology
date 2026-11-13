@@ -43,7 +43,7 @@ Component kind determines the allowed relationships and their counts:
 | Component kind | Reads from ports | Writes to ports | Publishes messages | Subscribes to messages | Calls services |
 |----------------|------------------|-----------------|--------------------|-----------------------|---------------|
 | Extractor | Zero or more | None | One or more | None | Zero or more |
-| Loader | None | Zero or more | None | Exactly one | Zero or more |
+| Loader | None | Zero or more | Zero or more | Exactly one | Zero or more |
 | Transactional integration | One or more | One or more | None | None | Zero or more |
 
 An extractor without a declared input port keeps its source inside the component. A loader without a declared output port keeps its destination inside the component. Absence of a port means no shared connection is declared, not that the component has no source or destination.
