@@ -239,8 +239,8 @@ Rules:
 
 ### Loader
 
-A loader subscribes to one channel — handling at least one of its messages — and may write to an
-outside-world port.
+A loader subscribes to one channel — handling at least one of its messages — may write to an
+outside-world port, and may publish messages of its own.
 
 ```csharp
 builder.AddLoader("order-loader")
@@ -248,11 +248,38 @@ builder.AddLoader("order-loader")
     .To(Ports.OrderLoaderDestination);
 ```
 
+Two shapes come up in practice. The more common one is a **receipt**: the loader writes to an
+external system, gets back an identifier or confirmation the system assigned, and publishes
+that as a message of its own for some other component to pick up — a different message, often
+consumed by a different component than the one that produced `Messages.Orders`:
+
+```csharp
+builder.AddLoader("order-loader")
+    .Subscribes(Messages.Orders)
+    .To(Ports.OrderLoaderDestination)
+    .Publishes(Messages.OrderReceipt);   // the destination's assigned id, for another component
+```
+
+The other is a **self-trigger**: the loader publishes a message and also handles it on the
+same channel it subscribes to, so the trigger runs through the same ack/retry-backed pipeline
+as everything else, rather than being invoked in-process out of band:
+
+```csharp
+builder.AddLoader("order-loader")
+    .Subscribes(Messages.Orders, configure: sub => sub.AlsoHandles(Messages.ResyncRequested))
+    .Publishes(Messages.ResyncRequested)
+    .To(Ports.OrderLoaderDestination);
+```
+
+Both are the same `Publishes` call — a loader's published messages are no different from an
+extractor's. What differs is only whether the published message happens to also be one of the
+loader's own subscribed messages (self-trigger) or not (receipt, the more common case).
+
 Rules:
 
 - `Subscribes` is required once, and exactly once: a loader that never subscribes is a `Build()` error, and a second `Subscribes` throws at the call site.
 - `To` is optional; a loader without `To` has a private local destination.
-- Loaders cannot publish messages.
+- `Publishes` is optional, and may be called several times with distinct messages, the same as an extractor's.
 
 ### Transactional integration
 
@@ -277,9 +304,12 @@ Rules:
 Illegal methods are absent from the builder types:
 
 ```csharp
-builder.AddLoader("loader").Publishes(Messages.Orders);        // does not compile
+builder.AddLoader("loader").From(Ports.OrderExtractorSource);  // does not compile
 builder.AddExtractor("extractor").Subscribes(Messages.Orders); // does not compile
 ```
+
+A second `Subscribes` on one loader is a different kind of illegality: it compiles, and throws
+`InvalidOperationException` at the declaration call.
 
 ## OTLP export DSL
 

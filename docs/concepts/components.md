@@ -30,7 +30,7 @@ Each kind exposes only its own legal edges:
 | Kind | Subscribes | Publishes | Port | Services | Required |
 |------|-----------|-----------|------|----------|----------|
 | Extractor | — | messages | `From(port)` | `Calls(service)` | `Publishes` |
-| Loader | exactly 1 message | — | `To(port)` | `Calls(service)` | `Subscribes` |
+| Loader | one channel (one or more messages on it) | messages | `To(port)` | `Calls(service)` | `Subscribes` |
 | Transactional integration | — | — | `From` / `To(port)` | `Calls(service)` | `From` and `To` |
 
 `Subscribes`/`Publishes` are the asynchronous (message) edges; `From`/`To` are the edges out through ports; `Calls` records Dapr service app IDs the component invokes. A component may publish several distinct messages — several may share one channel; publishing the same message twice throws `InvalidOperationException` at the declaration. See [Messages](messages.md), [Ports](ports.md), and the [Model and DSL Reference](model.md).
@@ -58,9 +58,17 @@ A second minted identity is derived rather than declared: a transactional integr
 ## What the compiler rejects
 
 ```csharp
-s.AddLoader("l").Publishes(topic);        // loaders publish nothing
+s.AddLoader("l").From(port);              // loaders reach the outside world through To
 s.AddExtractor("e").Subscribes(topic);    // extractors read ports, not topics
 ```
+
+A loader *can* publish (`s.AddLoader("l").Subscribes(a).Publishes(b)` compiles). The common
+case is a **receipt**: the loader writes to an external system, gets back an id or
+confirmation, and publishes that as a message a different component subscribes to. A rarer
+case is a **self-trigger**: the loader publishes a message and also `AlsoHandles` it on the
+same channel it subscribes to, so the trigger runs through the same ack/retry-backed pipeline
+as everything else, rather than being invoked in-process out of band. See
+[Model and DSL Reference](model.md#loader) for both, worked out.
 
 Only what types cannot check — and what no single declaration line can decide — is validated at `Build()`. Invariants local to one declaration chain throw at the call site: a second `Subscribes` on one loader, a repeated `Calls` or `Publishes` channel, a handled message twice or off the subscription's channel. `Build()` validates what spans components: completeness (a required output that was never declared, a missing subscription, a topic with only one side) and cross-component conflicts. A loader needs no `To`: its destination may stay a private local component. See [Validation](validation.md).
 

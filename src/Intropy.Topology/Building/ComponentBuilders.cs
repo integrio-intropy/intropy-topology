@@ -66,8 +66,9 @@ public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, Extrac
 }
 
 /// <summary>Fluent builder for a loader: an edge block that subscribes to one channel —
-/// handling one or more of the messages on it — and writes to an external system through a port;
-/// loaders publish nothing.</summary>
+/// handling one or more of the messages on it — writes to an external system through a port,
+/// and may publish messages of its own, most often a receipt carrying what that system
+/// returned.</summary>
 public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderComponent>
 {
     internal LoaderBuilder(LoaderComponent component) : base(component) { }
@@ -116,6 +117,21 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
     public LoaderBuilder To(PortRef port)
     {
         Component.AddPort(port, PortDirection.Out);
+        return this;
+    }
+
+    /// <summary>Declares that the loader publishes a message. Most often a receipt: the loader
+    /// writes to its destination, gets back an id or a confirmation, and publishes it for
+    /// another component. Less often it is a message the loader handles itself
+    /// (<see cref="Subscribes"/> with <see cref="SubscriptionBuilder.AlsoHandles"/> on the same
+    /// channel), self-triggering its own work. Several published messages may travel on the
+    /// same channel.</summary>
+    /// <param name="message">The message the loader publishes.</param>
+    /// <exception cref="InvalidOperationException">The component already declares publishing
+    /// <paramref name="message"/>; a component publishes a message at most once.</exception>
+    public LoaderBuilder Publishes(MessageRef message)
+    {
+        Component.AddPublish(message);
         return this;
     }
 }

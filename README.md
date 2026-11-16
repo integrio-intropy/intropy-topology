@@ -124,12 +124,14 @@ The block-specific builders expose only each block's legal edges, so these are c
 method simply does not exist:
 
 ```csharp
-builder.AddLoader("l").Subscribes(t).Publishes(t);   // loaders publish nothing
-builder.AddExtractor("e").Subscribes(t);             // extractors read ports, not topics
+builder.AddLoader("l").From(p);          // loaders reach the outside world through To
+builder.AddExtractor("e").Subscribes(t); // extractors read ports, not topics
 ```
 
 Per block: extractors read a port (`From`) and publish messages; loaders subscribe to one
-message and may write through a port (a private local destination needs no declared edge);
+channel, may write through a port (a private local destination needs no declared edge), and
+may also publish — most often a receipt for another component, occasionally a message they
+also subscribe to, self-triggering their own work the same way everything else arrives;
 transactional integrations read/write ports. Every message should have both sides: `Build()`
 warns when a published message has no subscriber or a subscription has no publisher, while
 deployment validation can treat those incomplete channels as errors.

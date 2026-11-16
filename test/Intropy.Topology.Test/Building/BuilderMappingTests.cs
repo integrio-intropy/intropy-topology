@@ -79,6 +79,63 @@ public class BuilderMappingTests
     }
 
     [Fact]
+    public void Publishes_OnLoader_ShouldRecordTopic()
+    {
+        // Arrange: the receipt shape — the loader publishes a different message than it consumes,
+        // for another component to pick up
+        var s = SystemBuilder.Create("test-system");
+        s.AddLoader("loader").Subscribes(TestMessages.Raw).Publishes(TestMessages.Enriched);
+        s.AddExtractor("source").Publishes(TestMessages.Raw);
+        s.AddLoader("receipt-sink").Subscribes(TestMessages.Enriched);
+
+        // Act
+        var edge = s.Build().Components[0].Publishes.Single();
+
+        // Assert
+        Assert.Equal("test-pubsub", edge.PubSubName);
+        Assert.Equal("enriched-events", edge.TopicName);
+    }
+
+    [Fact]
+    public void PublishAndSubscribe_DifferentMessages_ShouldMaterializeBothSidesOfEachTopic()
+    {
+        // Arrange: the receipt shape end to end — an extractor feeds the loader, and the loader's
+        // receipt is consumed by a different component
+        var s = SystemBuilder.Create("test-system");
+        s.AddExtractor("source").Publishes(TestMessages.Raw);
+        s.AddLoader("loader").Subscribes(TestMessages.Raw).Publishes(TestMessages.Enriched);
+        s.AddLoader("receipt-sink").Subscribes(TestMessages.Enriched);
+
+        // Act
+        var topology = s.Build();
+
+        // Assert
+        var raw = topology.Topics.Single(t => t.TopicName == "raw-events");
+        Assert.Equal(["source"], raw.Publishers);
+        Assert.Equal(["loader"], raw.Subscribers);
+        var enriched = topology.Topics.Single(t => t.TopicName == "enriched-events");
+        Assert.Equal(["loader"], enriched.Publishers);
+        Assert.Equal(["receipt-sink"], enriched.Subscribers);
+    }
+
+    [Fact]
+    public void PublishAndSubscribe_SameMessageOnOneChannel_ShouldMaterializeBothEdgesWithoutDuplication()
+    {
+        // Arrange: the self-trigger pattern — a loader subscribes to and publishes the same
+        // message on its one channel, so the topic sees it as both publisher and subscriber
+        var s = SystemBuilder.Create("test-system");
+        s.AddLoader("loader").Subscribes(TestMessages.Raw).Publishes(TestMessages.Raw);
+
+        // Act
+        var topology = s.Build();
+
+        // Assert
+        var topic = Assert.Single(topology.Topics);
+        Assert.Equal(["loader"], topic.Publishers);
+        Assert.Equal(["loader"], topic.Subscribers);
+    }
+
+    [Fact]
     public void FromAndTo_ShouldMapDirections()
     {
         // Arrange
@@ -106,6 +163,19 @@ public class BuilderMappingTests
         // Assert
         Assert.Same(builder, builder.Publishes(TestMessages.Raw));
         Assert.Same(builder, builder.From(TestPorts.Pim));
+    }
+
+    [Fact]
+    public void LoaderFluentMethods_ShouldReturnSameBuilderInstance()
+    {
+        // Arrange
+        var s = SystemBuilder.Create("test-system");
+        var builder = s.AddLoader("loader");
+
+        // Assert
+        Assert.Same(builder, builder.Subscribes(TestMessages.Raw));
+        Assert.Same(builder, builder.Publishes(TestMessages.Raw));
+        Assert.Same(builder, builder.To(TestPorts.Erp));
     }
 
     [Fact]

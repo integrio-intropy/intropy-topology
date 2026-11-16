@@ -144,6 +144,25 @@ public class TopologyGeneratorTests
     }
 
     [Fact]
+    public void Generate_WithALoaderPublishingAndSubscribingTheSameMessage_ShouldScopeItOnceNotTwice()
+    {
+        // Arrange — the self-trigger pattern: a loader publishes a command to itself and also
+        // subscribes to it, on its one channel.
+        var message = MessageRef<string>.Define("resync-requested", pubSub: "self-loop-pubsub");
+        var builder = SystemBuilder.Create("self-loop-system");
+        builder.AddLoader("loader").Subscribes(message).Publishes(message);
+
+        // Act
+        var files = TopologyGenerator.Generate(builder.Build(), new DevelopmentManifest([], [], []),
+            Directory.GetCurrentDirectory()).Files;
+
+        // Assert — scoped once, not twice, despite being both publisher and subscriber
+        var pubSub = files.Single(f => f.RelativePath == "components/self-loop-pubsub.yaml");
+        Assert.Contains("scopes:", pubSub.Content, StringComparison.Ordinal);
+        Assert.Single(pubSub.Content.Split('\n'), line => line.Trim() == "- \"loader\"");
+    }
+
+    [Fact]
     public void Generate_ShouldCarry_InternalQueueInTheRuntimeConfig()
     {
         // Act

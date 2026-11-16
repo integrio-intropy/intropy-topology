@@ -26,11 +26,11 @@ A component is an integration workload with a name and a kind. It contains the p
 
 There are three component kinds:
 
-| Kind | Connections |
-|------|-------------|
-| Extractor | Reads from optional source ports and publishes one or more messages. |
-| Loader | Subscribes to one message and writes through optional destination ports. |
-| Transactional integration | Reads from at least one source port and writes through at least one destination port. |
+| Kind | Connections                                                                                                                                 |
+|------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| Extractor | Reads from optional source ports and publishes one or more messages.                                                                        |
+| Loader | Subscribes to one or more messages on one channel, writes through optional destination ports, and may publish messages, typically receipts. |
+| Transactional integration | Reads from at least one source port and writes through at least one destination port.                                                       |
 
 All three kinds can invoke services. A transactional integration also has an internal hand-off between receiving and sending. That hand-off is not a public message connection.
 
