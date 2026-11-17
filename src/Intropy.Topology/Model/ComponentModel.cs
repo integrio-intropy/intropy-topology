@@ -43,4 +43,16 @@ public sealed record ComponentModel
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<EndpointEdge>? Endpoints { get; init; }
+
+    /// <summary>
+    /// The Dapr state store the component keeps its read cursors in, minted by the
+    /// materializer as <c>&lt;component&gt;-cursors</c> when it reads an external port;
+    /// <see langword="null"/> otherwise, and then omitted when serializing. One store per
+    /// component: the framework keys each cursor record by component and port.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CursorStore { get; init; }
+
+    /// <summary>The cursor store's name for <paramref name="componentName"/>.</summary>
+    public static string CursorStoreNameFor(string componentName) => $"{componentName}-cursors";
 }

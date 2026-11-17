@@ -112,12 +112,18 @@ public static class IntropyGenerate
 
     private sealed record GraphDevelopment(
         IReadOnlyList<GraphMock>? Mocks,
-        IReadOnlyList<GraphFilePort>? Files)
+        IReadOnlyList<GraphFilePort>? Files,
+        IReadOnlyList<GraphPortSettings>? Settings)
     {
         public static GraphDevelopment From(DevelopmentManifest development) => new(
             Optional(development.Mocks.Select(GraphMock.From)),
-            Optional(development.Files.Select(GraphFilePort.From)));
+            Optional(development.Files.Select(GraphFilePort.From)),
+            Optional(development.Settings.GroupBy(s => s.PortName, StringComparer.Ordinal)
+                .Select(g => new GraphPortSettings(g.Key, [.. g.Select(s => s.Key)]))));
     }
+
+    // Keys only: a local setting such as a connection string carries a password.
+    private sealed record GraphPortSettings(string Port, IReadOnlyList<string> Keys);
 
     // A service mock keeps its appId key; a port mock names its port instead.
     private sealed record GraphMock(string? AppId, string? Port, string Artifact, string Title, string Version, string BaseUri)
@@ -142,7 +148,8 @@ public static class IntropyGenerate
         IReadOnlyList<GraphEndpoint>? Endpoints,
         IReadOnlyList<string>? Uses,
         GraphInternalQueue? InternalQueue,
-        GraphChannel? Channel)
+        GraphChannel? Channel,
+        string? CursorStore)
     {
         public static GraphComponent From(ComponentModel component) => new(
             component.Name,
@@ -158,7 +165,8 @@ public static class IntropyGenerate
                 ? null
                 : new GraphInternalQueue(component.InternalQueue.PubSubName, component.InternalQueue.TopicName,
                     SubscriptionRouting.ResourceNameFor(component.Name), SubscriptionRouting.UnhandledPath),
-            GraphChannel.From(ComponentChannel.For(component)));
+            GraphChannel.From(ComponentChannel.For(component)),
+            component.CursorStore);
     }
 
     /// <summary>The one pubsub and topic the component runs on, as a deployment passes them in
@@ -250,11 +258,14 @@ public static class IntropyGenerate
 
     private sealed record GraphPort(
         string Name,
+        string? Kind,
         IReadOnlyList<string>? Directions,
         IReadOnlyList<string>? UsedBy)
     {
+        // Kind appears only for an external port, so graphs of binding-only systems are unchanged.
         public static GraphPort From(PortResource port) => new(
             port.Name,
+            port.Kind is PortKind.External ? "external" : null,
             Optional(port.Directions.Select(Direction)),
             Optional(port.UsedBy));
     }

@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Intropy.Topology.Model;
 using Intropy.Topology.Validation;
 
 namespace Intropy.Topology;
@@ -113,13 +114,33 @@ public sealed record PortRef
     /// <summary>The port's name (DNS-1123 label, e.g. <c>pim</c>).</summary>
     public string Name { get; }
 
-    private PortRef(string name) => Name = name;
+    /// <summary>How the component reaches the port: through a Dapr binding of the port's name
+    /// (<see cref="PortKind.Binding"/>), or through a client of its own
+    /// (<see cref="PortKind.External"/>).</summary>
+    public PortKind Kind { get; }
 
-    /// <summary>Declares a port.</summary>
+    private PortRef(string name, PortKind kind)
+    {
+        Name = name;
+        Kind = kind;
+    }
+
+    /// <summary>Declares a port reached through a Dapr binding of the same name.</summary>
     /// <param name="name">The port's name (DNS-1123 label).</param>
     /// <exception cref="ArgumentException">The name is not a valid DNS-1123 label.</exception>
     public static PortRef Define([ConstantExpected] string name) =>
-        new(NameRules.RequireLabel(name, nameof(name)));
+        new(NameRules.RequireLabel(name, nameof(name)), PortKind.Binding);
+
+    /// <summary>
+    /// Declares an external port: a system the component reaches through a client of its own,
+    /// such as a database or an HTTP API, rather than a Dapr binding. It can be read (<c>From</c>),
+    /// written (<c>To</c>), or both by different components. Each component that reads an external
+    /// port gets a state store for its cursors, named <c>&lt;component&gt;-cursors</c>.
+    /// </summary>
+    /// <param name="name">The port's name (DNS-1123 label).</param>
+    /// <exception cref="ArgumentException">The name is not a valid DNS-1123 label.</exception>
+    public static PortRef DefineExternal([ConstantExpected] string name) =>
+        new(NameRules.RequireLabel(name, nameof(name)), PortKind.External);
 }
 
 

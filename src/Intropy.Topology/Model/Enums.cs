@@ -42,3 +42,18 @@ public enum PortDirection
     /// <summary>Writes to the external system (<c>To</c>).</summary>
     Out,
 }
+
+/// <summary>How a component reaches a port.</summary>
+[System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PortKind>))]
+public enum PortKind
+{
+    /// <summary>Through a Dapr binding named after the port (the default). The binding's type,
+    /// address and credentials are deployment configuration.</summary>
+    Binding,
+
+    /// <summary>Reached by the component itself, through a client or adapter of its own (such as a
+    /// database or an HTTP API), with settings the deployment supplies. There is no Dapr binding. A
+    /// component that reads the port keeps a cursor between runs in a state store the topology
+    /// mints; a component that writes to it needs only the settings.</summary>
+    External,
+}

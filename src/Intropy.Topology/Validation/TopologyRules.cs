@@ -20,12 +20,14 @@ internal static class TopologyRules
         new Rules.PubSubPortNameCollisionRule(),
         new Rules.ServiceAppIdCollisionRule(),
         new Rules.EndpointNameCollisionRule(),
+        new Rules.CursorStoreNameCollisionRule(),
     ];
 
     private static readonly IDeclarationRule[] DeclarationRules =
     [
         new Rules.MessageChannelConflictRule(),
         new Rules.MessageContractConflictRule(),
+        new Rules.PortKindConflictRule(),
     ];
 
     public static IReadOnlyList<TopologyDiagnostic> Run(SystemBuilder builder, SystemTopology topology)

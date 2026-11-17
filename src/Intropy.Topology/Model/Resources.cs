@@ -93,8 +93,14 @@ public sealed record PortResource
     /// <summary>The port's name (DNS-1123 label) — its whole identity.</summary>
     public required string Name { get; init; }
 
-    /// <summary>The Dapr binding component name — identical to <see cref="Name"/>.</summary>
+    /// <summary>The Dapr binding component name — identical to <see cref="Name"/>. An external port
+    /// renders no binding; the name is still reserved.</summary>
     public string DaprComponentName => DaprComponentNameFor(Name);
+
+    /// <summary>How the port is reached. Omitted when serializing a binding port, so the models of
+    /// systems without external ports serialize unchanged.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public PortKind Kind { get; init; }
 
     /// <summary>The union of directions the port is used in.</summary>
     public required IReadOnlyList<PortDirection> Directions { get; init; }

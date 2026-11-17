@@ -178,7 +178,8 @@ public static class IntropyAspire
 
             Wire(project, component, stagedPath, configDir, redis,
                 microcks is not null && (component.Uses.Count > 0 || mockReadiness!.MocksAnyPortOf(component)) ? microcks : null,
-                PortRootPaths(builder.AppHostDirectory, component, development), topology.Otlp);
+                PortRootPaths(builder.AppHostDirectory, component, development),
+                ExternalPortVariables(topology, component, development), topology.Otlp);
             resources[component.Name] = project;
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
@@ -382,6 +383,7 @@ public static class IntropyAspire
         IResourceBuilder<ContainerResource> redis,
         IResourceBuilder<ContainerResource>? microcks,
         IReadOnlyDictionary<string, string> portRootPaths,
+        IReadOnlyDictionary<string, string> externalPortVariables,
         OtlpSettings? otlp)
     {
         const string development = "Development";
@@ -427,6 +429,10 @@ public static class IntropyAspire
         {
             project.WithEnvironment($"Ports__{portName}__RootPath", rootPath);
         }
+        foreach (var (name, value) in externalPortVariables)
+        {
+            project.WithEnvironment(name, value);
+        }
         if (microcks is not null)
         {
             project.WaitFor(microcks);
@@ -447,6 +453,35 @@ public static class IntropyAspire
                 context.EnvironmentVariables[name] = value;
             }
         });
+
+    /// <summary>
+    /// The configuration of each external port <paramref name="component"/> reads or writes, keyed
+    /// by variable name: the port's local settings, as <c>Ports__&lt;port&gt;__&lt;key&gt;</c>, and
+    /// for a port it reads, the cursor store the topology minted, as
+    /// <c>Ports__&lt;port&gt;__CursorStore</c>. Named as the framework binds a port's section,
+    /// <c>Ports:&lt;port&gt;</c>.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, string> ExternalPortVariables(
+        SystemTopology topology, ComponentModel component, DevelopmentManifest development)
+    {
+        var variables = new Dictionary<string, string>(StringComparer.Ordinal);
+        var external = topology.Ports.Where(p => p.Kind is PortKind.External).Select(p => p.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var port in component.Ports.Where(p => external.Contains(p.PortName)))
+        {
+            if (port.Direction is PortDirection.In && component.CursorStore is not null)
+            {
+                variables[$"Ports__{port.PortName}__{DevelopmentBuilder.PortSettingsBuilder.CursorStoreKey}"] = component.CursorStore;
+            }
+
+            foreach (var setting in development.Settings.Where(s => s.PortName == port.PortName))
+            {
+                variables[$"Ports__{port.PortName}__{setting.Key}"] = setting.Value;
+            }
+        }
+
+        return variables;
+    }
 
     /// <summary>
     /// The absolute root path of each port the component reads from, keyed by port name. A
