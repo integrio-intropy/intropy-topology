@@ -57,3 +57,16 @@ public enum PortKind
     /// mints; a component that writes to it needs only the settings.</summary>
     External,
 }
+
+/// <summary>What a system store keeps.</summary>
+[System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<StoreRole>))]
+public enum StoreRole
+{
+    /// <summary>Payloads too large to travel inside a message, kept while a pointer travels
+    /// instead (the claim check).</summary>
+    Claim,
+
+    /// <summary>Copies of the payloads components received, kept so an incident or a trace can
+    /// show what arrived.</summary>
+    Archive,
+}

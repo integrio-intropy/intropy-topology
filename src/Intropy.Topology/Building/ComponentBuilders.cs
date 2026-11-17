@@ -63,6 +63,25 @@ public sealed class ExtractorBuilder : ComponentBuilder<ExtractorBuilder, Extrac
         Component.AddPublish(message);
         return this;
     }
+
+    /// <summary>Declares that the extractor claim-checks: a payload too large to travel inside a
+    /// message is kept in the system's claim store while a pointer travels instead. The store is
+    /// minted for the system and scoped to the components that declare this; a component that
+    /// reads claim-checked messages another one wrote must declare it too.</summary>
+    public ExtractorBuilder ClaimChecks()
+    {
+        Component.UseClaimStore();
+        return this;
+    }
+
+    /// <summary>Declares that the extractor archives: it copies the payloads it receives to the
+    /// system's archive store, so an incident or a trace can show what arrived. The store is
+    /// minted for the system and scoped to the components that declare this.</summary>
+    public ExtractorBuilder Archives()
+    {
+        Component.UseArchiveStore();
+        return this;
+    }
 }
 
 /// <summary>Fluent builder for a loader: an edge block that subscribes to one channel —
@@ -116,6 +135,25 @@ public sealed class LoaderBuilder : ComponentBuilder<LoaderBuilder, LoaderCompon
     public LoaderBuilder To(PortRef port)
     {
         Component.AddPort(port, PortDirection.Out);
+        return this;
+    }
+
+    /// <summary>Declares that the loader claim-checks: a payload too large to travel inside a
+    /// message is kept in the system's claim store while a pointer travels instead. The store is
+    /// minted for the system and scoped to the components that declare this; a component that
+    /// reads claim-checked messages another one wrote must declare it too.</summary>
+    public LoaderBuilder ClaimChecks()
+    {
+        Component.UseClaimStore();
+        return this;
+    }
+
+    /// <summary>Declares that the loader archives: it copies the payloads it receives to the
+    /// system's archive store, so an incident or a trace can show what arrived. The store is
+    /// minted for the system and scoped to the components that declare this.</summary>
+    public LoaderBuilder Archives()
+    {
+        Component.UseArchiveStore();
         return this;
     }
 }
@@ -234,6 +272,25 @@ public sealed class TransactionalIntegrationBuilder
     public TransactionalIntegrationBuilder To(PortRef port)
     {
         Component.AddPort(port, PortDirection.Out);
+        return this;
+    }
+
+    /// <summary>Declares that the integration claim-checks: a payload too large to travel inside a
+    /// message is kept in the system's claim store while a pointer travels instead. The store is
+    /// minted for the system and scoped to the components that declare this; a component that
+    /// reads claim-checked messages another one wrote must declare it too.</summary>
+    public TransactionalIntegrationBuilder ClaimChecks()
+    {
+        Component.UseClaimStore();
+        return this;
+    }
+
+    /// <summary>Declares that the integration archives: it copies the payloads it receives to the
+    /// system's archive store, so an incident or a trace can show what arrived. The store is
+    /// minted for the system and scoped to the components that declare this.</summary>
+    public TransactionalIntegrationBuilder Archives()
+    {
+        Component.UseArchiveStore();
         return this;
     }
 }

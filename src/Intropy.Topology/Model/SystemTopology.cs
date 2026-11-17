@@ -33,6 +33,14 @@ public sealed record SystemTopology
     public required IReadOnlyList<ServiceResource> Services { get; init; }
 
     /// <summary>
+    /// The stores the system's components share (the claim store, the archive store), materialized
+    /// from usage and sorted by name; <see langword="null"/> when no component uses one, and then
+    /// omitted when serializing, so the models of systems without a store serialize unchanged.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<StoreResource>? Stores { get; init; }
+
+    /// <summary>
     /// The OTLP export target declared for the system, or <see langword="null"/> when telemetry
     /// goes to each runtime's default sink. Null is deliberately omitted when serializing so a
     /// topology that declares nothing serializes exactly as it did before OTLP was declarable —

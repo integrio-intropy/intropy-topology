@@ -117,6 +117,13 @@ public static class TopologyGenerator
             files.Add(CursorStoreComponent(component));
         }
 
+        // The system's stores are localstorage folders locally, whatever storage backs them
+        // when deployed.
+        foreach (var store in topology.Stores ?? [])
+        {
+            files.Add(StoreComponent(store, hostRoot));
+        }
+
         foreach (var mock in development.Mocks.Where(mock => mock.Target == MockTarget.Service))
         {
             var service = topology.Services.Single(service => service.AppId == mock.Name);
@@ -184,6 +191,22 @@ public static class TopologyGenerator
         var name = component.CursorStore!;
         var yaml = DaprYaml.Component(name, "state.redis", [("redisHost", "localhost:6380")], [component.Name]);
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{name}.yaml", yaml);
+    }
+
+    /// <summary>The folder a store resolves to on a developer machine: <c>test/&lt;store&gt;</c>
+    /// under the system host, next to the folders its file ports conventionally resolve to.</summary>
+    public static string LocalStoreRootPath(string hostRoot, StoreResource store)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(hostRoot);
+        ArgumentNullException.ThrowIfNull(store);
+        return Path.GetFullPath(Path.Combine(hostRoot, "test", store.Name));
+    }
+
+    private static GeneratedFile StoreComponent(StoreResource store, string hostRoot)
+    {
+        var metadata = new List<(string, string)> { ("rootPath", LocalStoreRootPath(hostRoot, store)) };
+        var yaml = DaprYaml.Component(store.Name, "bindings.localstorage", metadata, store.UsedBy);
+        return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{store.Name}.yaml", yaml);
     }
 
     private static GeneratedFile SubscriptionResource(string componentName, string pubSubName, string topicName,
@@ -260,6 +283,8 @@ public static class TopologyGenerator
                     ? null
                     : new { component.InternalQueue.PubSubName, component.InternalQueue.TopicName },
                 component.CursorStore,
+                component.ClaimStore,
+                component.ArchiveStore,
             },
         };
 

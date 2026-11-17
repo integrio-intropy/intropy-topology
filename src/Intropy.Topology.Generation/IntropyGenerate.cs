@@ -94,6 +94,7 @@ public static class IntropyGenerate
         [property: JsonPropertyName("messagegroups")] IReadOnlyList<GraphMessageGroup> MessageGroups,
         IReadOnlyList<GraphPort>? Ports,
         IReadOnlyList<GraphService>? Services,
+        IReadOnlyList<GraphStore>? Stores,
         GraphDevelopment? Development)
     {
         public static GraphDocument From(SystemTopology topology, DevelopmentManifest? development) => new(
@@ -107,6 +108,7 @@ public static class IntropyGenerate
             [.. topology.MessageGroups.Select(GraphMessageGroup.From)],
             Optional(topology.Ports.Select(GraphPort.From)),
             Optional(topology.Services.Select(GraphService.From)),
+            Optional((topology.Stores ?? []).Select(GraphStore.From)),
             development is null ? null : GraphDevelopment.From(development));
     }
 
@@ -149,7 +151,9 @@ public static class IntropyGenerate
         IReadOnlyList<string>? Uses,
         GraphInternalQueue? InternalQueue,
         GraphChannel? Channel,
-        string? CursorStore)
+        string? CursorStore,
+        string? ClaimStore,
+        string? ArchiveStore)
     {
         public static GraphComponent From(ComponentModel component) => new(
             component.Name,
@@ -166,7 +170,9 @@ public static class IntropyGenerate
                 : new GraphInternalQueue(component.InternalQueue.PubSubName, component.InternalQueue.TopicName,
                     SubscriptionRouting.ResourceNameFor(component.Name), SubscriptionRouting.UnhandledPath),
             GraphChannel.From(ComponentChannel.For(component)),
-            component.CursorStore);
+            component.CursorStore,
+            component.ClaimStore,
+            component.ArchiveStore);
     }
 
     /// <summary>The one pubsub and topic the component runs on, as a deployment passes them in
@@ -254,6 +260,19 @@ public static class IntropyGenerate
             Optional(topic.Messages),
             Optional(topic.Publishers),
             Optional(topic.Subscribers));
+    }
+
+    // A store the system's components share. Role is "claim" or "archive". Like a port, it
+    // becomes one Dapr binding whose type is deployment configuration.
+    private sealed record GraphStore(
+        string Name,
+        string Role,
+        IReadOnlyList<string>? UsedBy)
+    {
+        public static GraphStore From(StoreResource store) => new(
+            store.Name,
+            store.Role is StoreRole.Claim ? "claim" : "archive",
+            Optional(store.UsedBy));
     }
 
     private sealed record GraphPort(

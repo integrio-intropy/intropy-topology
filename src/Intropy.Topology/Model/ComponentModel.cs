@@ -53,6 +53,20 @@ public sealed record ComponentModel
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? CursorStore { get; init; }
 
+    /// <summary>
+    /// The system's claim store, when the component declared that it claim-checks;
+    /// <see langword="null"/> otherwise, and then omitted when serializing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ClaimStore { get; init; }
+
+    /// <summary>
+    /// The system's archive store, when the component declared that it archives;
+    /// <see langword="null"/> otherwise, and then omitted when serializing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ArchiveStore { get; init; }
+
     /// <summary>The cursor store's name for <paramref name="componentName"/>.</summary>
     public static string CursorStoreNameFor(string componentName) => $"{componentName}-cursors";
 }
