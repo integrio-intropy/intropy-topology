@@ -29,7 +29,8 @@ internal sealed class PortKindConflictRule : IDeclarationRule
 
 /// <summary>
 /// A cursor store is a Dapr Component in the system's namespace, like a pubsub and a port's
-/// binding, so its minted name must not equal either.
+/// binding, so its minted name must not equal either. Nor may it equal a service's app id: a
+/// service mock renders to the same <c>components/&lt;name&gt;.yaml</c> path.
 /// </summary>
 internal sealed class CursorStoreNameCollisionRule : IModelRule
 {
@@ -38,13 +39,14 @@ internal sealed class CursorStoreNameCollisionRule : IModelRule
         var taken = topology.Topics.Select(t => t.PubSubName)
             .Concat(topology.Components.Select(c => c.InternalQueue?.PubSubName).OfType<string>())
             .Concat(topology.Ports.Select(p => p.DaprComponentName))
+            .Concat(topology.Services.Select(s => s.AppId))
             .ToHashSet(StringComparer.Ordinal);
 
         foreach (var component in topology.Components.Where(c => c.CursorStore is not null && taken.Contains(c.CursorStore)))
         {
             yield return new TopologyDiagnostic(
                 DiagnosticSeverity.Error,
-                $"The cursor store '{component.CursorStore}' minted for component '{component.Name}' has the same name as a pubsub or port; all become Dapr Component names in the same namespace.",
+                $"The cursor store '{component.CursorStore}' minted for component '{component.Name}' has the same name as a pubsub, port, or service; all become Dapr Component names in the same namespace.",
                 component.CursorStore);
         }
     }

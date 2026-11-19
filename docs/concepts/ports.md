@@ -16,7 +16,7 @@ graph LR
 
 Every edge block reaches the outside world through a port. A binding port runs through Dapr: it becomes exactly one Dapr binding component carrying the port's name, never declared separately.
 
-The name is the port's **whole identity**. The binding's deployed `spec.type` — sftp, blob, http — together with its address and credentials, is environment-owned deployment configuration. The topology deliberately does not repeat it: a fact deployment owns and can edit would drift from a second copy declared here, and a drifting topology is an untrusted one. Locally, F5 runs substitute their own resolution through the development definition (every port resolves to a localstorage folder), so the system runs with zero external configuration.
+The name is the port's **whole identity**. The binding's deployed `spec.type` — sftp, blob, http — together with its address and credentials, is environment-owned deployment configuration. The topology deliberately does not repeat it: a fact deployment owns and can edit would drift from a second copy declared here, and a drifting topology is an untrusted one. Locally, F5 runs substitute their own resolution through the development definition (every binding port resolves to a localstorage folder), so the system runs with zero external configuration.
 
 ## Declaring ports
 

@@ -104,4 +104,18 @@ public class ExternalPortTests
         // Assert
         Assert.Contains(exception.Diagnostics, d => d.Target == "x-cursors");
     }
+
+    [Fact]
+    public void Build_WithCursorStoreNamedLikeAService_ShouldFail()
+    {
+        // Act — component "x" mints "x-cursors", which a service's app id already names.
+        var exception = Assert.Throws<TopologyValidationException>(() => Build(b =>
+        {
+            b.AddExtractor("x").From(s_campaigns).Publishes(s_changed).Calls(ServiceRef.Define("x-cursors"));
+            b.AddLoader("y").Subscribes(s_changed);
+        }));
+
+        // Assert
+        Assert.Contains(exception.Diagnostics, d => d.Target == "x-cursors" && d.Message.Contains("cursor store", StringComparison.Ordinal));
+    }
 }

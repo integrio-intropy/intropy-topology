@@ -40,7 +40,7 @@ Messages and ports are declared as static fields in a scaffolded `Messages.cs` /
 
 - **Compile-time legality** — block builders make illegal topology uncompilable. [Learn more](concepts/components.md)
 - **Typed refs** — `MessageRef<T>` names a message's identity, channel, and event contract; `PortRef` names the port an edge block reaches the outside world through; `ServiceRef` names a Dapr service app ID a component invokes. [Learn more](concepts/model.md)
-- **Port-named Dapr bindings** — every port materializes as exactly one Dapr binding component named after the port; local runs resolve it to a host folder. [Learn more](concepts/ports.md)
+- **Port-named Dapr bindings** — every binding port materializes as exactly one Dapr binding component named after the port, and local runs resolve it to a host folder. An external port is reached through the component's own client instead, with no binding. [Learn more](concepts/ports.md)
 - **Collect-all validation** — `Build()` reports every violation at once, never just the first. [Learn more](concepts/validation.md)
 - **Deterministic materialization** — the output model is immutable, sorted, and byte-stable across runs. [Learn more](concepts/materialization.md)
 

@@ -77,11 +77,15 @@ public static class Ports
 }
 ```
 
-All connectivity runs through Dapr — a port never bypasses it. The port's name is its
-whole identity; the deployed binding's `spec.type`, address, and credentials are environment-owned
-deployment configuration the topology deliberately does not repeat. Local runs resolve every
-port to a folder on the host through the development definition, so the system runs with zero
-external configuration.
+A binding port (`PortRef.Define`) runs through Dapr as one binding component named after the
+port. The port's name is its whole identity; the deployed binding's `spec.type`, address, and
+credentials are environment-owned deployment configuration the topology deliberately does not
+repeat. Local runs resolve every binding port to a folder on the host through the development
+definition, so the system runs with zero external configuration.
+
+An external port (`PortRef.DefineExternal`) is a database or API the component reaches through a
+client of its own, with no Dapr binding. Its local values come from `development.Settings(port)`,
+and a component that reads one gets its own Dapr state store for cursors.
 
 ## One model, two backends
 
