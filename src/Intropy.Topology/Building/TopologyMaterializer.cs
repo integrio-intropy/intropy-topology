@@ -20,8 +20,25 @@ internal static class TopologyMaterializer
 
         foreach (var component in builder.Components)
         {
-            components.Add(MaterializeComponent(component, builder.PubSubName, topics, messages, ports, services));
+            components.Add(MaterializeComponent(component, builder.SystemName, builder.PubSubName, topics, messages, ports, services));
         }
+
+        // The stores are the system's own, like its pubsub: one of each, named after the system,
+        // and materialized only when a component uses it.
+        StoreResource? Store(string name, StoreRole role, Func<ComponentModel, string?> used)
+        {
+            var usedBy = components.Where(c => used(c) is not null).Select(c => c.Name).ToArray();
+            return usedBy.Length == 0 ? null : new StoreResource { Name = name, Role = role, UsedBy = usedBy };
+        }
+
+        StoreResource[] stores =
+        [
+            .. new[]
+            {
+                Store(StoreResource.ArchiveStoreNameFor(builder.SystemName), StoreRole.Archive, c => c.ArchiveStore),
+                Store(StoreResource.ClaimStoreNameFor(builder.SystemName), StoreRole.Claim, c => c.ClaimStore),
+            }.OfType<StoreResource>(),
+        ];
 
         return new SystemTopology
         {
@@ -75,12 +92,14 @@ internal static class TopologyMaterializer
                 .OrderBy(s => s.Key, StringComparer.Ordinal)
                 .Select(s => new ServiceResource { AppId = s.Key, Consumers = [.. s.Value.Consumers] })
                 .ToArray(),
+            Stores = stores.Length == 0 ? null : stores,
             Otlp = builder.OtlpDeclaration,
         };
     }
 
     private static ComponentModel MaterializeComponent(
         Component component,
+        string systemName,
         string systemPubSub,
         Dictionary<(string PubSub, string Topic), TopicAccumulator> topics,
         Dictionary<string, MessageAccumulator> messages,
@@ -178,6 +197,8 @@ internal static class TopologyMaterializer
             CursorStore = component.PortCalls.Any(p => p.Port.Kind is PortKind.External && p.Direction is PortDirection.In)
                 ? ComponentModel.CursorStoreNameFor(component.Name)
                 : null,
+            ClaimStore = component.ClaimChecks ? StoreResource.ClaimStoreNameFor(systemName) : null,
+            ArchiveStore = component.Archives ? StoreResource.ArchiveStoreNameFor(systemName) : null,
         };
     }
 

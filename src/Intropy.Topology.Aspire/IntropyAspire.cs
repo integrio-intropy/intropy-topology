@@ -149,6 +149,13 @@ public static class IntropyAspire
             }
         });
 
+        // A store's local folder is nobody's to seed, so nothing else creates it; the
+        // localstorage binding needs it to exist.
+        foreach (var store in topology.Stores ?? [])
+        {
+            Directory.CreateDirectory(TopologyGenerator.LocalStoreRootPath(builder.AppHostDirectory, store));
+        }
+
         var resources = new Dictionary<string, IResourceBuilder<IResource>>(StringComparer.Ordinal);
         var waiters = new Dictionary<string, Action<IResourceBuilder<IResource>>>(StringComparer.Ordinal);
         var unresolved = new List<string>();
@@ -179,7 +186,10 @@ public static class IntropyAspire
             Wire(project, component, stagedPath, configDir, redis,
                 microcks is not null && (component.Uses.Count > 0 || mockReadiness!.MocksAnyPortOf(component)) ? microcks : null,
                 PortRootPaths(builder.AppHostDirectory, component, development),
-                ExternalPortVariables(topology, component, development), topology.Otlp);
+                new Dictionary<string, string>(
+                    [.. ExternalPortVariables(topology, component, development), .. StoreVariables(component)],
+                    StringComparer.Ordinal),
+                topology.Otlp);
             resources[component.Name] = project;
             waiters[component.Name] = dependency => project.WaitFor(dependency);
         }
@@ -480,6 +490,32 @@ public static class IntropyAspire
             }
         }
 
+        return variables;
+    }
+
+    /// <summary>
+    /// The settings that point <paramref name="component"/> at the system stores it uses, keyed by
+    /// variable name. The framework reads a store's adapter from its own configuration section,
+    /// <c>ClaimStore</c> or <c>ArchiveStore</c>, with the settings a port takes: the binding's name
+    /// and its kind, which locally is always a localstorage folder. A deployment sets the same two
+    /// variables for the binding it renders.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, string> StoreVariables(ComponentModel component)
+    {
+        var variables = new Dictionary<string, string>(StringComparer.Ordinal);
+        void Add(string section, string? store)
+        {
+            if (store is null)
+            {
+                return;
+            }
+
+            variables[$"{section}__DaprBindingName"] = store;
+            variables[$"{section}__Kind"] = "Local";
+        }
+
+        Add("ClaimStore", component.ClaimStore);
+        Add("ArchiveStore", component.ArchiveStore);
         return variables;
     }
 

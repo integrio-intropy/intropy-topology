@@ -109,3 +109,28 @@ public sealed record PortResource
     public required IReadOnlyList<string> UsedBy { get; init; }
 }
 
+
+/// <summary>
+/// A store the system's components share, materialized from usage: the claim store or the archive
+/// store. Not a port: no external system touches it, and it has no direction. Like the system's
+/// pubsub it is plumbing the system owns, named after the system and scoped to the components that
+/// declared using it. It materializes as one Dapr binding component; which storage backs it is
+/// deployment configuration, as a port's binding type is.
+/// </summary>
+public sealed record StoreResource
+{
+    /// <summary>The claim store's name for <paramref name="systemName"/>.</summary>
+    public static string ClaimStoreNameFor(string systemName) => $"{systemName}-claim-store";
+
+    /// <summary>The archive store's name for <paramref name="systemName"/>.</summary>
+    public static string ArchiveStoreNameFor(string systemName) => $"{systemName}-archive-store";
+
+    /// <summary>The store's name, which is also its Dapr binding component's name.</summary>
+    public required string Name { get; init; }
+
+    /// <summary>What the store keeps.</summary>
+    public required StoreRole Role { get; init; }
+
+    /// <summary>Names of the components using the store, in declaration order.</summary>
+    public required IReadOnlyList<string> UsedBy { get; init; }
+}

@@ -21,6 +21,8 @@ internal static class TopologyRules
         new Rules.ServiceAppIdCollisionRule(),
         new Rules.EndpointNameCollisionRule(),
         new Rules.CursorStoreNameCollisionRule(),
+        new Rules.StoreNameCollisionRule(),
+        new Rules.ClaimCheckSubscriberRule(),
     ];
 
     private static readonly IDeclarationRule[] DeclarationRules =

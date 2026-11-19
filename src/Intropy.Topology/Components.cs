@@ -43,6 +43,16 @@ public abstract class Component
 
     internal IReadOnlyList<EndpointRef> EndpointCalls => _endpoints;
 
+    /// <summary>Whether the component declared that it claim-checks large payloads.</summary>
+    internal bool ClaimChecks { get; private set; }
+
+    /// <summary>Whether the component declared that it archives the payloads it receives.</summary>
+    internal bool Archives { get; private set; }
+
+    internal void UseClaimStore() => ClaimChecks = true;
+
+    internal void UseArchiveStore() => Archives = true;
+
     internal SubscriptionDeclaration AddSubscription(string componentName)
     {
         var subscription = new SubscriptionDeclaration(componentName);
