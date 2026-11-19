@@ -24,6 +24,7 @@ public sealed class DevelopmentBuilder
     private readonly List<MockDeclaration> _mocks = [];
     private readonly List<FileDeclaration> _files = [];
     private readonly List<RerunDeclaration> _reruns = [];
+    private readonly List<PortSetting> _settings = [];
 
     internal DevelopmentBuilder(SystemTopology topology, string root)
     {
@@ -59,6 +60,7 @@ public sealed class DevelopmentBuilder
             throw new DevelopmentValidationException($"Port '{port.Name}' is not used by the system topology.");
         }
 
+        RequireBindingPort(port, "a mock");
         if (_files.Any(candidate => candidate.PortName == port.Name))
         {
             throw new DevelopmentValidationException(
@@ -90,6 +92,7 @@ public sealed class DevelopmentBuilder
             throw new DevelopmentValidationException($"Port '{port.Name}' is not used by the system topology.");
         }
 
+        RequireBindingPort(port, "a file resolution");
         if (_files.Any(candidate => candidate.PortName == port.Name))
         {
             throw new DevelopmentValidationException($"Port '{port.Name}' has more than one file resolution.");
@@ -104,6 +107,36 @@ public sealed class DevelopmentBuilder
         var declaration = new FileDeclaration(port.Name);
         _files.Add(declaration);
         return new FileBuilder(declaration);
+    }
+
+    /// <summary>
+    /// Declares the local settings of an external port: the values a deployment sets per environment,
+    /// such as the address or connection string of the system it reaches. Each setting reaches every
+    /// component that reads or writes the port as <c>Ports__&lt;port&gt;__&lt;key&gt;</c>. A reader's
+    /// cursor store is set by the host (<c>CursorStore</c>), not here.
+    /// </summary>
+    /// <param name="port">The external port to configure locally.</param>
+    public PortSettingsBuilder Settings(PortRef port)
+    {
+        ArgumentNullException.ThrowIfNull(port);
+        var resource = _topology.Ports.SingleOrDefault(candidate => candidate.Name == port.Name)
+            ?? throw new DevelopmentValidationException($"Port '{port.Name}' is not used by the system topology.");
+        if (resource.Kind is not PortKind.External)
+        {
+            throw new DevelopmentValidationException(
+                $"Port '{port.Name}' is reached through a binding; only an external port takes settings. Resolve it with Files(port) or Mock(port).");
+        }
+
+        return new PortSettingsBuilder(port.Name, _settings);
+    }
+
+    private void RequireBindingPort(PortRef port, string resolution)
+    {
+        if (_topology.Ports.Any(candidate => candidate.Name == port.Name && candidate.Kind is PortKind.External))
+        {
+            throw new DevelopmentValidationException(
+                $"Port '{port.Name}' is external and has no binding to resolve to {resolution}; declare its local values with Settings(port).");
+        }
     }
 
     /// <summary>Declares how often a run-to-completion component is re-run locally.</summary>
@@ -147,6 +180,7 @@ public sealed class DevelopmentBuilder
         }
 
         var unresolved = _topology.Ports
+            .Where(port => port.Kind is PortKind.Binding)
             .Where(port => !_files.Any(file => file.PortName == port.Name)
                 && !_mocks.Any(mock => mock.Target == MockTarget.Port && mock.Name == port.Name))
             .Select(port => port.Name)
@@ -174,7 +208,54 @@ public sealed class DevelopmentBuilder
             mocks.OrderBy(mock => mock.Target).ThenBy(mock => mock.Name, StringComparer.Ordinal).ToArray(),
             files.OrderBy(file => file.PortName, StringComparer.Ordinal).ToArray(),
             _reruns.Select(rerun => new ComponentRerun(rerun.ComponentName, rerun.Delay!.Value))
-                .OrderBy(rerun => rerun.ComponentName, StringComparer.Ordinal).ToArray());
+                .OrderBy(rerun => rerun.ComponentName, StringComparer.Ordinal).ToArray(),
+            _settings.OrderBy(setting => setting.PortName, StringComparer.Ordinal)
+                .ThenBy(setting => setting.Key, StringComparer.Ordinal).ToArray());
+    }
+
+    /// <summary>Sets the local values of one external port.</summary>
+    public sealed class PortSettingsBuilder
+    {
+        /// <summary>The setting the host sets itself, to the component's cursor store.</summary>
+        public const string CursorStoreKey = "CursorStore";
+
+        private static readonly Regex s_key = new("^[A-Za-z][A-Za-z0-9]*$", RegexOptions.CultureInvariant);
+        private readonly string _portName;
+        private readonly List<PortSetting> _settings;
+
+        internal PortSettingsBuilder(string portName, List<PortSetting> settings)
+        {
+            _portName = portName;
+            _settings = settings;
+        }
+
+        /// <summary>Sets one value of the port's configuration section.</summary>
+        /// <param name="key">The setting's name in the port's section, such as <c>ConnectionString</c>: letters and digits, starting with a letter.</param>
+        /// <param name="value">The local value.</param>
+        public PortSettingsBuilder Set(string key, string value)
+        {
+            ArgumentNullException.ThrowIfNull(key);
+            ArgumentNullException.ThrowIfNull(value);
+            if (!s_key.IsMatch(key))
+            {
+                throw new DevelopmentValidationException(
+                    $"Setting '{key}' for port '{_portName}' is not a valid key; use letters and digits, starting with a letter.");
+            }
+
+            if (string.Equals(key, CursorStoreKey, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new DevelopmentValidationException(
+                    $"Setting '{key}' for port '{_portName}' is set by the host to the component's cursor store; do not declare it.");
+            }
+
+            if (_settings.Any(s => s.PortName == _portName && string.Equals(s.Key, key, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new DevelopmentValidationException($"Setting '{key}' for port '{_portName}' is declared more than once.");
+            }
+
+            _settings.Add(new PortSetting(_portName, key, value));
+            return this;
+        }
     }
 
     /// <summary>Configures the OpenAPI artifact for one service or port mock.</summary>
@@ -272,7 +353,39 @@ public sealed class DevelopmentBuilder
 public sealed record DevelopmentManifest(
     IReadOnlyList<OpenApiMock> Mocks,
     IReadOnlyList<PortFileResolution> Files,
-    IReadOnlyList<ComponentRerun> Reruns);
+    IReadOnlyList<ComponentRerun> Reruns,
+    IReadOnlyList<PortSetting> Settings)
+{
+    /// <summary>Creates a manifest without port settings. Kept so code compiled against a version
+    /// without external ports still binds.</summary>
+    public DevelopmentManifest(
+        IReadOnlyList<OpenApiMock> Mocks,
+        IReadOnlyList<PortFileResolution> Files,
+        IReadOnlyList<ComponentRerun> Reruns)
+        : this(Mocks, Files, Reruns, [])
+    {
+    }
+
+    /// <summary>Deconstructs into the three original components, without <see cref="Settings"/>.</summary>
+    public void Deconstruct(
+        out IReadOnlyList<OpenApiMock> Mocks,
+        out IReadOnlyList<PortFileResolution> Files,
+        out IReadOnlyList<ComponentRerun> Reruns)
+    {
+        Mocks = this.Mocks;
+        Files = this.Files;
+        Reruns = this.Reruns;
+    }
+}
+
+/// <summary>
+/// One local value of an external port's configuration. Local-only: never written into the generated
+/// artifacts, since a value such as a connection string is a secret the deployment owns.
+/// </summary>
+/// <param name="PortName">The external port.</param>
+/// <param name="Key">The setting's name in the port's section.</param>
+/// <param name="Value">The local value.</param>
+public sealed record PortSetting(string PortName, string Key, string Value);
 
 /// <summary>
 /// One run-to-completion component's local re-run cadence. Local-only host mechanism: it is

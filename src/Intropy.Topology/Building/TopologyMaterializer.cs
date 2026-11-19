@@ -66,6 +66,7 @@ internal static class TopologyMaterializer
                 .Select(c => new PortResource
                 {
                     Name = c.Key,
+                    Kind = c.Value.Kind,
                     Directions = [.. c.Value.Directions.Order()],
                     UsedBy = [.. c.Value.UsedBy],
                 })
@@ -172,6 +173,11 @@ internal static class TopologyMaterializer
             Endpoints = component.Kind is ComponentKind.Gateway
                 ? [.. component.EndpointCalls.Select(e => new EndpointEdge { EndpointName = e.Name, Path = e.Path })]
                 : null,
+            // Minted from what the component reads, not declared: reading an external port means
+            // keeping a cursor (writing one does not), and the store is the component's own.
+            CursorStore = component.PortCalls.Any(p => p.Port.Kind is PortKind.External && p.Direction is PortDirection.In)
+                ? ComponentModel.CursorStoreNameFor(component.Name)
+                : null,
         };
     }
 
@@ -215,9 +221,10 @@ internal static class TopologyMaterializer
         PortRef port,
         PortDirection direction)
     {
+        // First-seen kind wins; PortKindConflictRule reports a port declared with two kinds.
         if (!ports.TryGetValue(port.Name, out var accumulator))
         {
-            accumulator = new PortAccumulator();
+            accumulator = new PortAccumulator(port.Kind);
             ports[port.Name] = accumulator;
         }
 
@@ -246,8 +253,9 @@ internal static class TopologyMaterializer
         public SortedSet<string> Consumers { get; } = new(StringComparer.Ordinal);
     }
 
-    private sealed class PortAccumulator
+    private sealed class PortAccumulator(PortKind kind)
     {
+        public PortKind Kind { get; } = kind;
         public HashSet<PortDirection> Directions { get; } = [];
         public SortedSet<string> UsedBy { get; } = new(StringComparer.Ordinal);
     }

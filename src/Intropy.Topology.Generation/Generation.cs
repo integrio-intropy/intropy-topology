@@ -103,11 +103,18 @@ public static class TopologyGenerator
         var resolutions = development.Files.ToDictionary(file => file.PortName, StringComparer.Ordinal);
         var portMocks = development.Mocks.Where(mock => mock.Target == MockTarget.Port)
             .ToDictionary(mock => mock.Name, StringComparer.Ordinal);
-        foreach (var port in topology.Ports)
+        // An external port has no binding: the component reaches the system through its own client.
+        foreach (var port in topology.Ports.Where(port => port.Kind is PortKind.Binding))
         {
             files.Add(portMocks.TryGetValue(port.Name, out var portMock)
                 ? MockedBindingComponent(port, portMock)
                 : BindingComponent(port, resolutions[port.Name], hostRoot));
+        }
+
+        // A component reading an external port keeps its cursors in a state store of its own.
+        foreach (var component in topology.Components.Where(c => c.CursorStore is not null))
+        {
+            files.Add(CursorStoreComponent(component));
         }
 
         foreach (var mock in development.Mocks.Where(mock => mock.Target == MockTarget.Service))
@@ -137,7 +144,7 @@ public static class TopologyGenerator
 
         foreach (var component in topology.Components)
         {
-            files.Add(ComponentConfig(topology.SystemName, component));
+            files.Add(ComponentConfig(topology.SystemName, component, topology));
         }
 
         return new GeneratedArtifacts(files);
@@ -168,6 +175,15 @@ public static class TopologyGenerator
         };
         var yaml = DaprYaml.Component(pubSubName, "pubsub.redis", metadata, scopes);
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{pubSubName}.yaml", yaml);
+    }
+
+    private static GeneratedFile CursorStoreComponent(ComponentModel component)
+    {
+        // The local Redis behind the pub/sub also keeps cursors: the run's state lives as long
+        // as the container. Scoped to its component, which is the only reader and writer.
+        var name = component.CursorStore!;
+        var yaml = DaprYaml.Component(name, "state.redis", [("redisHost", "localhost:6380")], [component.Name]);
+        return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{name}.yaml", yaml);
     }
 
     private static GeneratedFile SubscriptionResource(string componentName, string pubSubName, string topicName,
@@ -209,8 +225,10 @@ public static class TopologyGenerator
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{mock.Name}.yaml", yaml);
     }
 
-    private static GeneratedFile ComponentConfig(string systemName, ComponentModel component)
+    private static GeneratedFile ComponentConfig(string systemName, ComponentModel component, SystemTopology topology)
     {
+        var external = topology.Ports.Where(p => p.Kind is PortKind.External).Select(p => p.Name)
+            .ToHashSet(StringComparer.Ordinal);
         var config = new
         {
             Intropy = new
@@ -234,12 +252,14 @@ public static class TopologyGenerator
                 {
                     c.PortName,
                     Direction = c.Direction.ToString(),
-                    DaprComponent = PortResource.DaprComponentNameFor(c.PortName),
+                    Kind = external.Contains(c.PortName) ? PortKind.External.ToString() : null,
+                    DaprComponent = external.Contains(c.PortName) ? null : PortResource.DaprComponentNameFor(c.PortName),
                 }),
                 Uses = component.Uses,
                 InternalQueue = component.InternalQueue is null
                     ? null
                     : new { component.InternalQueue.PubSubName, component.InternalQueue.TopicName },
+                component.CursorStore,
             },
         };
 
