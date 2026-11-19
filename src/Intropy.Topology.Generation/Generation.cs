@@ -162,16 +162,19 @@ public static class TopologyGenerator
         return PubSubComponent(pubSubName, scopes);
     }
 
+    // The local Redis behind both pub/sub and cursor stores. Port 6380 because `dapr init`
+    // publishes its own dapr_redis on the host's 6379.
+    private const string LocalRedisHost = "localhost:6380";
+
     private static GeneratedFile PubSubComponent(string pubSubName, IEnumerable<string> scopes)
     {
         scopes = scopes.OrderBy(n => n, StringComparer.Ordinal);
 
         // Redis Streams with consumer groups: an unacked or RETRY'd message is redelivered
-        // after the component's redeliverInterval instead of being dropped. Port 6380 because
-        // `dapr init` publishes its own dapr_redis on the host's 6379.
+        // after the component's redeliverInterval instead of being dropped.
         var metadata = new[]
         {
-            ("redisHost", "localhost:6380"),
+            ("redisHost", LocalRedisHost),
         };
         var yaml = DaprYaml.Component(pubSubName, "pubsub.redis", metadata, scopes);
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{pubSubName}.yaml", yaml);
@@ -182,7 +185,7 @@ public static class TopologyGenerator
         // The local Redis behind the pub/sub also keeps cursors: the run's state lives as long
         // as the container. Scoped to its component, which is the only reader and writer.
         var name = component.CursorStore!;
-        var yaml = DaprYaml.Component(name, "state.redis", [("redisHost", "localhost:6380")], [component.Name]);
+        var yaml = DaprYaml.Component(name, "state.redis", [("redisHost", LocalRedisHost)], [component.Name]);
         return new GeneratedFile($"{GeneratedArtifacts.ComponentsDir}/{name}.yaml", yaml);
     }
 

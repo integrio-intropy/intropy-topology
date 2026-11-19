@@ -41,7 +41,7 @@ public static class Ports
 }
 ```
 
-The name is the port's whole identity; the deployed binding's type and credentials are environment-owned deployment configuration. Locally, the development definition resolves every port to a folder on the host, so the system runs with zero external configuration. Ports are system-owned and never shared across systems. Direction is not part of the identity — it follows from usage (`From` reads, `To` writes).
+The name is the port's whole identity; the deployed binding's type and credentials are environment-owned deployment configuration. Locally, the development definition resolves every binding port to a folder on the host, so the system runs with zero external configuration. A port reached through the component's own client, such as a database, is declared with `PortRef.DefineExternal` instead; see [external ports](concepts/ports.md#external-ports). Ports are system-owned and never shared across systems. Direction is not part of the identity — it follows from usage (`From` reads, `To` writes).
 
 ## Declare platform services
 
